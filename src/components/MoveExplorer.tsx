@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { calculateMove } from "../lib/calc";
+import { calculateMove, getMoveDetails } from "../lib/calc";
 import { getMoveLibrary } from "../lib/moves";
-import { FieldState, PokemonSet } from "../lib/types";
+import { FieldState, PokemonSet, StatStages } from "../lib/types";
 
-export default function MoveExplorer({ attacker, defender, field }: { attacker: PokemonSet; defender: PokemonSet; field: FieldState }) {
+export default function MoveExplorer({ attacker, defender, field, attackerStages = { atk: 0, def: 0 }, defenderStages = { atk: 0, def: 0 } }: { attacker: PokemonSet; defender: PokemonSet; field: FieldState; attackerStages?: StatStages; defenderStages?: StatStages }) {
   const [query, setQuery] = useState("");
   const [move, setMove] = useState("");
   const [result, setResult] = useState<ReturnType<typeof calculateMove>>(null);
@@ -18,8 +18,8 @@ export default function MoveExplorer({ attacker, defender, field }: { attacker: 
       setResult(null);
       return;
     }
-    setResult(calculateMove(attacker, defender, move, field));
-  }, [attacker, defender, move, field]);
+    setResult(calculateMove(attacker, defender, move, field, attackerStages, defenderStages));
+  }, [attacker, defender, move, field, attackerStages, defenderStages]);
 
   return (
     <section className="panel explorer-panel">
@@ -36,15 +36,18 @@ export default function MoveExplorer({ attacker, defender, field }: { attacker: 
           <option value="">Choose a move</option>
           {filtered.map(name => <option key={name}>{name}</option>)}
         </select>
-        <button className="primary" onClick={() => setResult(move ? calculateMove(attacker, defender, move, field) : null)}>Recalculate</button>
+        <button className="primary" onClick={() => setResult(move ? calculateMove(attacker, defender, move, field, attackerStages, defenderStages) : null)}>Recalculate</button>
       </div>
-      {result && (
-        <div className="explorer-result">
+      {result && (() => {
+        const details = getMoveDetails(result.move);
+        return <div className="explorer-result">
           <strong>{result.move}</strong>
+          {details && <span>{details.type} · {details.category} · BP {details.power ?? "Variable / —"} · Accuracy {details.accuracy === null ? "—" : `${details.accuracy}%`} · PP {details.pp ?? "—"} · Priority {details.priority}</span>}
+          {details && <p>{details.description}</p>}
           <span>{result.min}–{result.max} HP · {result.minPct.toFixed(1)}–{result.maxPct.toFixed(1)}% after hazards · {result.ko}</span>
           <code>{result.description}</code>
-        </div>
-      )}
+        </div>;
+      })()}
     </section>
   );
 }

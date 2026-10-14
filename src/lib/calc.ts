@@ -1,5 +1,5 @@
 import { calculate, Generations, Move, Pokemon, Field, TYPE_CHART } from "@smogon/calc";
-import { DamageSummary, FieldState, PokemonSet, StatId } from "./types";
+import { DamageSummary, FieldState, MoveDetails, PokemonSet, StatStages } from "./types";
 
 const gen = Generations.get(9);
 
@@ -24,7 +24,7 @@ function resolveCalcType(value?: string): CalcType | undefined {
   return isCalcType(trimmed) ? trimmed : undefined;
 }
 
-function makePokemon(set: PokemonSet) {
+function makePokemon(set: PokemonSet, boosts: Partial<Record<"atk" | "def" | "spa" | "spd", number>> = {}) {
   return new Pokemon(gen, set.species, {
     item: set.item.trim() || undefined,
     ability: set.ability.trim() || undefined,
@@ -33,6 +33,7 @@ function makePokemon(set: PokemonSet) {
     teraType: resolveCalcType(set.teraType),
     evs: set.evs,
     ivs: set.ivs,
+    boosts,
   });
 }
 
@@ -54,10 +55,20 @@ function makeField(state: FieldState) {
   });
 }
 
-function flattenNumbers(value: unknown): number[] {
-  if (typeof value === "number") return [value];
-  if (Array.isArray(value)) return value.flatMap(flattenNumbers);
-  return [];
+function damageRange(value: unknown): { min: number; max: number } | null {
+  if (typeof value === "number" && Number.isFinite(value)) return { min: value, max: value };
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const children = value.map(damageRange).filter((item): item is { min: number; max: number } => item !== null);
+  if (!children.length) return null;
+  // A flat array represents the random damage rolls for one hit. Nested arrays
+  // represent successive hits (or component hits), whose damage is additive.
+  if (value.every(item => typeof item === "number")) {
+    return { min: Math.min(...children.map(item => item.min)), max: Math.max(...children.map(item => item.max)) };
+  }
+  return {
+    min: children.reduce((sum, item) => sum + item.min, 0),
+    max: children.reduce((sum, item) => sum + item.max, 0),
+  };
 }
 
 function hasItem(set: PokemonSet, item: string) {
@@ -121,8 +132,10 @@ function cacheKey(
   defender: PokemonSet,
   moveName: string,
   fieldState: FieldState,
+  attackerStages: StatStages,
+  defenderStages: StatStages,
 ) {
-  return JSON.stringify([attacker, defender, moveName, fieldState]);
+  return JSON.stringify([attacker, defender, moveName, fieldState, attackerStages, defenderStages]);
 }
 
 const CACHE_LIMIT = 1500;
@@ -151,22 +164,24 @@ export function calculateMove(
   defender: PokemonSet,
   moveName: string,
   fieldState: FieldState,
+  attackerStages: StatStages = { atk: 0, def: 0 },
+  defenderStages: StatStages = { atk: 0, def: 0 },
 ): DamageSummary | null {
   if (!moveName.trim()) return null;
 
-  const key = cacheKey(attacker, defender, moveName, fieldState);
+  const key = cacheKey(attacker, defender, moveName, fieldState, attackerStages, defenderStages);
   const cached = getCached(key);
   if (cached !== undefined) return cached;
 
   try {
-    const attackerPokemon = makePokemon(attacker);
-    const defenderPokemon = makePokemon(defender);
+    const attackerPokemon = makePokemon(attacker, { atk: attackerStages.atk });
+    const defenderPokemon = makePokemon(defender, { def: defenderStages.def });
     const move = new Move(gen, moveName);
     const field = makeField(fieldState);
     const result = calculate(gen, attackerPokemon, defenderPokemon, move, field);
 
-    const values = flattenNumbers((result as unknown as { damage?: unknown }).damage);
-    if (!values.length) {
+    const range = damageRange((result as unknown as { damage?: unknown }).damage);
+    if (!range) {
       return setCached(key, {
         move: moveName,
         min: 0,
@@ -183,8 +198,8 @@ export function calculateMove(
       });
     }
 
-    const min = Math.min(...values);
-    const max = Math.max(...values);
+    const min = range.min;
+    const max = range.max;
     const maxHp = defenderPokemon.maxHP();
     const entryHazardDamage = getEntryHazardDamage(defender, defenderPokemon, fieldState);
     const effectiveHp = Math.max(1, maxHp - entryHazardDamage);
@@ -227,11 +242,53 @@ function safeDescription(result: unknown, fallback: string) {
   }
 }
 
-function koLabel(minPct: number, maxPct: number) {
-  if (minPct >= 100) return "OHKO";
-  if (maxPct >= 100) return "Possible OHKO";
-  if (minPct >= 50) return "2HKO";
-  if (minPct >= 33.4) return "3HKO";
-  if (minPct >= 25) return "4HKO";
-  return "Not a clean 4HKO";
+export function koLabel(minPct: number, maxPct: number) {
+  if (maxPct <= 0) return "No damage";
+  let guaranteed = 5;
+  let possible = 5;
+  for (let hits = 1; hits <= 4; hits++) {
+    if (minPct * hits >= 100 && guaranteed === 5) guaranteed = hits;
+    if (maxPct * hits >= 100 && possible === 5) possible = hits;
+  }
+  if (possible < guaranteed) return `Possible ${possible}HKO · ${guaranteed <= 4 ? `${guaranteed}HKO` : "4HKO+"}`;
+  return guaranteed <= 4 ? `${guaranteed}HKO` : "4HKO+";
+}
+
+/** Return generation-specific move metadata from the same data bundled with @smogon/calc. */
+export function getMoveDetails(moveName: string): MoveDetails | null {
+  try {
+    const move = new Move(gen, moveName) as unknown as Record<string, unknown>;
+    const moveTable = (gen as unknown as { moves?: { get?: (name: string) => unknown } }).moves;
+    const raw = (moveTable?.get?.(moveName) || {}) as Record<string, unknown>;
+    const text = (value: unknown) => typeof value === "string" ? value : "";
+    const numeric = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : null;
+    return {
+      name: text(move.name) || moveName,
+      type: text(move.type) || text(raw.type) || "Unknown",
+      category: text(move.category) || text(raw.category) || "Unknown",
+      power: numeric(move.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp),
+      accuracy: numeric(move.accuracy) ?? numeric(raw.accuracy),
+      pp: numeric(move.pp) ?? numeric(raw.pp),
+      priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0),
+      description: text(raw.desc) || text(raw.shortDesc) || text(move.desc) || "No description is available in the bundled move data.",
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function getPokemonTypes(set: PokemonSet): string[] {
+  try {
+    return [...new Pokemon(gen, set.species, {
+      item: set.item.trim() || undefined,
+      ability: set.ability.trim() || undefined,
+      nature: set.nature.trim() || undefined,
+      level: set.level || 100,
+      teraType: resolveCalcType(set.teraType),
+      evs: set.evs,
+      ivs: set.ivs,
+    }).types];
+  } catch {
+    return [];
+  }
 }

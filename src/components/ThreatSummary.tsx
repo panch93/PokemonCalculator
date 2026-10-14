@@ -18,7 +18,7 @@ export default function ThreatSummary({ left, right, matchups }: { left: { name:
   return (
     <section className="panel threat-panel">
       <div className="panel-title-row">
-        <div><h2>Threat snapshot</h2><p>Initial heuristic: how many Team A members have a simulated OHKO against each Team B member.</p></div>
+        <div><h2>Threat snapshot</h2><p>Using each Team A member’s selected matrix move, how many have a potential OHKO against each Team B member.</p></div>
       </div>
       <div className="threat-grid">
         {threats.map(t => (

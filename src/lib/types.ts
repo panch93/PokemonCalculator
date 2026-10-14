@@ -29,6 +29,19 @@ export type FieldState = {
   defenderAuroraVeil: boolean;
 };
 
+export type StatStages = { atk: number; def: number };
+
+export type MoveDetails = {
+  name: string;
+  type: string;
+  category: string;
+  power: number | null;
+  accuracy: number | null;
+  pp: number | null;
+  priority: number;
+  description: string;
+};
+
 export type DamageSummary = {
   move: string;
   min: number;
