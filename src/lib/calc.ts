@@ -81,8 +81,6 @@ function makeField(state: FieldState) {
       isReflect: state.defenderReflect,
       isLightScreen: state.defenderLightScreen,
       isAuroraVeil: state.defenderAuroraVeil,
-      isLeechSeeded: state.defenderLeechSeed,
-      isSaltCure: state.defenderSaltCure,
     },
   });
 }
@@ -253,6 +251,11 @@ export function calculateMove(
       ? `Entry hazards remove ${entryHazardDamage} HP (${entryHazardPct.toFixed(1)}%) before this attack.`
       : "No entry-hazard damage is applied before this attack.";
 
+    const residualNotes = [
+      fieldState.defenderLeechSeed ? "Leech Seed is active on the defender; its end-of-turn drain is not included in this direct-damage range." : "",
+      fieldState.defenderSaltCure ? "Salt Cure is active on the defender; its end-of-turn damage is not included in this direct-damage range." : "",
+    ].filter(Boolean).join(" ");
+
     return setCached(key, {
       move: moveName,
       min,
@@ -266,7 +269,7 @@ export function calculateMove(
       entryHazardDamage,
       entryHazardPct,
       ko: koLabel(minPct, maxPct),
-      description: `${safeDescription(result, moveName)} ${hazardText}`,
+      description: `${safeDescription(result, moveName)} ${hazardText}${residualNotes ? ` ${residualNotes}` : ""}`,
     });
   } catch {
     return setCached(key, null);

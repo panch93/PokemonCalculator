@@ -96,7 +96,7 @@ export default function TeamLab() {
     const normalized = team.map(p => ({ ...p, importedTeraType: p.importedTeraType ?? p.teraType ?? "" }));
     while (normalized.length < 6) normalized.push({
       name: `Empty Slot ${normalized.length + 1}`, species: "Pikachu", item: "", ability: "", nature: "Hardy", level: 100,
-      teraType: "", evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
+      teraType: "", importedTeraType: "", evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
       ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: ["Thunderbolt", "", "", ""],
     });
     const nextTeam = normalized.slice(0, 6);
