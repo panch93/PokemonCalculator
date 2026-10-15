@@ -22,8 +22,6 @@ export type Team = PokemonSet[];
 export type FieldState = {
   weather: "" | "Sun" | "Rain" | "Sand" | "Snow";
   terrain: "" | "Electric" | "Grassy" | "Misty" | "Psychic";
-  attackerStealthRock: boolean;
-  attackerSpikes: number;
   defenderStealthRock: boolean;
   defenderSpikes: number;
   defenderReflect: boolean;

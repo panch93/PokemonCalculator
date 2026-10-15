@@ -71,10 +71,6 @@ function makeField(state: FieldState) {
   return new Field({
     weather: state.weather || undefined,
     terrain: state.terrain || undefined,
-    attackerSide: {
-      isSR: state.attackerStealthRock,
-      spikes: state.attackerSpikes,
-    },
     defenderSide: {
       isSR: state.defenderStealthRock,
       spikes: state.defenderSpikes,

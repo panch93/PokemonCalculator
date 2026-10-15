@@ -11,15 +11,14 @@ import MatchupMatrix from "./MatchupMatrix";
 import FieldPanel from "./FieldPanel";
 
 const DEFAULT_FIELD: FieldState = {
-  weather: "", terrain: "", attackerStealthRock: false, attackerSpikes: 0,
-  defenderStealthRock: false, defenderSpikes: 0, defenderReflect: false,
+  weather: "", terrain: "", defenderStealthRock: false, defenderSpikes: 0, defenderReflect: false,
   defenderLightScreen: false, defenderAuroraVeil: false, defenderLeechSeed: false, defenderSaltCure: false,
 };
 const ZERO_STAGES = (): StatStages[] => Array.from({ length: 6 }, () => ({ atk: 0, def: 0 }));
 const initialMoves = (team: Team) => team.map(p => p.moves.find(Boolean) || "");
 const STORAGE_KEY = "pokemon-team-lab-v0.3.0";
 
-type SavedState = { teamA?: Team; teamB?: Team; movesA?: string[]; movesB?: string[]; stagesA?: StatStages[]; stagesB?: StatStages[]; swapped?: boolean; critical?: boolean };
+type SavedState = { schemaVersion?: number; teamA?: Team; teamB?: Team; movesA?: string[]; movesB?: string[]; stagesA?: StatStages[]; stagesB?: StatStages[]; swapped?: boolean; critical?: boolean };
 
 export default function TeamLab() {
   const [left, setLeft] = useState<Team>(sampleTeamA);
@@ -41,8 +40,12 @@ export default function TeamLab() {
     try {
       const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "null") as SavedState | null;
       if (saved) {
-        const savedA = normalizeTeam(saved.teamA) || sampleTeamA;
-        const savedB = normalizeTeam(saved.teamB) || sampleTeamB;
+        // Older releases stored the imported Tera type as already active by default.
+        // Migrate those saves so Terastallization starts disabled, while preserving
+        // deliberate Tera selections in saves written by this version.
+        const resetLegacyTera = saved.schemaVersion !== 2;
+        const savedA = normalizeTeam(saved.teamA, resetLegacyTera) || sampleTeamA;
+        const savedB = normalizeTeam(saved.teamB, resetLegacyTera) || sampleTeamB;
         setLeft(savedA); setRight(savedB);
         if (saved.movesA) setMovesA(reconcileMoves(savedA, saved.movesA));
         else setMovesA(initialMoves(savedA));
@@ -60,7 +63,7 @@ export default function TeamLab() {
   useEffect(() => {
     if (!storageReady) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ teamA: left, teamB: right, movesA, movesB, stagesA, stagesB, swapped, critical }));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 2, teamA: left, teamB: right, movesA, movesB, stagesA, stagesB, swapped, critical }));
     } catch { /* The app still works if storage is disabled or full. */ }
   }, [left, right, movesA, movesB, stagesA, stagesB, swapped, critical, storageReady]);
 
@@ -93,7 +96,7 @@ export default function TeamLab() {
   };
 
   const importTeam = (side: "left" | "right", team: Team) => {
-    const normalized = team.map(p => ({ ...p, importedTeraType: p.importedTeraType ?? p.teraType ?? "" }));
+    const normalized = team.map(p => ({ ...p, teraType: "", importedTeraType: p.importedTeraType ?? p.teraType ?? "" }));
     while (normalized.length < 6) normalized.push({
       name: `Empty Slot ${normalized.length + 1}`, species: "Pikachu", item: "", ability: "", nature: "Hardy", level: 100,
       teraType: "", importedTeraType: "", evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
@@ -156,10 +159,10 @@ export default function TeamLab() {
   );
 }
 
-function normalizeTeam(value: unknown): Team | null {
+function normalizeTeam(value: unknown, resetTera = false): Team | null {
   if (!Array.isArray(value) || value.length !== 6) return null;
   if (!value.every(p => p && typeof p.species === "string" && Array.isArray(p.moves))) return null;
-  return value.map(p => ({ ...p, teraType: p.teraType || "", importedTeraType: p.importedTeraType ?? p.teraType ?? "", dead: Boolean(p.dead) })) as Team;
+  return value.map(p => ({ ...p, teraType: resetTera ? "" : (p.teraType || ""), importedTeraType: p.importedTeraType ?? p.teraType ?? "", dead: Boolean(p.dead) })) as Team;
 }
 
 function reconcileMoves(team: Team, previous: string[]) {

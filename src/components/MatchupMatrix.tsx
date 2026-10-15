@@ -57,8 +57,12 @@ export default function MatchupMatrix(props: Props) {
           const details = move ? getMoveDetails(move) : null;
           const showIdentity = mi === 0;
           return <tr key={`${poke.name}-${row}-${mi}`} className={`${mi === 0 ? "pokemon-block-start" : ""} ${poke.dead ? "fainted-row" : ""} ${poke.teraType ? "tera-attacker" : ""}`}>
-            {mi === 0 && <th className="attacker-sprite-cell" rowSpan={3} title={poke.species}><Sprite pokemon={poke} /><span className="sprite-slot">{row + 1}</span></th>}
-            {showIdentity && <th className="attacker-identity-cell" rowSpan={4}><span className="matrix-pokemon-name">{row + 1}. {poke.name}{poke.dead ? " (Fainted)" : ""}{poke.teraType ? <span className="tera-marker"> TERA</span> : null}</span><span className="type-list">{displayTypes(poke).map(t => <span className={typeClass(t)} key={t}>{t}</span>)}</span><span className="stage-control"><small>Atk stage</small><select value={rowStages[row]?.atk ?? 0} onChange={e => props.onAttackStageChange(row, Number(e.target.value))}>{stageOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></span></th>}
+            {mi === 0 && <th className={`attacker-info-cell ${poke.teraType ? "tera-attacker-info" : ""}`} rowSpan={4} title={poke.species}>
+              <Sprite pokemon={poke} />
+              <span className="matrix-pokemon-name">{row + 1}. {poke.name}{poke.dead ? " (Fainted)" : ""}{poke.teraType ? <span className="tera-marker"> TERA</span> : null}</span>
+              <span className="type-list">{displayTypes(poke).map(t => <span className={typeClass(t)} key={t}>{t}</span>)}</span>
+              <span className="stage-control"><small>Atk stage</small><select value={rowStages[row]?.atk ?? 0} onChange={e => props.onAttackStageChange(row, Number(e.target.value))}>{stageOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></span>
+            </th>}
             <th className="attacker-move-cell"><div className="move-label" title={move ? formatMoveTooltip(move) : "No move assigned"}><strong>{mi + 1}. {move || "—"}</strong>{details && <span className="row-move-meta"><span className={typeClass(details.type)}>{details.type}</span><span>{details.category === "Physical" ? "PHY" : details.category === "Special" ? "SPL" : details.category}</span></span>}</div></th>
             {right.map((_, col) => {
               const item = matchups[row]?.[col];

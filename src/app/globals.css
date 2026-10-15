@@ -178,19 +178,20 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 .pokemon-card-options select { width: auto; max-width: 115px; padding: 4px 6px; font-size: .72rem; }
 .pokemon-card-options .dead-toggle input { width: auto; accent-color: var(--danger); }
 
-/* Compact matrix: sprite/identity and move are separate columns; each damage result stays on one line. */
+/* Compact matrix: one attacker identity column, one move column, then defender damage columns. */
 .matrix { border-collapse: collapse; border-spacing: 0; min-width: 1120px; table-layout: auto; }
 .matrix th, .matrix td { border: 1px solid var(--border); padding: 4px; }
 .matrix thead th { vertical-align: middle; }
-.matrix .corner { min-width: 205px; text-align: left; }
-.matrix .attacker-sprite-cell { width: 74px; min-width: 74px; padding: 2px; text-align: center; vertical-align: middle; position: relative; }
+.matrix .corner { min-width: 310px; text-align: left; }
+.matrix .attacker-info-cell { width: 142px; min-width: 142px; padding: 5px; text-align: center; vertical-align: middle; }
 .matrix-sprite { width: 64px; height: 64px; object-fit: contain; image-rendering: auto; display: block; margin: 0 auto; }
 .sprite-slot { position: absolute; top: 2px; left: 4px; color: var(--muted); font-size: .6rem; }
-.matrix .attacker-identity-cell { width: 132px; min-width: 132px; vertical-align: middle; text-align: left; }
+.matrix .attacker-info-cell .matrix-sprite { width: 64px; height: 58px; }
+.matrix .attacker-info-cell .matrix-pokemon-name { display: block; text-align: left; overflow-wrap: anywhere; }
+.matrix .attacker-info-cell .type-list { justify-content: flex-start; margin: 3px 0; }
+.matrix .attacker-info-cell .stage-control { justify-content: start; grid-template-columns: auto 54px; margin: 3px 0 0; }
+.matrix .attacker-info-cell .stage-control select { width: 54px; }
 .matrix .attacker-move-cell { width: 168px; min-width: 168px; vertical-align: middle; text-align: left; }
-.matrix .attacker-identity-cell .type-list { justify-content: flex-start; margin: 3px 0; }
-.matrix .attacker-identity-cell .stage-control { justify-content: start; grid-template-columns: auto 54px; margin: 3px 0 0; }
-.matrix .attacker-identity-cell .stage-control select { width: 54px; }
 .matrix .move-label { min-height: 0; margin: 0; align-items: flex-start; flex-direction: column; gap: 3px; }
 .matrix .move-label strong { font-size: .72rem; line-height: 1.2; }
 .matrix .row-move-meta { margin-top: 0; }
@@ -216,8 +217,8 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 
 /* Tera state is visually distinct and uses the Tera type as the displayed type. */
 .matrix .tera-active { background: #183329; box-shadow: inset 0 0 0 2px #6ee7b7; }
-.matrix .tera-attacker .attacker-identity-cell,
-.matrix .tera-attacker .attacker-sprite-cell { background: #183329; }
+.matrix .tera-attacker .attacker-info-cell,
+.matrix .attacker-info-cell.tera-attacker-info { background: #183329; }
 .matrix .tera-marker { display: inline-block; margin-left: 3px; color: #6ee7b7; font-size: .55rem; font-weight: 900; letter-spacing: .06em; }
 .matrix .tera-matchup-cell { box-shadow: inset 0 0 0 1px rgba(110,231,183,.22); }
 
