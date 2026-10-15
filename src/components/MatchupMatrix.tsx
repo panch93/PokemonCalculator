@@ -3,97 +3,17 @@
 import { getMoveDetails, getPokemonTypes } from "../lib/calc";
 import { Matchup, PokemonSet, StatStages } from "../lib/types";
 
-type Props = {
-  left: PokemonSet[];
-  right: PokemonSet[];
-  matchups: (Matchup | null)[][];
-  selected: { row: number; col: number } | null;
-  swapped: boolean;
-  rowMoves: string[];
-  rowStages: StatStages[];
-  colStages: StatStages[];
-  onToggleSwap: () => void;
-  onSelect: (row: number, col: number) => void;
-  onMoveChange: (row: number, move: string) => void;
-  onAttackStageChange: (row: number, value: number) => void;
-  onDefenseStageChange: (col: number, value: number) => void;
-};
-
+type Props = { left: PokemonSet[]; right: PokemonSet[]; matchups: (Matchup | null)[][]; selected: { row: number; col: number } | null; swapped: boolean; rowMoves: string[]; rowStages: StatStages[]; colStages: StatStages[]; critical: boolean; onCriticalChange: (value: boolean) => void; onToggleSwap: () => void; onSelect: (row: number, col: number) => void; onMoveChange: (row: number, move: string) => void; onAttackStageChange: (row: number, value: number) => void; onDefenseStageChange: (col: number, value: number) => void };
 const STAGES = Array.from({ length: 13 }, (_, i) => i - 6);
 const stageOptions = STAGES.map(stage => ({ value: String(stage), label: stage > 0 ? `+${stage}` : String(stage) }));
 function typeClass(type: string) { return `type-badge type-${type.toLowerCase().replace(/[^a-z]/g, "")}`; }
-function koClass(ko: string) {
-  if (ko === "No damage") return "ko-none";
-  const tier = ko.includes(" · ") ? ko.split(" · ").pop() || ko : ko;
-  if (tier.includes("1HKO") || tier.includes("OHKO")) return "ko-1";
-  if (tier.includes("2HKO")) return "ko-2";
-  if (tier.includes("3HKO")) return "ko-3";
-  if (tier.includes("4HKO")) return "ko-4";
-  return "ko-5";
-}
-function formatMoveTooltip(name: string) {
-  const detail = getMoveDetails(name);
-  if (!detail) return name;
-  const power = detail.power === null ? "Variable / no direct power" : `Base power: ${detail.power}`;
-  const accuracy = detail.accuracy === null ? "Accuracy: —" : `Accuracy: ${detail.accuracy}%`;
-  const pp = detail.pp === null ? "PP: —" : `PP: ${detail.pp}`;
-  return `${detail.name}\n${detail.type} · ${detail.category}\n${power}\n${accuracy} · ${pp}\nPriority: ${detail.priority}\n\n${detail.description}`;
-}
+function koClass(ko: string) { if (ko === "No damage") return "ko-none"; const tier = ko.includes(" · ") ? ko.split(" · ").pop() || ko : ko; if (tier.includes("1HKO") || tier.includes("OHKO")) return "ko-1"; if (tier.includes("2HKO")) return "ko-2"; if (tier.includes("3HKO")) return "ko-3"; if (tier.includes("4HKO")) return "ko-4"; return "ko-5"; }
+function formatMoveTooltip(name: string) { const d = getMoveDetails(name); if (!d) return name; return `${d.name}\n${d.type} · ${d.category}\n${d.power === null ? "Variable / no direct power" : `Base power: ${d.power}`}\n${d.accuracy === null ? "Accuracy: —" : `Accuracy: ${d.accuracy}%`} · ${d.pp === null ? "PP: —" : `PP: ${d.pp}`}\nPriority: ${d.priority}\n\n${d.description}`; }
 
 export default function MatchupMatrix(props: Props) {
-  const { left, right, matchups, selected, swapped, rowMoves, rowStages, colStages } = props;
-  return (
-    <section className="panel matrix-panel">
-      <div className="panel-title-row">
-        <div><h2>6 × 6 matchup matrix</h2><p>Choose one move per attacking row. Stage changes affect the calculator's stat stages.</p></div>
-        <button onClick={props.onToggleSwap} title="Swap the attacking and defending teams">⇄ {swapped ? "Team B attacks" : "Team A attacks"}</button>
-      </div>
-      <div className="ko-legend" aria-label="KO colour legend">
-        <span className="ko-1">1HKO</span><span className="ko-2">2HKO</span><span className="ko-3">3HKO</span><span className="ko-4">4HKO</span><span className="ko-5">4HKO+</span>
-      </div>
-      <div className="matrix-scroll">
-        <table className="matrix">
-          <thead><tr>
-            <th className="corner">Attacker ↓ / Defender →</th>
-            {right.map((poke, col) => {
-              const types = getPokemonTypes(poke);
-              return <th key={`${poke.name}-${col}`}>
-                <span className="matrix-pokemon-name">{col + 1}. {poke.name}</span>
-                <span className="type-list">{types.map(type => <span className={typeClass(type)} key={type}>{type}</span>)}</span>
-                <span className="stage-control"><small>Def stage</small><select aria-label={`${poke.name} defence stage`} value={colStages[col]?.def ?? 0} onChange={e => props.onDefenseStageChange(col, Number(e.target.value))}>{stageOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></span>
-              </th>;
-            })}
-          </tr></thead>
-          <tbody>{left.map((poke, row) => {
-            const types = getPokemonTypes(poke);
-            const availableMoves = poke.moves.filter(Boolean).slice(0, 4);
-            const selectedMove = rowMoves[row] || availableMoves[0] || "";
-            const details = selectedMove ? getMoveDetails(selectedMove) : null;
-            return <tr key={`${poke.name}-${row}`}>
-              <th className="row-header">
-                <span className="matrix-pokemon-name">{row + 1}. {poke.name}</span>
-                <span className="type-list">{types.map(type => <span className={typeClass(type)} key={type}>{type}</span>)}</span>
-                <span className="stage-control"><small>Atk stage</small><select aria-label={`${poke.name} attack stage`} value={rowStages[row]?.atk ?? 0} onChange={e => props.onAttackStageChange(row, Number(e.target.value))}>{stageOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></span>
-                <select className="row-move-select" aria-label={`${poke.name} selected move`} value={selectedMove} title={selectedMove ? formatMoveTooltip(selectedMove) : "No moves imported"} onChange={e => props.onMoveChange(row, e.target.value)}>
-                  {!availableMoves.length && <option value="">No moves</option>}
-                  {availableMoves.map(move => <option key={move} value={move} title={formatMoveTooltip(move)}>{move}</option>)}
-                </select>
-                {details && <span className="row-move-meta" title={formatMoveTooltip(selectedMove)}><span className={typeClass(details.type)}>{details.type}</span><span>{details.category === "Physical" ? "PHY" : details.category === "Special" ? "SPL" : details.category}</span></span>}
-              </th>
-              {right.map((_, col) => {
-                const item = matchups[row]?.[col];
-                const result = item?.moves.find(move => move.move === selectedMove) || (item?.best?.move === selectedMove ? item.best : undefined);
-                const active = selected?.row === row && selected?.col === col;
-                const tier = result ? koClass(result.ko) : "ko-none";
-                const title = result ? `${selectedMove}\n${result.min}–${result.max} HP · ${result.minPct.toFixed(1)}–${result.maxPct.toFixed(1)}%\n${result.ko}\n${formatMoveTooltip(selectedMove)}` : "No valid result for this move";
-                return <td key={col}><button title={title} className={`matrix-cell ${tier} ${active ? "active" : ""}`} onClick={() => props.onSelect(row, col)}>
-                  {result ? <><strong>{result.maxPct.toFixed(0)}%</strong><small>{selectedMove}</small><em>{result.ko}</em></> : <span>—</span>}
-                </button></td>;
-              })}
-            </tr>;
-          })}</tbody>
-        </table>
-      </div>
-    </section>
-  );
+ const { left, right, matchups, selected, swapped, rowStages, colStages } = props;
+ return <section className="panel matrix-panel"><div className="panel-title-row"><div><h2>6 × 6 matchup matrix</h2><p>All four moves are shown for each attacker. Hover over a move or damage cell for move details and damage rolls.</p></div><div className="button-row"><label className={`crit-toggle ${props.critical ? "active" : ""}`}><input type="checkbox" checked={props.critical} onChange={e => props.onCriticalChange(e.target.checked)}/> Critical hits</label><button onClick={props.onToggleSwap} title="Swap attacking and defending teams">⇄ {swapped ? "Team B attacks" : "Team A attacks"}</button></div></div>
+ <div className="ko-legend"><span className="ko-1">1HKO</span><span className="ko-2">2HKO</span><span className="ko-3">3HKO</span><span className="ko-4">4HKO</span><span className="ko-5">4HKO+</span></div>
+ <div className="matrix-scroll"><table className="matrix"><thead><tr><th className="corner">Attacker / move ↓</th>{right.map((poke,col)=><th key={`${poke.name}-${col}`} className={poke.dead?"fainted-cell":""}><span className="matrix-pokemon-name">{col+1}. {poke.name}{poke.dead?" (Fainted)":""}</span><span className="type-list">{getPokemonTypes(poke).map(t=><span className={typeClass(t)} key={t}>{t}</span>)}</span><span className="stage-control"><small>Def stage</small><select value={colStages[col]?.def??0} onChange={e=>props.onDefenseStageChange(col,Number(e.target.value))}>{stageOptions.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select></span></th>)}</tr></thead>
+ <tbody>{left.map((poke,row)=>{const moves=[...poke.moves.filter(Boolean).slice(0,4)]; while(moves.length<4) moves.push(""); return moves.map((move,mi)=>{const details=move?getMoveDetails(move):null; return <tr key={`${poke.name}-${row}-${mi}`} className={`${mi===0?"pokemon-block-start":""} ${poke.dead?"fainted-row":""}`}><th className="row-header">{mi===0?<><span className="matrix-pokemon-name">{row+1}. {poke.name}{poke.dead?" (Fainted)":""}</span><span className="type-list">{getPokemonTypes(poke).map(t=><span className={typeClass(t)} key={t}>{t}</span>)}</span><span className="stage-control"><small>Atk stage</small><select value={rowStages[row]?.atk??0} onChange={e=>props.onAttackStageChange(row,Number(e.target.value))}>{stageOptions.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select></span></>:null}<div className="move-label" title={move?formatMoveTooltip(move):"No move assigned"}><strong>{mi+1}. {move||"—"}</strong>{details&&<span className="row-move-meta"><span className={typeClass(details.type)}>{details.type}</span><span>{details.category==="Physical"?"PHY":details.category==="Special"?"SPL":details.category}</span></span>}</div></th>{right.map((_,col)=>{const item=matchups[row]?.[col];const result=item?.moves.find(m=>m.move===move);const active=selected?.row===row&&selected?.col===col;const title=result?`${formatMoveTooltip(move)}\n\nDamage range: ${result.min}–${result.max} HP (${result.minPct.toFixed(1)}–${result.maxPct.toFixed(1)}%)\nPossible damage rolls: ${(result.rolls || []).join(", ") || "not available for this move"}\n${result.ko}\n${result.description}`:move?`${formatMoveTooltip(move)}\n\nNo direct damage result for this move.`:"No move assigned";return <td key={col} className={right[col]?.dead?"fainted-cell":""}><button title={title} disabled={!move} className={`matrix-cell compact-cell ${result?koClass(result.ko):"ko-none"} ${active?"active":""} ${poke.dead||right[col]?.dead?"fainted-cell":""}`} onClick={()=>props.onSelect(row,col)}>{result?<><strong>{result.maxPct.toFixed(0)}%</strong><small>{result.minPct.toFixed(0)}–{result.maxPct.toFixed(0)}%</small><em>{result.ko}</em></>:<span>—</span>}</button></td>})}</tr>})})}</tbody></table></div></section>;
 }

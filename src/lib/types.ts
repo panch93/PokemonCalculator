@@ -10,6 +10,7 @@ export type PokemonSet = {
   nature: string;
   level: number;
   teraType?: string;
+  dead?: boolean;
   evs: Stats;
   ivs: Stats;
   moves: string[];
@@ -27,6 +28,8 @@ export type FieldState = {
   defenderReflect: boolean;
   defenderLightScreen: boolean;
   defenderAuroraVeil: boolean;
+  defenderLeechSeed: boolean;
+  defenderSaltCure: boolean;
 };
 
 export type StatStages = { atk: number; def: number };
@@ -46,6 +49,7 @@ export type DamageSummary = {
   move: string;
   min: number;
   max: number;
+  rolls?: number[];
   minPct: number;
   maxPct: number;
   rawMinPct: number;

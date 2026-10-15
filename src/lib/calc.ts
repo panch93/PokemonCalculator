@@ -25,7 +25,7 @@ function resolveCalcType(value?: string): CalcType | undefined {
 }
 
 function makePokemon(set: PokemonSet, boosts: Partial<Record<"atk" | "def" | "spa" | "spd", number>> = {}) {
-  return new Pokemon(gen, set.species, {
+  const pokemon = new Pokemon(gen, set.species, {
     item: set.item.trim() || undefined,
     ability: set.ability.trim() || undefined,
     nature: set.nature.trim() || undefined,
@@ -35,6 +35,9 @@ function makePokemon(set: PokemonSet, boosts: Partial<Record<"atk" | "def" | "sp
     ivs: set.ivs,
     boosts,
   });
+  // Selecting a Tera type means this set is Terastallized; blank/None leaves it normal.
+  if (resolveCalcType(set.teraType)) (pokemon as unknown as { isTera: boolean }).isTera = true;
+  return pokemon;
 }
 
 function makeField(state: FieldState) {
@@ -51,6 +54,8 @@ function makeField(state: FieldState) {
       isReflect: state.defenderReflect,
       isLightScreen: state.defenderLightScreen,
       isAuroraVeil: state.defenderAuroraVeil,
+      isLeechSeeded: state.defenderLeechSeed,
+      isSaltCure: state.defenderSaltCure,
     },
   });
 }
@@ -134,8 +139,9 @@ function cacheKey(
   fieldState: FieldState,
   attackerStages: StatStages,
   defenderStages: StatStages,
+  critical: boolean,
 ) {
-  return JSON.stringify([attacker, defender, moveName, fieldState, attackerStages, defenderStages]);
+  return JSON.stringify([attacker, defender, moveName, fieldState, attackerStages, defenderStages, critical]);
 }
 
 const CACHE_LIMIT = 1500;
@@ -166,10 +172,11 @@ export function calculateMove(
   fieldState: FieldState,
   attackerStages: StatStages = { atk: 0, def: 0 },
   defenderStages: StatStages = { atk: 0, def: 0 },
+  critical = false,
 ): DamageSummary | null {
   if (!moveName.trim()) return null;
 
-  const key = cacheKey(attacker, defender, moveName, fieldState, attackerStages, defenderStages);
+  const key = cacheKey(attacker, defender, moveName, fieldState, attackerStages, defenderStages, critical);
   const cached = getCached(key);
   if (cached !== undefined) return cached;
 
@@ -177,6 +184,7 @@ export function calculateMove(
     const attackerPokemon = makePokemon(attacker, { atk: attackerStages.atk });
     const defenderPokemon = makePokemon(defender, { def: defenderStages.def });
     const move = new Move(gen, moveName);
+    if (critical) (move as unknown as { isCrit: boolean }).isCrit = true;
     const field = makeField(fieldState);
     const result = calculate(gen, attackerPokemon, defenderPokemon, move, field);
 
@@ -200,6 +208,10 @@ export function calculateMove(
 
     const min = range.min;
     const max = range.max;
+    const rawDamage = (result as unknown as { damage?: unknown }).damage;
+    const rolls = Array.isArray(rawDamage) && rawDamage.every(value => typeof value === "number")
+      ? [...new Set(rawDamage as number[])].sort((a, b) => a - b)
+      : undefined;
     const maxHp = defenderPokemon.maxHP();
     const entryHazardDamage = getEntryHazardDamage(defender, defenderPokemon, fieldState);
     const effectiveHp = Math.max(1, maxHp - entryHazardDamage);
@@ -218,6 +230,7 @@ export function calculateMove(
       move: moveName,
       min,
       max,
+      rolls,
       minPct,
       maxPct,
       rawMinPct,

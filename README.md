@@ -2,20 +2,6 @@
 
 A GitHub-ready Next.js static web app for 6v6 Pokémon matchup analysis using `@smogon/calc`.
 
-
---- 6v6 vs 6v6 team workspace
---- Showdown-style team paste import
---- Showdown-style team export
---- 6x6 matchup matrix
---- Click any matchup to inspect every move on the attacking set
---- Damage ranges and percentage ranges from `@smogon/calc`
---- Nature / EV / IV / item / ability / level / Tera support in the set model
---- Field controls for weather, terrain, Stealth Rock, Spikes, Reflect, Light Screen, Aurora Veil
---- Move explorer that attempts to enumerate the current Smogon calc data; it falls back to a curated starter catalog if the installed data layer does not expose enumeration
---- Basic threat/answer summary
---- Fully client-side/static architecture
---- GitHub Pages deployment workflow
-
 ## Features in v0.3.0
 
 - Corrected all React client-component directives.
