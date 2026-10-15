@@ -1,12 +1,10 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { sampleTeamA, sampleTeamB } from "../lib/sample-data";
 import { calculateMove } from "../lib/calc";
-import { exportTeam } from "../lib/team-parser";
 import { FieldState, Matchup, StatStages, Team } from "../lib/types";
 import TeamPastePanel from "./TeamPastePanel";
-import TeamColumn from "./TeamColumn";
 import MatchupMatrix from "./MatchupMatrix";
 import FieldPanel from "./FieldPanel";
 
@@ -23,8 +21,6 @@ type SavedState = { schemaVersion?: number; teamA?: Team; teamB?: Team; movesA?:
 export default function TeamLab() {
   const [left, setLeft] = useState<Team>(sampleTeamA);
   const [right, setRight] = useState<Team>(sampleTeamB);
-  const [leftSelected, setLeftSelected] = useState(0);
-  const [rightSelected, setRightSelected] = useState(0);
   const [field, setField] = useState<FieldState>(DEFAULT_FIELD);
   const [selected, setSelected] = useState({ row: 0, col: 0 });
   const [swapped, setSwapped] = useState(false);
@@ -34,7 +30,7 @@ export default function TeamLab() {
   const [stagesA, setStagesA] = useState<StatStages[]>(ZERO_STAGES);
   const [stagesB, setStagesB] = useState<StatStages[]>(ZERO_STAGES);
   const [storageReady, setStorageReady] = useState(false);
-  const deferredField = useDeferredValue(field);
+  const [teamsOpen, setTeamsOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -69,19 +65,19 @@ export default function TeamLab() {
 
   const matchupsA = useMemo<(Matchup | null)[][]>(() => left.map((attacker, row) => right.map((defender, col) => {
     const moves = attacker.moves.filter(Boolean).slice(0, 4)
-      .map(move => calculateMove(attacker, defender, move, deferredField, stagesA[row], stagesB[col], critical))
+      .map(move => calculateMove(attacker, defender, move, field, stagesA[row], stagesB[col], critical))
       .filter((value): value is NonNullable<typeof value> => Boolean(value));
     const selectedMove = movesA[row];
     return { attacker, defender, moves, best: moves.find(m => m.move === selectedMove) || moves[0] };
-  })), [left, right, deferredField, stagesA, stagesB, movesA, critical]);
+  })), [left, right, field, stagesA, stagesB, movesA, critical]);
 
   const matchupsB = useMemo<(Matchup | null)[][]>(() => right.map((attacker, row) => left.map((defender, col) => {
     const moves = attacker.moves.filter(Boolean).slice(0, 4)
-      .map(move => calculateMove(attacker, defender, move, deferredField, stagesB[row], stagesA[col], critical))
+      .map(move => calculateMove(attacker, defender, move, field, stagesB[row], stagesA[col], critical))
       .filter((value): value is NonNullable<typeof value> => Boolean(value));
     const selectedMove = movesB[row];
     return { attacker, defender, moves, best: moves.find(m => m.move === selectedMove) || moves[0] };
-  })), [left, right, deferredField, stagesA, stagesB, movesB, critical]);
+  })), [left, right, field, stagesA, stagesB, movesB, critical]);
 
   const visibleMatchups = swapped ? matchupsB : matchupsA;
   const rowTeam = swapped ? right : left;
@@ -110,11 +106,7 @@ export default function TeamLab() {
     }
   };
 
-  const downloadTeam = (team: Team, filename: string) => {
-    const blob = new Blob([exportTeam(team)], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
-  };
+
 
   const updateRowMove = (index: number, move: string) => {
     if (swapped) setMovesB(prev => prev.map((value, i) => i === index ? move : value));
@@ -133,28 +125,23 @@ export default function TeamLab() {
     <main>
       <header className="hero">
         <div><span className="eyebrow">BATTLE LAB / GEN 9</span><h1>Pokemon Team Lab</h1><p>6v6 matchup analysis powered by the Smogon damage calculator.</p></div>
-        <div className="hero-actions"><button onClick={() => downloadTeam(left, "team-a.txt")}>Export A</button><button onClick={() => downloadTeam(right, "team-b.txt")}>Export B</button></div>
+        <div className="hero-actions"><button onClick={() => setTeamsOpen(true)}>Teams · Import / Export</button></div>
       </header>
-      <div className="page-grid">
-        <aside className="sidebar">
-          <TeamColumn title="TEAM A" team={left} selected={leftSelected} onUpdate={(i, patch) => updatePokemon("left", i, patch)} onSelect={i => { setLeftSelected(i); setSelected(swapped ? { row: rightSelected, col: i } : { row: i, col: rightSelected }); }} />
-          <TeamColumn title="TEAM B" team={right} selected={rightSelected} onUpdate={(i, patch) => updatePokemon("right", i, patch)} onSelect={i => { setRightSelected(i); setSelected(swapped ? { row: i, col: leftSelected } : { row: leftSelected, col: i }); }} />
-        </aside>
-        <section className="workspace">
-          <TeamPastePanel left={left} right={right} onImport={importTeam} />
-          <FieldPanel value={field} onChange={setField} />
-          <MatchupMatrix
-            left={rowTeam} right={colTeam} matchups={visibleMatchups} selected={selected} swapped={swapped}
-            rowMoves={rowMoves} rowStages={rowStages} colStages={colStages} critical={critical} onCriticalChange={setCritical}
-            onToggleSwap={() => { setSwapped(value => !value); setSelected(value => ({ row: value.col, col: value.row })); }}
-            onSelect={(row, col) => { setSelected({ row, col }); if (swapped) { setRightSelected(row); setLeftSelected(col); } else { setLeftSelected(row); setRightSelected(col); } }}
-            onMoveChange={updateRowMove}
-            onAttackStageChange={(index, value) => updateStage(index, "atk", value, swapped ? "right" : "left")}
-            onDefenseStageChange={(index, value) => updateStage(index, "def", value, swapped ? "left" : "right")}
-          />
-
-        </section>
+      <div className="workspace workspace-full">
+        <FieldPanel value={field} onChange={setField} />
+        <MatchupMatrix
+          left={rowTeam} right={colTeam} matchups={visibleMatchups} selected={selected} swapped={swapped}
+          rowMoves={rowMoves} rowStages={rowStages} colStages={colStages} critical={critical} onCriticalChange={setCritical}
+          onToggleSwap={() => { setSwapped(value => !value); setSelected(value => ({ row: value.col, col: value.row })); }}
+          onSelect={(row, col) => setSelected({ row, col })}
+          onMoveChange={updateRowMove}
+          onAttackStageChange={(index, value) => updateStage(index, "atk", value, swapped ? "right" : "left")}
+          onDefenseStageChange={(index, value) => updateStage(index, "def", value, swapped ? "left" : "right")}
+          onRowPokemonChange={(index, patch) => updatePokemon(swapped ? "right" : "left", index, patch)}
+          onColPokemonChange={(index, patch) => updatePokemon(swapped ? "left" : "right", index, patch)}
+        />
       </div>
+      <TeamPastePanel left={left} right={right} open={teamsOpen} onClose={() => setTeamsOpen(false)} onImport={importTeam} />
     </main>
   );
 }

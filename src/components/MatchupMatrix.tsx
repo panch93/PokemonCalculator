@@ -10,6 +10,7 @@ type Props = {
   critical: boolean; onCriticalChange: (value: boolean) => void; onToggleSwap: () => void;
   onSelect: (row: number, col: number) => void; onMoveChange: (row: number, move: string) => void;
   onAttackStageChange: (row: number, value: number) => void; onDefenseStageChange: (col: number, value: number) => void;
+  onRowPokemonChange: (row: number, patch: Partial<PokemonSet>) => void; onColPokemonChange: (col: number, patch: Partial<PokemonSet>) => void;
 };
 
 const STAGES = Array.from({ length: 13 }, (_, i) => i - 6);
@@ -47,7 +48,8 @@ export default function MatchupMatrix(props: Props) {
     <div className="ko-legend"><span className="ko-1">1HKO</span><span className="ko-2">2HKO</span><span className="ko-3">3HKO</span><span className="ko-4">4HKO</span><span className="ko-5">4HKO+</span></div>
     <div className="matrix-scroll"><table className="matrix">
       <thead><tr><th className="corner" colSpan={2}>Attacker / move ↓</th>{right.map((poke, col) => <th key={`${poke.name}-${col}`} className={`defender-header ${poke.dead ? "fainted-cell" : ""} ${poke.teraType ? "tera-active" : ""}`}>
-        <div className="defender-identity"><Sprite pokemon={poke} /><div><span className="matrix-pokemon-name">{col + 1}. {poke.name}{poke.dead ? " (Fainted)" : ""}{poke.teraType ? <span className="tera-marker"> TERA</span> : null}</span><span className="type-list">{displayTypes(poke).map(t => <span className={typeClass(t)} key={t}>{t}</span>)}</span></div></div>
+        <div className="defender-identity"><Sprite pokemon={poke} /><div><span className="matrix-pokemon-name">{col + 1}. {poke.name}{poke.dead ? " (Fainted)" : ""}{poke.teraType ? <span className="tera-marker"> TERA</span> : null}</span><span className="type-list">{displayTypes(poke).map(t => <span className={typeClass(t)} key={t}>{t}</span>)}</span><small className="matrix-item">{poke.item || "No item"}</small></div></div>
+        <div className="matrix-pokemon-controls"><label>Tera <select aria-label={`${poke.name} Tera type`} value={poke.teraType || ""} disabled={!poke.importedTeraType} onChange={e => props.onColPokemonChange(col, { teraType: e.target.value })}><option value="">None</option>{poke.importedTeraType && <option value={poke.importedTeraType}>{poke.importedTeraType}</option>}</select></label><label className="matrix-dead-control"><input type="checkbox" checked={Boolean(poke.dead)} onChange={e => props.onColPokemonChange(col, { dead: e.target.checked })}/> Fainted</label></div>
         <span className="stage-control"><small>Def stage</small><select value={colStages[col]?.def ?? 0} onChange={e => props.onDefenseStageChange(col, Number(e.target.value))}>{stageOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></span>
       </th>)}</tr></thead>
       <tbody>{left.map((poke, row) => {
@@ -57,10 +59,12 @@ export default function MatchupMatrix(props: Props) {
           const details = move ? getMoveDetails(move) : null;
           const showIdentity = mi === 0;
           return <tr key={`${poke.name}-${row}-${mi}`} className={`${mi === 0 ? "pokemon-block-start" : ""} ${poke.dead ? "fainted-row" : ""} ${poke.teraType ? "tera-attacker" : ""}`}>
-            {mi === 0 && <th className={`attacker-info-cell ${poke.teraType ? "tera-attacker-info" : ""}`} rowSpan={4} title={poke.species}>
+            {mi === 0 && <th className={`attacker-info-cell ${poke.teraType ? "tera-attacker-info" : ""} ${poke.dead ? "fainted-cell" : ""}`} rowSpan={4} title={poke.species}>
               <Sprite pokemon={poke} />
               <span className="matrix-pokemon-name">{row + 1}. {poke.name}{poke.dead ? " (Fainted)" : ""}{poke.teraType ? <span className="tera-marker"> TERA</span> : null}</span>
               <span className="type-list">{displayTypes(poke).map(t => <span className={typeClass(t)} key={t}>{t}</span>)}</span>
+              <small className="matrix-item">{poke.item || "No item"}</small>
+              <div className="matrix-pokemon-controls"><label>Tera <select aria-label={`${poke.name} Tera type`} value={poke.teraType || ""} disabled={!poke.importedTeraType} onChange={e => props.onRowPokemonChange(row, { teraType: e.target.value })}><option value="">None</option>{poke.importedTeraType && <option value={poke.importedTeraType}>{poke.importedTeraType}</option>}</select></label><label className="matrix-dead-control"><input type="checkbox" checked={Boolean(poke.dead)} onChange={e => props.onRowPokemonChange(row, { dead: e.target.checked })}/> Fainted</label></div>
               <span className="stage-control"><small>Atk stage</small><select value={rowStages[row]?.atk ?? 0} onChange={e => props.onAttackStageChange(row, Number(e.target.value))}>{stageOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></span>
             </th>}
             <th className="attacker-move-cell"><div className="move-label" title={move ? formatMoveTooltip(move) : "No move assigned"}><strong>{mi + 1}. {move || "—"}</strong>{details && <span className="row-move-meta"><span className={typeClass(details.type)}>{details.type}</span><span>{details.category === "Physical" ? "PHY" : details.category === "Special" ? "SPL" : details.category}</span></span>}</div></th>

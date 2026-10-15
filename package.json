@@ -1,6 +1,6 @@
 {
   "name": "pokemon-team-lab",
-  "version": "0.4.6",
+  "version": "0.4.8",
   "private": true,
   "description": "Gen 9 Pokemon team matchup matrix with bundled Pok\u00e9mon Showdown move descriptions.",
   "scripts": {
