@@ -1,5 +1,6 @@
 import { calculate, Generations, Move, Pokemon, Field, TYPE_CHART } from "@smogon/calc";
 import { DamageSummary, FieldState, MoveDetails, PokemonSet, StatStages } from "./types";
+import { getMoveDescription } from "./move-descriptions";
 
 const gen = Generations.get(9);
 
@@ -283,7 +284,7 @@ export function getMoveDetails(moveName: string): MoveDetails | null {
       accuracy: numeric(move.accuracy) ?? numeric(raw.accuracy),
       pp: numeric(move.pp) ?? numeric(raw.pp),
       priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0),
-      description: text(raw.desc) || text(raw.shortDesc) || text(move.desc) || "No description is available in the bundled move data.",
+      description: text(raw.desc) || text(raw.shortDesc) || text(move.desc) || getMoveDescription(moveName, { type: text(move.type) || text(raw.type), category: text(move.category) || text(raw.category), power: numeric(move.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp), accuracy: numeric(move.accuracy) ?? numeric(raw.accuracy), priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0) }),
     };
   } catch {
     return null;

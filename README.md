@@ -58,3 +58,10 @@ The workflow installs dependencies, builds the static site, and deploys `out/`.
 `@smogon/calc` calculates the damage of a move against the supplied field state. Entry hazards are represented as side state in the calculator, but their switch-in HP loss is not itself returned as the move's `damage` array. This app therefore calculates the Gen 9 singles entry-hazard HP loss separately and uses the remaining HP for its hazard-adjusted KO percentage.
 
 The current model is intentionally a 6v6 singles analysis lab. It does not yet simulate an entire battle turn-by-turn, recovery across turns, or all switching sequences. The KO tiers are damage-range estimates, not a complete battle simulator.
+
+
+## Version 0.4.1 updates
+
+- Tera controls are restricted to the imported Tera type and None; Pokémon without an imported Tera type cannot change it.
+- The matchup matrix uses separate sprite, Pokémon details, and move columns, with compact single-line damage cells.
+- Move hover descriptions use a local move-summary catalog alongside the bundled calculator metadata.

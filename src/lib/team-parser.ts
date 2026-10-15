@@ -33,6 +33,7 @@ export function parseTeamPaste(input: string): Team {
       nature: "Hardy",
       level: 100,
       teraType: "",
+      importedTeraType: "",
       evs: emptyStats(),
       ivs: defaultIVs(),
       moves: [],
@@ -44,7 +45,7 @@ export function parseTeamPaste(input: string): Team {
       else if (/^IVs:/i.test(line)) set.ivs = { ...defaultIVs(), ...parseStats(line.replace(/^IVs:\s*/i, "")) };
       else if (/^([A-Za-z]+) Nature$/i.test(line)) set.nature = line.replace(/\s+Nature$/i, "");
       else if (/^Level:/i.test(line)) set.level = Number(line.replace(/^Level:\s*/i, "")) || 100;
-      else if (/^Tera Type:/i.test(line)) set.teraType = line.replace(/^Tera Type:\s*/i, "");
+      else if (/^Tera Type:/i.test(line)) { set.teraType = line.replace(/^Tera Type:\s*/i, ""); set.importedTeraType = set.teraType; }
       else if (/^-\s*/.test(line)) set.moves.push(line.replace(/^-\s*/, ""));
     }
 

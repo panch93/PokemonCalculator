@@ -17,7 +17,7 @@ export default function TeamColumn({ title, team, selected, onSelect, onUpdate }
           <span className="poke-main"><strong>{poke.name || poke.species}</strong><small>{poke.species}</small><span className="type-list">{getPokemonTypes(poke).map(type => <span className={typeClass(type)} key={type}>{type}</span>)}</span></span>
           <span className="poke-meta">{poke.item || "No item"}</span>
         </button>
-        <div className="pokemon-card-options"><label>Tera <select aria-label={`${poke.name} Tera type`} value={poke.teraType || ""} onChange={e => onUpdate(index, { teraType: e.target.value })}><option value="">None</option>{TYPES.filter(Boolean).map(type => <option key={type}>{type}</option>)}</select></label><label className="dead-toggle"><input type="checkbox" checked={Boolean(poke.dead)} onChange={e => onUpdate(index, { dead: e.target.checked })}/> Fainted</label></div>
+        <div className="pokemon-card-options"><label>Tera <select aria-label={`${poke.name} Tera type`} value={poke.teraType || ""} disabled={!poke.importedTeraType} onChange={e => onUpdate(index, { teraType: e.target.value })}><option value="">None</option>{poke.importedTeraType && <option value={poke.importedTeraType}>{poke.importedTeraType}</option>}</select></label><label className="dead-toggle"><input type="checkbox" checked={Boolean(poke.dead)} onChange={e => onUpdate(index, { dead: e.target.checked })}/> Fainted</label></div>
       </div>
     ))}</div>
   </section>;

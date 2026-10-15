@@ -177,3 +177,36 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 .pokemon-card-options label { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: .7rem; }
 .pokemon-card-options select { width: auto; max-width: 115px; padding: 4px 6px; font-size: .72rem; }
 .pokemon-card-options .dead-toggle input { width: auto; accent-color: var(--danger); }
+
+/* Compact matrix: sprite/identity and move are separate columns; each damage result stays on one line. */
+.matrix { border-collapse: collapse; border-spacing: 0; min-width: 1120px; table-layout: auto; }
+.matrix th, .matrix td { border: 1px solid var(--border); padding: 4px; }
+.matrix thead th { vertical-align: middle; }
+.matrix .corner { min-width: 205px; text-align: left; }
+.matrix .attacker-sprite-cell { width: 74px; min-width: 74px; padding: 2px; text-align: center; vertical-align: middle; position: relative; }
+.matrix-sprite { width: 64px; height: 64px; object-fit: contain; image-rendering: auto; display: block; margin: 0 auto; }
+.sprite-slot { position: absolute; top: 2px; left: 4px; color: var(--muted); font-size: .6rem; }
+.matrix .attacker-identity-cell { width: 132px; min-width: 132px; vertical-align: middle; text-align: left; }
+.matrix .attacker-move-cell { width: 168px; min-width: 168px; vertical-align: middle; text-align: left; }
+.matrix .attacker-identity-cell .type-list { justify-content: flex-start; margin: 3px 0; }
+.matrix .attacker-identity-cell .stage-control { justify-content: start; grid-template-columns: auto 54px; margin: 3px 0 0; }
+.matrix .attacker-identity-cell .stage-control select { width: 54px; }
+.matrix .move-label { min-height: 0; margin: 0; align-items: flex-start; flex-direction: column; gap: 3px; }
+.matrix .move-label strong { font-size: .72rem; line-height: 1.2; }
+.matrix .row-move-meta { margin-top: 0; }
+.matrix .defender-header { min-width: 118px; }
+.matrix .defender-identity { display: flex; align-items: center; gap: 5px; justify-content: center; min-height: 65px; }
+.matrix .defender-identity .matrix-sprite { width: 56px; height: 56px; flex: 0 0 56px; }
+.matrix .defender-identity > div { min-width: 0; }
+.matrix .defender-identity .matrix-pokemon-name { overflow-wrap: anywhere; }
+.matrix .defender-identity .type-list { justify-content: flex-start; margin: 3px 0; }
+.matrix .defender-header .stage-control { grid-template-columns: auto 48px; justify-content: center; }
+.matrix .defender-header .stage-control select { width: 48px; }
+.matrix .compact-cell { min-height: 30px; height: 30px; width: 100%; padding: 3px 4px; border-radius: 4px; }
+.matrix .damage-inline { display: flex; align-items: center; justify-content: space-between; gap: 5px; width: 100%; white-space: nowrap; }
+.matrix .damage-inline strong { font-size: .7rem; letter-spacing: -.02em; }
+.matrix .damage-inline em { font-size: .58rem; font-style: normal; white-space: nowrap; }
+.matrix tbody tr { height: 36px; }
+.matrix .pokemon-block-start th, .matrix .pokemon-block-start td { border-top-width: 2px; border-top-color: #667487; }
+.matrix .fainted-cell, .matrix .fainted-row .matrix-cell { opacity: .48; filter: grayscale(1); }
+@media (max-width: 700px) { .matrix { min-width: 1120px; } }

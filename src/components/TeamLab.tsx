@@ -93,7 +93,7 @@ export default function TeamLab() {
   };
 
   const importTeam = (side: "left" | "right", team: Team) => {
-    const normalized = [...team];
+    const normalized = team.map(p => ({ ...p, importedTeraType: p.importedTeraType ?? p.teraType ?? "" }));
     while (normalized.length < 6) normalized.push({
       name: `Empty Slot ${normalized.length + 1}`, species: "Pikachu", item: "", ability: "", nature: "Hardy", level: 100,
       teraType: "", evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
@@ -155,7 +155,7 @@ export default function TeamLab() {
 function normalizeTeam(value: unknown): Team | null {
   if (!Array.isArray(value) || value.length !== 6) return null;
   if (!value.every(p => p && typeof p.species === "string" && Array.isArray(p.moves))) return null;
-  return value.map(p => ({ ...p, teraType: p.teraType || "", dead: Boolean(p.dead) })) as Team;
+  return value.map(p => ({ ...p, teraType: p.teraType || "", importedTeraType: p.importedTeraType ?? p.teraType ?? "", dead: Boolean(p.dead) })) as Team;
 }
 
 function reconcileMoves(team: Team, previous: string[]) {

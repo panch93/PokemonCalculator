@@ -10,6 +10,7 @@ export type PokemonSet = {
   nature: string;
   level: number;
   teraType?: string;
+  importedTeraType?: string;
   dead?: boolean;
   evs: Stats;
   ivs: Stats;

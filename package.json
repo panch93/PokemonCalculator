@@ -1,8 +1,8 @@
 {
   "name": "pokemon-team-lab",
-  "version": "0.3.0",
+  "version": "0.4.1",
   "private": true,
-  "description": "GitHub-ready 6v6 Pokemon team matchup lab with stat stages and move-selected matchup matrix powered by @smogon/calc.",
+  "description": "Gen 9 Pokemon team matchup matrix with four-move damage comparisons, Tera options, and move descriptions.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
