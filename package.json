@@ -1,6 +1,6 @@
 {
   "name": "pokemon-team-lab",
-  "version": "0.4.8",
+  "version": "0.5.0",
   "private": true,
   "description": "Gen 9 Pokemon team matchup matrix with bundled Pok\u00e9mon Showdown move descriptions.",
   "scripts": {
@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "check:move-data": "node scripts/check-move-data.mjs"
+    "check:move-data": "node scripts/check-move-data.mjs",
+    "check:field-effects": "node scripts/check-field-effects.cjs"
   },
   "dependencies": {
     "@smogon/calc": "0.12.0",

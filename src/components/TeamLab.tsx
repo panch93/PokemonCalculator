@@ -130,7 +130,7 @@ export default function TeamLab() {
       <div className="workspace workspace-full">
         <FieldPanel value={field} onChange={setField} />
         <MatchupMatrix
-          left={rowTeam} right={colTeam} matchups={visibleMatchups} selected={selected} swapped={swapped}
+          left={rowTeam} right={colTeam} matchups={visibleMatchups} fieldState={field} selected={selected} swapped={swapped}
           rowMoves={rowMoves} rowStages={rowStages} colStages={colStages} critical={critical} onCriticalChange={setCritical}
           onToggleSwap={() => { setSwapped(value => !value); setSelected(value => ({ row: value.col, col: value.row })); }}
           onSelect={(row, col) => setSelected({ row, col })}

@@ -67,16 +67,23 @@ function makePokemon(set: PokemonSet, boosts: Partial<Record<"atk" | "def" | "sp
   return pokemon;
 }
 
+/**
+ * Build a fresh singles field for each attacker-vs-defender calculation.
+ * The UI's hazards/screens always belong to the current defender, regardless
+ * of which team is attacking. Never reuse a Field instance: the calc engine
+ * clones and can mutate side conditions for abilities such as Infiltrator.
+ */
 function makeField(state: FieldState) {
   return new Field({
+    gameType: "Singles",
     weather: state.weather || undefined,
     terrain: state.terrain || undefined,
     defenderSide: {
-      isSR: state.defenderStealthRock,
-      spikes: state.defenderSpikes,
-      isReflect: state.defenderReflect,
-      isLightScreen: state.defenderLightScreen,
-      isAuroraVeil: state.defenderAuroraVeil,
+      isSR: Boolean(state.defenderStealthRock),
+      spikes: Math.max(0, Math.min(3, Number(state.defenderSpikes) || 0)),
+      isReflect: Boolean(state.defenderReflect),
+      isLightScreen: Boolean(state.defenderLightScreen),
+      isAuroraVeil: Boolean(state.defenderAuroraVeil),
     },
   });
 }
@@ -247,9 +254,17 @@ export function calculateMove(
       ? `Entry hazards remove ${entryHazardDamage} HP (${entryHazardPct.toFixed(1)}%) before this attack.`
       : "No entry-hazard damage is applied before this attack.";
 
+    const activeScreensForMove =
+      (fieldState.defenderReflect && move.category === "Physical") ||
+      (fieldState.defenderLightScreen && move.category === "Special") ||
+      fieldState.defenderAuroraVeil;
+    const screenBypassNote = !critical && hasAbility(attacker, "Infiltrator") && activeScreensForMove
+      ? "Infiltrator bypasses the defender's active Reflect, Light Screen, and Aurora Veil; those screens therefore do not reduce this damage."
+      : "";
     const residualNotes = [
       fieldState.defenderLeechSeed ? "Leech Seed is active on the defender; its end-of-turn drain is not included in this direct-damage range." : "",
       fieldState.defenderSaltCure ? "Salt Cure is active on the defender; its end-of-turn damage is not included in this direct-damage range." : "",
+      screenBypassNote,
     ].filter(Boolean).join(" ");
 
     return setCached(key, {
