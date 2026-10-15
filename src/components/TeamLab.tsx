@@ -122,6 +122,10 @@ export default function TeamLab() {
     if (teamSide === "left") setStagesA(updater); else setStagesB(updater);
   };
 
+  // Render the deterministic sample state immediately. Saved browser state is restored
+  // after mount; gating the whole app on storageReady could leave the UI stuck on loading
+  // if a browser extension or storage implementation interferes with the effect.
+
   return (
     <main>
       <header className="hero">
