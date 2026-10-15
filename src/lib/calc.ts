@@ -1,6 +1,32 @@
 import { calculate, Generations, Move, Pokemon, Field, TYPE_CHART } from "@smogon/calc";
+import { Dex } from "@pkmn/dex";
 import { DamageSummary, FieldState, MoveDetails, PokemonSet, StatStages } from "./types";
-import { getMoveDescription } from "./move-descriptions";
+
+/** Read canonical English move descriptions from the bundled pkmn/ps dex data. */
+function getPkmnMoveDescription(name: string): string | undefined {
+  try {
+    const psMove = Dex.moves.get(name) as unknown as { desc?: unknown; shortDesc?: unknown; exists?: boolean };
+    if (psMove?.exists === false) return undefined;
+    if (typeof psMove?.desc === "string" && psMove.desc.trim()) return psMove.desc.trim();
+    if (typeof psMove?.shortDesc === "string" && psMove.shortDesc.trim()) return psMove.shortDesc.trim();
+  } catch {
+    // Fall back to calculator metadata for custom/unknown moves.
+  }
+  return undefined;
+}
+
+/** Defensive fallback for custom/unknown moves absent from the bundled dex. */
+function getMoveDescription(
+  name: string,
+  metadata?: { type?: string; category?: string; power?: number | null; accuracy?: number | null; priority?: number },
+): string {
+  const type = metadata?.type && metadata.type !== "Unknown" ? `${metadata.type}-type` : "move";
+  const category = metadata?.category && metadata.category !== "Unknown" ? ` ${metadata.category.toLowerCase()}` : "";
+  const power = metadata?.power == null ? "variable or no direct" : `${metadata.power}-power`;
+  const accuracy = metadata?.accuracy == null ? "variable" : `${metadata.accuracy}%`;
+  const priority = metadata?.priority ? ` Its priority is ${metadata.priority > 0 ? "+" : ""}${metadata.priority}.` : "";
+  return `${name} is a${category ? ` ${category.trim()}` : ""} ${type} move with ${power} base power and ${accuracy} accuracy.${priority} A full description is not available in the bundled Pokémon Showdown data.`;
+}
 
 const gen = Generations.get(9);
 
@@ -284,7 +310,7 @@ export function getMoveDetails(moveName: string): MoveDetails | null {
       accuracy: numeric(move.accuracy) ?? numeric(raw.accuracy),
       pp: numeric(move.pp) ?? numeric(raw.pp),
       priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0),
-      description: text(raw.desc) || text(raw.shortDesc) || text(move.desc) || getMoveDescription(moveName, { type: text(move.type) || text(raw.type), category: text(move.category) || text(raw.category), power: numeric(move.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp), accuracy: numeric(move.accuracy) ?? numeric(raw.accuracy), priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0) }),
+      description: getPkmnMoveDescription(moveName) || text(raw.desc) || text(raw.shortDesc) || text(move.desc) || getMoveDescription(moveName, { type: text(move.type) || text(raw.type), category: text(move.category) || text(raw.category), power: numeric(move.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp), accuracy: numeric(move.accuracy) ?? numeric(raw.accuracy), priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0) }),
     };
   } catch {
     return null;

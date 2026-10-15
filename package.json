@@ -1,19 +1,21 @@
 {
   "name": "pokemon-team-lab",
-  "version": "0.4.1",
+  "version": "0.4.5",
   "private": true,
-  "description": "Gen 9 Pokemon team matchup matrix with four-move damage comparisons, Tera options, and move descriptions.",
+  "description": "Gen 9 Pokemon team matchup matrix with bundled Pok\u00e9mon Showdown move descriptions.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:move-data": "node scripts/check-move-data.mjs"
   },
   "dependencies": {
     "@smogon/calc": "0.12.0",
     "next": "16.4.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "@pkmn/dex": "^0.10.11"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

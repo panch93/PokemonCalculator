@@ -65,3 +65,11 @@ The current model is intentionally a 6v6 singles analysis lab. It does not yet s
 - Tera controls are restricted to the imported Tera type and None; Pokémon without an imported Tera type cannot change it.
 - The matchup matrix uses separate sprite, Pokémon details, and move columns, with compact single-line damage cells.
 - Move hover descriptions use a local move-summary catalog alongside the bundled calculator metadata.
+
+
+## Version 0.4.5 — move descriptions and deployment checks
+
+- Move hover descriptions now prefer the bundled `@pkmn/dex` move data maintained in the [pkmn/ps](https://github.com/pkmn/ps) project, using the canonical `desc` field and `shortDesc` fallback. The data is bundled at build time; the website does not make live requests to GitHub when a move is hovered.
+- A compact metadata summary remains as a defensive fallback for moves absent from the bundled data.
+- The GitHub Pages workflow now installs dependencies, runs `npm run typecheck`, smoke-tests canonical descriptions for Tackle, Earthquake, Leech Seed, and Salt Cure, and only then runs the static production build. Removed npm caching because this archive does not include a lockfile; this avoids setup-node cache failures caused by a missing lockfile.
+- `@pkmn/dex` is pinned to version `0.10.11` for reproducible dependency resolution. Update that version deliberately to consume newer pkmn/ps data, then validate typecheck and production build before deploying.
