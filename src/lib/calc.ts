@@ -51,7 +51,7 @@ function resolveCalcType(value?: string): CalcType | undefined {
   return isCalcType(trimmed) ? trimmed : undefined;
 }
 
-function makePokemon(set: PokemonSet, boosts: Partial<Record<"atk" | "def" | "spa" | "spd", number>> = {}) {
+function makePokemon(set: PokemonSet, boosts: Partial<Record<"atk" | "def" | "spa" | "spd" | "spe", number>> = {}) {
   const pokemon = new Pokemon(gen, set.species, {
     item: set.item.trim() || undefined,
     ability: set.ability.trim() || undefined,
@@ -199,8 +199,8 @@ export function calculateMove(
   defender: PokemonSet,
   moveName: string,
   fieldState: FieldState,
-  attackerStages: StatStages = { atk: 0, def: 0 },
-  defenderStages: StatStages = { atk: 0, def: 0 },
+  attackerStages: StatStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 },
+  defenderStages: StatStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 },
   critical = false,
 ): DamageSummary | null {
   if (!moveName.trim()) return null;
@@ -210,8 +210,8 @@ export function calculateMove(
   if (cached !== undefined) return cached;
 
   try {
-    const attackerPokemon = makePokemon(attacker, { atk: attackerStages.atk });
-    const defenderPokemon = makePokemon(defender, { def: defenderStages.def });
+    const attackerPokemon = makePokemon(attacker, { atk: attackerStages.atk, spa: attackerStages.spa });
+    const defenderPokemon = makePokemon(defender, { def: defenderStages.def, spd: defenderStages.spd });
     const move = new Move(gen, moveName);
     if (critical) (move as unknown as { isCrit: boolean }).isCrit = true;
     const field = makeField(fieldState);

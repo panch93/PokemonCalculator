@@ -13,7 +13,7 @@ const DEFAULT_FIELD: FieldState = {
   defenderLightScreen: false, defenderAuroraVeil: false, defenderLeechSeed: false, defenderSaltCure: false,
   trickRoom: false, tailwindSide: "",
 };
-const ZERO_STAGES = (): StatStages[] => Array.from({ length: 6 }, () => ({ atk: 0, def: 0 }));
+const ZERO_STAGES = (): StatStages[] => Array.from({ length: 6 }, () => ({ atk: 0, spa: 0, def: 0, spd: 0, spe: 0 }));
 const initialMoves = (team: Team) => team.map(p => p.moves.find(Boolean) || "");
 const STORAGE_KEY = "pokemon-team-lab-v0.3.0";
 
@@ -114,7 +114,7 @@ export default function TeamLab() {
     if (swapped) setMovesB(prev => prev.map((value, i) => i === index ? move : value));
     else setMovesA(prev => prev.map((value, i) => i === index ? move : value));
   };
-  const updateStage = (index: number, stat: "atk" | "def", value: number, teamSide: "left" | "right") => {
+  const updateStage = (index: number, stat: keyof StatStages, value: number, teamSide: "left" | "right") => {
     const updater = (previous: StatStages[]) => previous.map((stage, i) => i === index ? { ...stage, [stat]: value } : stage);
     if (teamSide === "left") setStagesA(updater); else setStagesB(updater);
   };
@@ -137,8 +137,9 @@ export default function TeamLab() {
           onToggleSwap={() => { setSwapped(value => !value); setSelected(value => value ? ({ row: value.col, col: value.row }) : null); }}
           onSelect={(row, col) => setSelected({ row, col })}
           onMoveChange={updateRowMove}
-          onAttackStageChange={(index, value) => updateStage(index, "atk", value, swapped ? "right" : "left")}
-          onDefenseStageChange={(index, value) => updateStage(index, "def", value, swapped ? "left" : "right")}
+          onRowStageChange={(index, stat, value) => updateStage(index, stat, value, swapped ? "right" : "left")}
+          onColStageChange={(index, stat, value) => updateStage(index, stat, value, swapped ? "left" : "right")}
+          onResetStages={() => { setStagesA(ZERO_STAGES()); setStagesB(ZERO_STAGES()); }}
           onRowPokemonChange={(index, patch) => updatePokemon(swapped ? "right" : "left", index, patch)}
           onColPokemonChange={(index, patch) => updatePokemon(swapped ? "left" : "right", index, patch)}
         />
@@ -164,7 +165,7 @@ function reconcileMoves(team: Team, previous: string[]) {
 
 function normalizeStages(stages: StatStages[]): StatStages[] {
   return Array.from({ length: 6 }, (_, i) => ({
-    atk: clampStage(stages[i]?.atk ?? 0), def: clampStage(stages[i]?.def ?? 0),
+    atk: clampStage(stages[i]?.atk ?? 0), spa: clampStage(stages[i]?.spa ?? 0), def: clampStage(stages[i]?.def ?? 0), spd: clampStage(stages[i]?.spd ?? 0), spe: clampStage(stages[i]?.spe ?? 0),
   }));
 }
 function clampStage(value: number) { return Math.max(-6, Math.min(6, Math.round(Number(value) || 0))); }

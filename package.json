@@ -1,6 +1,6 @@
 {
   "name": "pokemon-team-lab",
-  "version": "0.5.6",
+  "version": "0.5.7",
   "private": true,
   "description": "Gen 9 team matchup matrix with Pok\u00e9mon Showdown data-backed battle-order estimates and move priority.",
   "scripts": {

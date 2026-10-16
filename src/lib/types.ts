@@ -34,7 +34,7 @@ export type FieldState = {
   tailwindSide: "" | "attacker" | "defender";
 };
 
-export type StatStages = { atk: number; def: number };
+export type StatStages = { atk: number; spa: number; def: number; spd: number; spe: number };
 
 export type MoveDetails = {
   name: string;

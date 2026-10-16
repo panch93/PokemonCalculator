@@ -5,7 +5,7 @@ import { calculateMove, getMoveDetails } from "../lib/calc";
 import { getMoveLibrary } from "../lib/moves";
 import { FieldState, PokemonSet, StatStages } from "../lib/types";
 
-export default function MoveExplorer({ attacker, defender, field, attackerStages = { atk: 0, def: 0 }, defenderStages = { atk: 0, def: 0 } }: { attacker: PokemonSet; defender: PokemonSet; field: FieldState; attackerStages?: StatStages; defenderStages?: StatStages }) {
+export default function MoveExplorer({ attacker, defender, field, attackerStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 }, defenderStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 } }: { attacker: PokemonSet; defender: PokemonSet; field: FieldState; attackerStages?: StatStages; defenderStages?: StatStages }) {
   const [query, setQuery] = useState("");
   const [move, setMove] = useState("");
   const [result, setResult] = useState<ReturnType<typeof calculateMove>>(null);

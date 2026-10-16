@@ -11,7 +11,7 @@ const ability = (p: PokemonSet, name: string) => clean(p.ability) === clean(name
 const item = (p: PokemonSet, name: string) => clean(p.item) === clean(name);
 
 /** Gen 9 estimated effective Speed using bundled Pokémon Showdown dex data. */
-export function getEffectiveSpeed(p: PokemonSet, field: FieldState, side: "attacker" | "defender" = "attacker"): number {
+export function getEffectiveSpeed(p: PokemonSet, field: FieldState, side: "attacker" | "defender" = "attacker", speedStage = 0): number {
   const species = Dex.species.get(p.species || p.name) as unknown as DexEntry;
   const base = Number(species?.baseStats?.spe);
   if (!Number.isFinite(base)) return 0;
@@ -23,7 +23,11 @@ export function getEffectiveSpeed(p: PokemonSet, field: FieldState, side: "attac
   if (nature?.plus === "spe") speed = Math.floor(speed * 1.1);
   if (nature?.minus === "spe") speed = Math.floor(speed * 0.9);
 
-  // Speed stages aren't currently editable in this UI; other speed-changing battle state
+  const stage = Math.max(-6, Math.min(6, Math.round(speedStage)));
+  if (stage > 0) speed = Math.floor(speed * (2 + stage) / 2);
+  else if (stage < 0) speed = Math.floor(speed * 2 / (2 - stage));
+
+  // Other speed-changing battle state
   // (paralysis, Tailwind, Trick Room, weather abilities activated by other sources) is not represented.
   if (p.status === "par" && !ability(p, "Quick Feet")) speed = Math.floor(speed * 0.5);
   if (ability(p, "Quick Feet") && p.status) speed = Math.floor(speed * 1.5);
@@ -71,7 +75,7 @@ export function getMovePriorityNote(p: PokemonSet, moveName: string, field: Fiel
 }
 
 /** Ratio of effective battle Speed to the Pokémon's unmodified calculated Speed. */
-export function getSpeedMultiplier(p: PokemonSet, field: FieldState, side: "attacker" | "defender" = "attacker"): number {
+export function getSpeedMultiplier(p: PokemonSet, field: FieldState, side: "attacker" | "defender" = "attacker", speedStage = 0): number {
   const species = Dex.species.get(p.species || p.name) as unknown as DexEntry;
   const base = Number(species?.baseStats?.spe);
   if (!Number.isFinite(base)) return 1;
@@ -82,5 +86,5 @@ export function getSpeedMultiplier(p: PokemonSet, field: FieldState, side: "atta
   const nature = Dex.natures.get(p.nature || "Serious") as unknown as DexEntry;
   if (nature?.plus === "spe") raw = Math.floor(raw * 1.1);
   if (nature?.minus === "spe") raw = Math.floor(raw * 0.9);
-  return raw > 0 ? getEffectiveSpeed(p, field, side) / raw : 1;
+  return raw > 0 ? getEffectiveSpeed(p, field, side, speedStage) / raw : 1;
 }

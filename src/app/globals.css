@@ -303,3 +303,24 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 .field-cycle strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: .61rem; font-weight: 750; }
 .field-cycle.active { border-color: #398864; background: #153328; }
 .field-cycle.active strong { color: #6ee7b7; }
+
+
+/* Compact stat-stage controls; the reset is icon-only to preserve matrix space. */
+.matrix .stat-stage-row { display: flex; align-items: center; justify-content: center; gap: 3px; width: 100%; margin: 4px 0 1px; }
+.matrix .stat-stage-row label { display: inline-flex; align-items: center; gap: 2px; color: var(--muted); font-size: .58rem; }
+.matrix .stat-stage-row select { width: 42px; min-width: 0; padding: 2px 1px; font-size: .61rem; }
+.matrix .reset-stages-button { width: 30px; min-width: 30px; padding: 5px 0; font-size: 1.15rem; line-height: 1; }
+.matrix .faint-toggle-name { display: inline-block; width: auto; max-width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--text); font-size: .7rem; font-weight: 750; line-height: 1.2; text-align: inherit; overflow-wrap: anywhere; }
+.matrix .faint-toggle-name:hover { color: var(--danger); border-color: transparent; }
+.matrix .screen-bypass-inline { color: var(--accent); font-size: .58rem; font-weight: 700; }
+.team-name-faint-toggle { cursor: pointer; }
+.team-name-faint-toggle:hover { color: var(--danger); }
+.pokemon-card-options { display: flex; align-items: center; justify-content: flex-start; gap: 8px; }
+.pokemon-card-options label { min-width: 0; }
+.pokemon-card-options select { max-width: 88px; }
+
+.matrix .matrix-pokemon-controls { flex-wrap: nowrap; gap: 4px; }
+.matrix .matrix-pokemon-controls label { gap: 2px; font-size: .58rem; }
+.matrix .matrix-pokemon-controls select { width: 53px; max-width: 53px; padding: 2px; font-size: .6rem; }
+.matrix .matrix-pokemon-controls select { width: 42px; max-width: 42px; padding: 2px 1px; font-size: .56rem; }
+.matrix .matrix-pokemon-controls label { font-size: .55rem; }
