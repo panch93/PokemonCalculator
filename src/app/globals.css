@@ -275,3 +275,10 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 
 /* Explain why screen toggles do not change damage for Infiltrator attackers. */
 .screen-bypass-note { display: block; margin-top: 2px; color: var(--muted, #9a6700); font-size: 0.68rem; line-height: 1.15; font-weight: 650; }
+
+/* Turn-order hints are per attacker/defender matchup, not a team-wide speed claim. */
+.matrix .turn-order { display: inline-flex; align-items: center; justify-content: center; align-self: flex-start; min-width: 20px; height: 18px; padding: 0 4px; border-radius: 4px; font-size: .78rem; font-weight: 800; line-height: 1; }
+.matrix .turn-order.attacker { color: #86efac; background: #123a28; }
+.matrix .turn-order.defender { color: #93c5fd; background: #172f4c; }
+.matrix .turn-order.tie { color: #fde68a; background: #443b18; }
+.matrix .matrix-cell { grid-template-rows: auto auto; justify-items: stretch; }

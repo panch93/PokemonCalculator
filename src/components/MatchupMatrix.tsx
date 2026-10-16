@@ -3,6 +3,7 @@
 import { getMoveDetails, getPokemonTypes } from "../lib/calc";
 import { FieldState, Matchup, PokemonSet, StatStages } from "../lib/types";
 import { formatAbilityTooltip, formatItemTooltip } from "../lib/item-ability-descriptions";
+import { getEffectiveSpeed, getMovePriorityLabel, getMovePriorityNote } from "../lib/battle-order";
 
 type Props = {
   left: PokemonSet[]; right: PokemonSet[]; matchups: (Matchup | null)[][]; fieldState: FieldState;
@@ -33,10 +34,11 @@ function spriteUrl(pokemon: PokemonSet) {
   const id = (pokemon.species || pokemon.name).toLowerCase().replace(/[^a-z0-9]/g, "");
   return `https://play.pokemonshowdown.com/sprites/gen5/${id}.png`;
 }
-function formatMoveTooltip(name: string) {
+function formatMoveTooltip(name: string, pokemon?: PokemonSet, field?: FieldState) {
   const d = getMoveDetails(name);
   if (!d) return name;
-  return `${d.name}\n${d.type} · ${d.category}\n${d.power === null ? "Variable / no direct power" : `Base power: ${d.power}`}\n${d.accuracy === null ? "Accuracy: —" : `Accuracy: ${d.accuracy}%`} · ${d.pp === null ? "PP: —" : `PP: ${d.pp}`}\nPriority: ${d.priority}\n\n${d.description}`;
+  const priority = pokemon && field ? getMovePriorityNote(pokemon, name, field) : `Base priority: ${d.priority}`;
+  return `${d.name}\n${d.type} · ${d.category}\n${d.power === null ? "Variable / no direct power" : `Base power: ${d.power}`}\n${d.accuracy === null ? "Accuracy: —" : `Accuracy: ${d.accuracy}%`} · ${d.pp === null ? "PP: —" : `PP: ${d.pp}`}\n${priority}\n\n${d.description}`;
 }
 function Sprite({ pokemon }: { pokemon: PokemonSet }) {
   return <img className="matrix-sprite" src={spriteUrl(pokemon)} alt={`${pokemon.species} sprite`} loading="lazy" onError={event => { event.currentTarget.style.visibility = "hidden"; }} />;
@@ -46,8 +48,8 @@ export default function MatchupMatrix(props: Props) {
   const { left, right, matchups, selected, swapped, rowStages, colStages, fieldState } = props;
   const anyScreenActive = fieldState.defenderReflect || fieldState.defenderLightScreen || fieldState.defenderAuroraVeil;
   return <section className="panel matrix-panel">
-    <div className="panel-title-row"><div><h2>6 × 6 matchup matrix</h2><p>All four moves are shown for each attacker. Hover over an ability or item for its description, or a move or damage value for move details and damage rolls.</p></div><div className="button-row"><label className={`crit-toggle ${props.critical ? "active" : ""}`}><input type="checkbox" checked={props.critical} onChange={e => props.onCriticalChange(e.target.checked)} /> Critical hits</label><button onClick={props.onToggleSwap} title="Swap attacking and defending teams">⇄ {swapped ? "Team B attacks" : "Team A attacks"}</button></div></div>
-    <div className="ko-legend"><span className="ko-1">1HKO</span><span className="ko-2">2HKO</span><span className="ko-3">3HKO</span><span className="ko-4">4HKO</span><span className="ko-5">4HKO+</span></div>
+    <div className="panel-title-row"><div><h2>6 × 6 matchup matrix</h2><p>All four moves are shown for each attacker. Move brackets show calculated priority; arrows compare effective Speed only and ignore move priority. Hover over moves or arrows for calculation details, and abilities or items for their descriptions.</p></div><div className="button-row"><label className={`crit-toggle ${props.critical ? "active" : ""}`}><input type="checkbox" checked={props.critical} onChange={e => props.onCriticalChange(e.target.checked)} /> Critical hits</label><button onClick={props.onToggleSwap} title="Swap attacking and defending teams">⇄ {swapped ? "Team B attacks" : "Team A attacks"}</button></div></div>
+    <div className="ko-legend"><span className="ko-1">1HKO</span><span className="ko-2">2HKO</span><span className="ko-3">3HKO</span><span className="ko-4">4HKO</span><span className="ko-5">4HKO+</span><span className="turn-order attacker">←</span><small>attacker first</small><span className="turn-order defender">↑</span><small>defender first</small><span className="turn-order tie">↔</span><small>tie</small><small>* conditional priority (Gale Wings assumes full HP)</small></div>
     <div className="matrix-scroll"><table className="matrix">
       <thead><tr><th className="corner" colSpan={2}>Attacker / move ↓</th>{right.map((poke, col) => <th key={`${poke.name}-${col}`} className={`defender-header ${poke.dead ? "fainted-cell" : ""} ${poke.teraType ? "tera-active" : ""}`}>
         <div className="defender-identity"><Sprite pokemon={poke} /><div><span className="matrix-pokemon-name">{col + 1}. {poke.name}{poke.dead ? " (Fainted)" : ""}{poke.teraType ? <span className="tera-marker"> TERA</span> : null}</span><span className="type-list">{displayTypes(poke).map(t => <span className={typeClass(t)} key={t}>{t}</span>)}</span><small className="matrix-item matrix-ability" title={formatAbilityTooltip(poke.ability)}>{poke.ability || "No ability"}</small><small className="matrix-item" title={formatItemTooltip(poke.item)}>{poke.item || "No item"}</small></div></div>
@@ -71,13 +73,18 @@ export default function MatchupMatrix(props: Props) {
               <div className="matrix-pokemon-controls"><label>Tera <select aria-label={`${poke.name} Tera type`} value={poke.teraType || ""} disabled={!poke.importedTeraType} onChange={e => props.onRowPokemonChange(row, { teraType: e.target.value })}><option value="">None</option>{poke.importedTeraType && <option value={poke.importedTeraType}>{poke.importedTeraType}</option>}</select></label><label className="matrix-dead-control"><input type="checkbox" checked={Boolean(poke.dead)} onChange={e => props.onRowPokemonChange(row, { dead: e.target.checked })}/> Fainted</label></div>
               <span className="stage-control"><small>Atk stage</small><select value={rowStages[row]?.atk ?? 0} onChange={e => props.onAttackStageChange(row, Number(e.target.value))}>{stageOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></span>
             </th>}
-            <th className="attacker-move-cell"><div className="move-label" title={move ? formatMoveTooltip(move) : "No move assigned"}><strong>{mi + 1}. {move || "—"}</strong>{details && <span className="row-move-meta"><span className={typeClass(details.type)}>{details.type}</span><span>{details.category === "Physical" ? "PHY" : details.category === "Special" ? "SPL" : details.category}</span></span>}</div></th>
+            <th className="attacker-move-cell"><div className="move-label" title={move ? formatMoveTooltip(move, poke, fieldState) : "No move assigned"}><strong>{mi + 1}. {move || "—"} {move ? getMovePriorityLabel(poke, move, fieldState) : ""}</strong>{details && <span className="row-move-meta"><span className={typeClass(details.type)}>{details.type}</span><span>{details.category === "Physical" ? "PHY" : details.category === "Special" ? "SPL" : details.category}</span></span>}</div></th>
             {right.map((_, col) => {
               const item = matchups[row]?.[col];
               const result = item?.moves.find(m => m.move.toLowerCase() === move.toLowerCase());
               const active = selected?.row === row && selected?.col === col;
-              const title = result ? `${formatMoveTooltip(move)}\n\nDamage range: ${result.min}–${result.max} HP (${result.minPct.toFixed(1)}–${result.maxPct.toFixed(1)}%)\nPossible damage rolls: ${(result.rolls || []).join(", ") || "not available for this move"}\n${result.ko}\n${result.description}` : move ? `${formatMoveTooltip(move)}\n\nNo direct damage result for this move.` : "No move assigned";
-              return <td key={col} className={`${right[col]?.dead ? "fainted-cell" : ""} ${right[col]?.teraType ? "tera-defender-cell" : ""}`}><button title={title} disabled={!move} className={`matrix-cell compact-cell ${result ? koClass(result.ko) : "ko-none"} ${active ? "active" : ""} ${poke.dead || right[col]?.dead ? "fainted-cell" : ""} ${poke.teraType || right[col]?.teraType ? "tera-matchup-cell" : ""}`} onClick={() => props.onSelect(row, col)}>{result ? <span className="damage-inline"><strong>{result.minPct.toFixed(0)}–{result.maxPct.toFixed(0)}%</strong><em>{result.ko}</em></span> : <span>—</span>}</button></td>;
+              const attackerSpeed = getEffectiveSpeed(poke, fieldState);
+              const defenderSpeed = getEffectiveSpeed(right[col], fieldState);
+              const order = attackerSpeed === defenderSpeed ? "tie"
+                : attackerSpeed > defenderSpeed ? "attacker" : "defender";
+              const orderLabel = order === "attacker" ? `${poke.name} is faster` : order === "defender" ? `${right[col].name} is faster` : "Equal Speed";
+              const title = result ? `${formatMoveTooltip(move, poke, fieldState)}\n${getMovePriorityNote(poke, move, fieldState)}\n\nDamage range: ${result.min}–${result.max} HP (${result.minPct.toFixed(1)}–${result.maxPct.toFixed(1)}%)\nPossible damage rolls: ${(result.rolls || []).join(", ") || "not available for this move"}\n${result.ko}\n${result.description}` : move ? `${formatMoveTooltip(move, poke, fieldState)}\n\nNo direct damage result for this move.` : "No move assigned";
+              return <td key={col} className={`${right[col]?.dead ? "fainted-cell" : ""} ${right[col]?.teraType ? "tera-defender-cell" : ""}`}><button title={title} disabled={!move} className={`matrix-cell compact-cell ${result ? koClass(result.ko) : "ko-none"} ${active ? "active" : ""} ${poke.dead || right[col]?.dead ? "fainted-cell" : ""} ${poke.teraType || right[col]?.teraType ? "tera-matchup-cell" : ""}`} onClick={() => props.onSelect(row, col)}>{move && <span className={`turn-order ${order}`} title={`Speed comparison only. ${orderLabel}. Effective Speed: ${attackerSpeed} vs ${defenderSpeed}. Move priority is not considered.`} aria-label={orderLabel}>{order === "attacker" ? "←" : order === "defender" ? "↑" : "↔"}</span>}{result ? <span className="damage-inline"><strong>{result.minPct.toFixed(0)}–{result.maxPct.toFixed(0)}%</strong><em>{result.ko}</em></span> : <span>—</span>}</button></td>;
             })}
           </tr>;
         });
