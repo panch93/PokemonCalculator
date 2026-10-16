@@ -12,6 +12,7 @@ export type PokemonSet = {
   teraType?: string;
   importedTeraType?: string;
   dead?: boolean;
+  status?: "" | "brn" | "par" | "psn" | "tox" | "slp" | "frz";
   evs: Stats;
   ivs: Stats;
   moves: string[];
@@ -29,6 +30,8 @@ export type FieldState = {
   defenderAuroraVeil: boolean;
   defenderLeechSeed: boolean;
   defenderSaltCure: boolean;
+  trickRoom: boolean;
+  tailwindSide: "" | "attacker" | "defender";
 };
 
 export type StatStages = { atk: number; def: number };

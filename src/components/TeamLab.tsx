@@ -11,18 +11,19 @@ import FieldPanel from "./FieldPanel";
 const DEFAULT_FIELD: FieldState = {
   weather: "", terrain: "", defenderStealthRock: false, defenderSpikes: 0, defenderReflect: false,
   defenderLightScreen: false, defenderAuroraVeil: false, defenderLeechSeed: false, defenderSaltCure: false,
+  trickRoom: false, tailwindSide: "",
 };
 const ZERO_STAGES = (): StatStages[] => Array.from({ length: 6 }, () => ({ atk: 0, def: 0 }));
 const initialMoves = (team: Team) => team.map(p => p.moves.find(Boolean) || "");
 const STORAGE_KEY = "pokemon-team-lab-v0.3.0";
 
-type SavedState = { schemaVersion?: number; teamA?: Team; teamB?: Team; movesA?: string[]; movesB?: string[]; stagesA?: StatStages[]; stagesB?: StatStages[]; swapped?: boolean; critical?: boolean };
+type SavedState = { schemaVersion?: number; field?: FieldState; teamA?: Team; teamB?: Team; movesA?: string[]; movesB?: string[]; stagesA?: StatStages[]; stagesB?: StatStages[]; swapped?: boolean; critical?: boolean };
 
 export default function TeamLab() {
   const [left, setLeft] = useState<Team>(sampleTeamA);
   const [right, setRight] = useState<Team>(sampleTeamB);
   const [field, setField] = useState<FieldState>(DEFAULT_FIELD);
-  const [selected, setSelected] = useState({ row: 0, col: 0 });
+  const [selected, setSelected] = useState<{ row: number; col: number } | null>(null);
   const [swapped, setSwapped] = useState(false);
   const [critical, setCritical] = useState(false);
   const [movesA, setMovesA] = useState<string[]>(() => initialMoves(sampleTeamA));
@@ -39,10 +40,11 @@ export default function TeamLab() {
         // Older releases stored the imported Tera type as already active by default.
         // Migrate those saves so Terastallization starts disabled, while preserving
         // deliberate Tera selections in saves written by this version.
-        const resetLegacyTera = saved.schemaVersion !== 2;
+        const resetLegacyTera = saved.schemaVersion !== 2 && saved.schemaVersion !== 3;
         const savedA = normalizeTeam(saved.teamA, resetLegacyTera) || sampleTeamA;
         const savedB = normalizeTeam(saved.teamB, resetLegacyTera) || sampleTeamB;
         setLeft(savedA); setRight(savedB);
+        if (saved.field) setField({ ...DEFAULT_FIELD, ...saved.field, tailwindSide: saved.field.tailwindSide || "", trickRoom: Boolean(saved.field.trickRoom) });
         if (saved.movesA) setMovesA(reconcileMoves(savedA, saved.movesA));
         else setMovesA(initialMoves(savedA));
         if (saved.movesB) setMovesB(reconcileMoves(savedB, saved.movesB));
@@ -59,9 +61,9 @@ export default function TeamLab() {
   useEffect(() => {
     if (!storageReady) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 2, teamA: left, teamB: right, movesA, movesB, stagesA, stagesB, swapped, critical }));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 3, teamA: left, teamB: right, field, movesA, movesB, stagesA, stagesB, swapped, critical }));
     } catch { /* The app still works if storage is disabled or full. */ }
-  }, [left, right, movesA, movesB, stagesA, stagesB, swapped, critical, storageReady]);
+  }, [left, right, field, movesA, movesB, stagesA, stagesB, swapped, critical, storageReady]);
 
   const matchupsA = useMemo<(Matchup | null)[][]>(() => left.map((attacker, row) => right.map((defender, col) => {
     const moves = attacker.moves.filter(Boolean).slice(0, 4)
@@ -132,7 +134,7 @@ export default function TeamLab() {
         <MatchupMatrix
           left={rowTeam} right={colTeam} matchups={visibleMatchups} fieldState={field} selected={selected} swapped={swapped}
           rowMoves={rowMoves} rowStages={rowStages} colStages={colStages} critical={critical} onCriticalChange={setCritical}
-          onToggleSwap={() => { setSwapped(value => !value); setSelected(value => ({ row: value.col, col: value.row })); }}
+          onToggleSwap={() => { setSwapped(value => !value); setSelected(value => value ? ({ row: value.col, col: value.row }) : null); }}
           onSelect={(row, col) => setSelected({ row, col })}
           onMoveChange={updateRowMove}
           onAttackStageChange={(index, value) => updateStage(index, "atk", value, swapped ? "right" : "left")}
@@ -149,7 +151,7 @@ export default function TeamLab() {
 function normalizeTeam(value: unknown, resetTera = false): Team | null {
   if (!Array.isArray(value) || value.length !== 6) return null;
   if (!value.every(p => p && typeof p.species === "string" && Array.isArray(p.moves))) return null;
-  return value.map(p => ({ ...p, teraType: resetTera ? "" : (p.teraType || ""), importedTeraType: p.importedTeraType ?? p.teraType ?? "", dead: Boolean(p.dead) })) as Team;
+  return value.map(p => ({ ...p, teraType: resetTera ? "" : (p.teraType || ""), importedTeraType: p.importedTeraType ?? p.teraType ?? "", dead: Boolean(p.dead), status: p.status || "" })) as Team;
 }
 
 function reconcileMoves(team: Team, previous: string[]) {

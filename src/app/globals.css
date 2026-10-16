@@ -222,7 +222,7 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 .matrix .tera-attacker .attacker-info-cell,
 .matrix .attacker-info-cell.tera-attacker-info { background: #183329; }
 .matrix .tera-marker { display: inline-block; margin-left: 3px; color: #6ee7b7; font-size: .55rem; font-weight: 900; letter-spacing: .06em; }
-.matrix .tera-matchup-cell { box-shadow: inset 0 0 0 1px rgba(110,231,183,.22); }
+
 
 /* Compact battle-field toggles with explicit ON/OFF state. */
 .field-panel { padding: 14px; }
@@ -282,3 +282,24 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 .matrix .turn-order.defender { color: #93c5fd; background: #172f4c; }
 .matrix .turn-order.tie { color: #fde68a; background: #443b18; }
 .matrix .matrix-cell { grid-template-rows: auto auto; justify-items: stretch; }
+
+
+/* Keep speed arrows in a narrow side slot so they do not fill damage cells. */
+.matrix .matchup-cell-layout { display: grid; grid-template-columns: minmax(0, 1fr) 20px; gap: 3px; align-items: stretch; min-width: 0; }
+.matrix .matchup-cell-layout .matrix-cell { min-width: 0; width: 100%; }
+.matrix .speed-arrow { min-width: 0; width: 20px; height: 30px; align-self: center; padding: 0; font-size: .78rem; }
+.matrix .speed-multiplier { display: block; width: fit-content; max-width: 100%; margin: 3px auto; padding: 2px 4px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); font-size: .58rem; white-space: nowrap; }
+.matrix .matrix-pokemon-controls select { width: auto; max-width: 76px; }
+.field-toggle-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.field-toggle { padding: 5px 6px; font-size: .64rem; }
+.field-toggle-state { font-size: .52rem; }
+.field-tailwind { min-width: 0; padding: 3px 5px; font-size: .64rem; }
+.field-tailwind select { min-width: 0; width: auto; max-width: 88px; padding: 3px; font-size: .62rem; }
+@media (max-width: 1100px) { .field-toggle-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .field-toggle-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* Click-to-cycle controls for multi-state battlefield effects. */
+.field-cycle { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 5px; padding: 5px 6px; border: 1px solid var(--border); border-radius: 7px; background: #0c1017; color: var(--muted); font-size: .64rem; text-align: left; }
+.field-cycle strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: .61rem; font-weight: 750; }
+.field-cycle.active { border-color: #398864; background: #153328; }
+.field-cycle.active strong { color: #6ee7b7; }

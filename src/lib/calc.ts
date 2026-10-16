@@ -55,6 +55,7 @@ function makePokemon(set: PokemonSet, boosts: Partial<Record<"atk" | "def" | "sp
   const pokemon = new Pokemon(gen, set.species, {
     item: set.item.trim() || undefined,
     ability: set.ability.trim() || undefined,
+    status: set.status || undefined,
     nature: set.nature.trim() || undefined,
     level: set.level || 100,
     teraType: resolveCalcType(set.teraType),
@@ -261,11 +262,39 @@ export function calculateMove(
     const screenBypassNote = !critical && hasAbility(attacker, "Infiltrator") && activeScreensForMove
       ? "Infiltrator bypasses the defender's active Reflect, Light Screen, and Aurora Veil; those screens therefore do not reduce this damage."
       : "";
+    // Toxic is progressive (1/16, 2/16, ... max HP each turn). Since the
+    // team editor does not track the toxic counter, show the first-turn tick
+    // explicitly and use it for the conditional post-residual KO note.
+    const toxicDamage = defender.status === "tox" && !hasAbility(defender, "Magic Guard") && !hasAbility(defender, "Poison Heal")
+      ? Math.max(1, Math.floor(maxHp / 16))
+      : 0;
+    const damageRolls = rolls?.length ? rolls : null;
+    const toxicKoNote = (() => {
+      if (!toxicDamage) return "";
+      const directGuaranteed = min + entryHazardDamage >= maxHp;
+      const directPossible = max + entryHazardDamage >= maxHp;
+      const toxicGuaranteed = min + entryHazardDamage + toxicDamage >= maxHp;
+      const toxicPossible = max + entryHazardDamage + toxicDamage >= maxHp;
+      if (toxicGuaranteed && !directGuaranteed) return " (guaranteed OHKO after toxic damage)";
+      if (!directPossible && toxicPossible && !damageRolls) return " (possible OHKO after toxic damage; exact roll chance unavailable)";
+      if (damageRolls && !directGuaranteed) {
+        const directChance = damageRolls.filter(roll => roll + entryHazardDamage >= maxHp).length / damageRolls.length;
+        const afterChance = damageRolls.filter(roll => roll + entryHazardDamage + toxicDamage >= maxHp).length / damageRolls.length;
+        if (afterChance > directChance) return ` (${(afterChance * 100).toFixed(1)}% chance to OHKO after toxic damage)`;
+      }
+      return "";
+    })();
+    const baseDescription = safeDescription(result, moveName);
     const residualNotes = [
-      fieldState.defenderLeechSeed ? "Leech Seed is active on the defender; its end-of-turn drain is not included in this direct-damage range." : "",
-      fieldState.defenderSaltCure ? "Salt Cure is active on the defender; its end-of-turn damage is not included in this direct-damage range." : "",
+      fieldState.defenderLeechSeed && !baseDescription.toLowerCase().includes("leech seed") ? "Leech Seed's end-of-turn drain is not included in the direct move damage; its residual damage may further affect the KO." : "",
+      fieldState.defenderSaltCure && !baseDescription.toLowerCase().includes("salt cure") ? "Salt Cure's end-of-turn damage is not included in the direct move damage; its residual damage may further affect the KO." : "",
+      toxicDamage > 0 && !baseDescription.toLowerCase().includes("toxic damage")
+        ? `Toxic removes ${toxicDamage} HP (${(toxicDamage / maxHp * 100).toFixed(1)}% of max HP) on the first toxic turn; the toxic counter is not tracked.${toxicKoNote}`
+        : "",
       screenBypassNote,
     ].filter(Boolean).join(" ");
+    const nativeHazardDescription = /after (stealth rock|spikes|entry hazards)/i.test(baseDescription);
+    const appendedHazardText = entryHazardDamage > 0 && !nativeHazardDescription ? ` ${hazardText}` : "";
 
     return setCached(key, {
       move: moveName,
@@ -280,7 +309,7 @@ export function calculateMove(
       entryHazardDamage,
       entryHazardPct,
       ko: koLabel(minPct, maxPct),
-      description: `${safeDescription(result, moveName)} ${hazardText}${residualNotes ? ` ${residualNotes}` : ""}`,
+      description: `${baseDescription}${appendedHazardText}${residualNotes ? ` ${residualNotes}` : ""}`,
     });
   } catch {
     return setCached(key, null);
