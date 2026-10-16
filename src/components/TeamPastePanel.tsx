@@ -36,7 +36,7 @@ function AutocompleteInput({ value, options, onChange, ariaLabel }: Autocomplete
   const [open, setOpen] = useState(false);
   const matches = useMemo(() => {
     const query = value.trim().toLowerCase();
-    return (query ? options.filter(option => option.toLowerCase().includes(query)) : options).slice(0, 4);
+    return (query ? options.filter(option => option.toLowerCase().includes(query)) : options);
   }, [options, value]);
   return <span className="builder-autocomplete">
     <input aria-label={ariaLabel} value={value} onFocus={() => setOpen(true)} onChange={event => { onChange(event.target.value); setOpen(true); }} onKeyDown={event => { if (event.key === "Escape") setOpen(false); if (event.key === "ArrowDown" && matches.length) setOpen(true); }} />

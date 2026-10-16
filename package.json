@@ -1,6 +1,6 @@
 {
   "name": "pokemon-team-lab",
-  "version": "0.5.14",
+  "version": "0.5.15",
   "private": true,
   "description": "Gen 9 team matchup matrix with a native team builder with autocomplete, Smogon meta-set presets, and Showdown paste import/export.",
   "scripts": {
