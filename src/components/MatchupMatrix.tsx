@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { getMoveDetails, getPokemonTypes } from "../lib/calc";
+import { calculateMove, getMoveDetails, getPokemonTypes } from "../lib/calc";
 import { FieldState, Matchup, PokemonSet, StatStages } from "../lib/types";
 import { formatAbilityTooltip, formatItemTooltip } from "../lib/item-ability-descriptions";
 import { getEffectiveSpeed, getMovePriorityLabel, getMovePriorityNote } from "../lib/battle-order";
@@ -46,6 +46,7 @@ function Sprite({ pokemon }: { pokemon: PokemonSet }) {
 }
 
 type SpeedEditor = { row: number; col: number };
+type MoveEditor = { row: number; col: number; move: string };
 const SPEED_ITEMS = ["Choice Scarf", "Iron Ball", "Macho Brace", "Power Anklet", "Power Band", "Power Belt", "Power Bracer", "Power Lens", "Power Weight"];
 function natureSpeedEffect(nature: string) {
   if (["Jolly", "Timid", "Hasty", "Naive"].includes(nature)) return "boosted";
@@ -62,9 +63,34 @@ function speedNatureFor(effect: string, current: string) {
 }
 function isSpeedItem(item: string) { return SPEED_ITEMS.some(name => name.toLowerCase() === item.trim().toLowerCase()); }
 
+const clampEV = (value: number) => Math.max(0, Math.min(252, Math.round(Number(value) || 0)));
+function statNatureEffect(nature: string, stat: string) {
+  const natures: Record<string, [string, string]> = { Adamant:["atk","spa"], Brave:["atk","spe"], Lonely:["atk","def"], Naughty:["atk","spd"], Modest:["spa","atk"], Quiet:["spa","spe"], Mild:["spa","def"], Rash:["spa","spd"], Bold:["def","atk"], Relaxed:["def","spe"], Impish:["def","spa"], Lax:["def","spd"], Calm:["spd","atk"], Sassy:["spd","spe"], Careful:["spd","spa"], Gentle:["spd","def"], Timid:["spe","atk"], Hasty:["spe","def"], Jolly:["spe","spa"], Naive:["spe","spd"] };
+  const effect = natures[nature]; return effect?.[0] === stat ? "boosted" : effect?.[1] === stat ? "hindered" : "unaffected";
+}
+function natureForStat(effect: string, stat: string, current: string) {
+  const list: Record<string, {boosted:string; hindered:string; neutral:string}> = {
+    atk:{boosted:"Adamant",hindered:"Modest",neutral:"Hardy"}, spa:{boosted:"Modest",hindered:"Adamant",neutral:"Hardy"},
+    def:{boosted:"Bold",hindered:"Lonely",neutral:"Hardy"}, spd:{boosted:"Calm",hindered:"Naughty",neutral:"Hardy"}, spe:{boosted:"Timid",hindered:"Brave",neutral:"Hardy"}
+  };
+  if (statNatureEffect(current, stat) === effect) return current;
+  return list[stat]?.[effect as "boosted" | "hindered" | "neutral"] || "Hardy";
+}
+const PHYSICAL_ATTACK_ITEMS = ["Choice Band", "Life Orb", "Muscle Band", "Expert Belt"];
+const SPECIAL_ATTACK_ITEMS = ["Choice Specs", "Life Orb", "Wise Glasses", "Expert Belt", "Throat Spray"];
+const PHYSICAL_DEFENSE_ITEMS = ["Eviolite", "Chilan Berry", "Occa Berry", "Kasib Berry", "Babiri Berry", "Colbur Berry", "Charti Berry", "Coba Berry", "Payapa Berry", "Rindo Berry", "Shuca Berry", "Tanga Berry", "Wacan Berry", "Yache Berry"];
+const SPECIAL_DEFENSE_ITEMS = ["Eviolite", "Assault Vest", "Chilan Berry", "Occa Berry", "Kasib Berry", "Babiri Berry", "Colbur Berry", "Charti Berry", "Coba Berry", "Payapa Berry", "Rindo Berry", "Shuca Berry", "Tanga Berry", "Wacan Berry", "Yache Berry"];
 export default function MatchupMatrix(props: Props) {
   const { left, right, matchups, selected, swapped, rowStages, colStages, fieldState } = props;
   const [speedEditor, setSpeedEditor] = useState<SpeedEditor | null>(null);
+  const [moveEditor, setMoveEditor] = useState<MoveEditor | null>(null);
+  const [moveAtkEvs, setMoveAtkEvs] = useState(0);
+  const [moveDefEvs, setMoveDefEvs] = useState(0);
+  const [moveHpEvs, setMoveHpEvs] = useState(0);
+  const [moveAtkNature, setMoveAtkNature] = useState("unaffected");
+  const [moveDefNature, setMoveDefNature] = useState("unaffected");
+  const [moveAtkItem, setMoveAtkItem] = useState("__keep__");
+  const [moveDefItem, setMoveDefItem] = useState("__keep__");
   const [attackerEvs, setAttackerEvs] = useState(0);
   const [defenderEvs, setDefenderEvs] = useState(0);
   const [attackerNatureEffect, setAttackerNatureEffect] = useState("unaffected");
@@ -78,6 +104,23 @@ export default function MatchupMatrix(props: Props) {
     setDefenderNatureEffect(d.nature === "Jolly" || d.nature === "Timid" || d.nature === "Hasty" || d.nature === "Naive" ? "boosted" : ["Brave", "Relaxed", "Quiet", "Sassy"].includes(d.nature) ? "hindered" : "unaffected");
     setAttackerItem(isSpeedItem(a.item) ? a.item : "__keep__"); setDefenderItem(isSpeedItem(d.item) ? d.item : "__keep__");
     setSpeedEditor({ row, col });
+  };
+  const openMoveEditor = (row: number, col: number, move: string) => {
+    const a = left[row], d = right[col], details = getMoveDetails(move);
+    const atkStat = details?.category === "Special" ? "spa" : "atk";
+    const defStat = details?.category === "Special" ? "spd" : "def";
+    setMoveAtkEvs(a.evs?.[atkStat] ?? 0); setMoveDefEvs(d.evs?.[defStat] ?? 0); setMoveHpEvs(d.evs?.hp ?? 0);
+    setMoveAtkNature(statNatureEffect(a.nature, atkStat)); setMoveDefNature(statNatureEffect(d.nature, defStat));
+    setMoveAtkItem("__keep__"); setMoveDefItem("__keep__"); setMoveEditor({ row, col, move });
+  };
+  const saveMoveEditor = () => {
+    if (!moveEditor) return;
+    const { row, col, move } = moveEditor, a = left[row], d = right[col], details = getMoveDetails(move);
+    const atkStat = details?.category === "Special" ? "spa" : "atk";
+    const defStat = details?.category === "Special" ? "spd" : "def";
+    props.onRowPokemonChange(row, { evs: { ...a.evs, [atkStat]: clampEV(moveAtkEvs) }, nature: natureForStat(moveAtkNature, atkStat, a.nature), item: moveAtkItem === "__keep__" ? a.item : moveAtkItem });
+    props.onColPokemonChange(col, { evs: { ...d.evs, [defStat]: clampEV(moveDefEvs), hp: clampEV(moveHpEvs) }, nature: natureForStat(moveDefNature, defStat, d.nature), item: moveDefItem === "__keep__" ? d.item : moveDefItem });
+    setMoveEditor(null);
   };
   const saveSpeedEditor = () => {
     if (!speedEditor) return;
@@ -126,12 +169,24 @@ export default function MatchupMatrix(props: Props) {
                 : (attackerSpeed > defenderSpeed) !== fieldState.trickRoom ? "attacker" : "defender";
               const orderLabel = order === "attacker" ? `${poke.name} moves first by Speed` : order === "defender" ? `${right[col].name} moves first by Speed` : "Equal Speed";
               const title = result ? `${formatMoveTooltip(move, poke, fieldState)}\n${getMovePriorityNote(poke, move, fieldState)}\n\nDamage range: ${result.min}–${result.max} HP (${result.minPct.toFixed(1)}–${result.maxPct.toFixed(1)}%)\nPossible damage rolls: ${(result.rolls || []).join(", ") || "not available for this move"}\n${result.ko}\n${result.description}` : move ? `${formatMoveTooltip(move, poke, fieldState)}\n\nNo direct damage result for this move.` : "No move assigned";
-              return <td key={col} className={`${right[col]?.dead ? "fainted-cell" : ""} ${right[col]?.teraType ? "tera-defender-cell" : ""}`}><div className="matchup-cell-layout"><button title={title} disabled={!move} className={`matrix-cell compact-cell ${result ? koClass(result.ko) : "ko-none"} ${active ? "active" : ""} ${poke.dead || right[col]?.dead ? "fainted-cell" : ""}`} onClick={() => props.onSelect(row, col)}>{result ? <span className="damage-inline"><strong>{result.minPct.toFixed(0)}–{result.maxPct.toFixed(0)}%</strong><em>{result.ko}</em></span> : <span>—</span>}</button>{move && <button type="button" className={`turn-order speed-arrow ${order}`} title={`Edit matchup Speed. ${orderLabel}. Effective Speed: ${attackerSpeed} vs ${defenderSpeed}.`} aria-label={`Edit Speed matchup: ${poke.name} versus ${right[col].name}`} onClick={() => openSpeedEditor(row, col)}>{order === "attacker" ? "←" : order === "defender" ? "↑" : "↔"}</button>}</div></td>;
+              return <td key={col} className={`${right[col]?.dead ? "fainted-cell" : ""} ${right[col]?.teraType ? "tera-defender-cell" : ""}`}><div className="matchup-cell-layout"><button title={title} disabled={!move} className={`matrix-cell compact-cell ${result ? koClass(result.ko) : "ko-none"} ${active ? "active" : ""} ${poke.dead || right[col]?.dead ? "fainted-cell" : ""}`} onClick={() => { props.onSelect(row, col); if (move && details && ["Physical", "Special"].includes(details.category)) openMoveEditor(row, col, move); }}>{result ? <span className="damage-inline"><strong>{result.minPct.toFixed(0)}–{result.maxPct.toFixed(0)}%</strong><em>{result.ko}</em></span> : <span>—</span>}</button>{move && <button type="button" className={`turn-order speed-arrow ${order}`} title={`Edit matchup Speed. ${orderLabel}. Effective Speed: ${attackerSpeed} vs ${defenderSpeed}.`} aria-label={`Edit Speed matchup: ${poke.name} versus ${right[col].name}`} onClick={() => openSpeedEditor(row, col)}>{order === "attacker" ? "←" : order === "defender" ? "↑" : "↔"}</button>}</div></td>;
             })}
           </tr>;
         });
       })}</tbody>
     </table></div>
+    {moveEditor && (() => {
+      const a = left[moveEditor.row], d = right[moveEditor.col], details = getMoveDetails(moveEditor.move);
+      if (!details || !["Physical", "Special"].includes(details.category)) return null;
+      const atkStat = details.category === "Special" ? "spa" : "atk", defStat = details.category === "Special" ? "spd" : "def";
+      const editedA: PokemonSet = { ...a, evs: { ...a.evs, [atkStat]: clampEV(moveAtkEvs) }, nature: natureForStat(moveAtkNature, atkStat, a.nature), item: moveAtkItem === "__keep__" ? a.item : moveAtkItem };
+      const editedD: PokemonSet = { ...d, evs: { ...d.evs, [defStat]: clampEV(moveDefEvs), hp: clampEV(moveHpEvs) }, nature: natureForStat(moveDefNature, defStat, d.nature), item: moveDefItem === "__keep__" ? d.item : moveDefItem };
+      const damage = calculateMove(editedA, editedD, moveEditor.move, fieldState, rowStages[moveEditor.row], colStages[moveEditor.col], props.critical);
+      const attackerItems = details.category === "Special" ? SPECIAL_ATTACK_ITEMS : PHYSICAL_ATTACK_ITEMS;
+      const defenderItems = details.category === "Special" ? SPECIAL_DEFENSE_ITEMS : PHYSICAL_DEFENSE_ITEMS;
+      const itemSelect = (value: string, current: string, options: string[]) => <><option value="__keep__">Keep current item{current ? ` (${current})` : ""}</option><option value="">No item</option>{options.map(item => <option key={item} value={item}>{item}</option>)}</>;
+      return <div className="speed-editor-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setMoveEditor(null); }}><section className="speed-editor panel" role="dialog" aria-modal="true" aria-labelledby="move-editor-title"><div className="panel-title-row"><div><h3 id="move-editor-title">Move Damage Editor</h3><p>{a.name} → {d.name} · {moveEditor.move} ({details.category})</p></div><button type="button" onClick={() => setMoveEditor(null)}>Close ×</button></div><div className="speed-editor-grid"><div className="speed-editor-side"><h4>Attacker: {a.name}</h4><label>{details.category === "Special" ? "SpA EVs" : "Atk EVs"}<input type="number" min="0" max="252" step="4" value={moveAtkEvs} onChange={e => setMoveAtkEvs(clampEV(Number(e.target.value)))} /></label><label>{details.category === "Special" ? "SpA nature effect" : "Atk nature effect"}<select value={moveAtkNature} onChange={e => setMoveAtkNature(e.target.value)}><option value="hindered">Hindered (−{details.category === "Special" ? "SpA" : "Atk"})</option><option value="unaffected">Unaffected</option><option value="boosted">Boosted (+{details.category === "Special" ? "SpA" : "Atk"})</option></select></label><label>Attacking item<select value={moveAtkItem} onChange={e => setMoveAtkItem(e.target.value)}>{itemSelect(moveAtkItem, a.item, attackerItems)}</select></label></div><div className="speed-editor-side"><h4>Defender: {d.name}</h4><label>HP EVs<input type="number" min="0" max="252" step="4" value={moveHpEvs} onChange={e => setMoveHpEvs(clampEV(Number(e.target.value)))} /></label><label>{details.category === "Special" ? "SpD EVs" : "Def EVs"}<input type="number" min="0" max="252" step="4" value={moveDefEvs} onChange={e => setMoveDefEvs(clampEV(Number(e.target.value)))} /></label><label>{details.category === "Special" ? "SpD nature effect" : "Def nature effect"}<select value={moveDefNature} onChange={e => setMoveDefNature(e.target.value)}><option value="hindered">Hindered (−{details.category === "Special" ? "SpD" : "Def"})</option><option value="unaffected">Unaffected</option><option value="boosted">Boosted (+{details.category === "Special" ? "SpD" : "Def"})</option></select></label><label>Defensive item<select value={moveDefItem} onChange={e => setMoveDefItem(e.target.value)}>{itemSelect(moveDefItem, d.item, defenderItems)}</select></label></div></div><div className="move-damage-preview"><strong>Current battlefield damage range</strong><p>{damage ? `${damage.min}–${damage.max} HP (${damage.minPct.toFixed(1)}–${damage.maxPct.toFixed(1)}%)` : "Damage range unavailable for this move."}</p><small>Includes current weather, terrain, screens, Tera state, abilities, stat stages, critical-hit setting, and other calculator-supported field effects.</small></div><div className="button-row speed-editor-actions"><button type="button" onClick={() => setMoveEditor(null)}>Cancel</button><button type="button" className="primary" onClick={saveMoveEditor}>OK · Update Teambuilder</button></div></section></div>;
+    })()}
     {speedEditor && (() => {
       const a = left[speedEditor.row], d = right[speedEditor.col];
       const editedA = { ...a, evs: { ...a.evs, spe: Math.max(0, Math.min(252, Number(attackerEvs) || 0)) }, nature: speedNatureFor(attackerNatureEffect, a.nature), item: attackerItem === "__keep__" ? a.item : attackerItem };

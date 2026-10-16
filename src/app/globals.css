@@ -457,3 +457,7 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 .speed-editor-actions { justify-content: flex-end; margin-top: 14px; }
 .matrix .speed-arrow { cursor: pointer; border: 0; }
 @media (max-width: 620px) { .speed-editor-grid { grid-template-columns: 1fr; } }
+
+.move-damage-preview { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
+.move-damage-preview p { margin: 6px 0; font-size: 1.2rem; font-weight: 700; }
+.move-damage-preview small { color: var(--muted); }
