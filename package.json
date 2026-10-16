@@ -1,8 +1,8 @@
 {
   "name": "pokemon-team-lab",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "private": true,
-  "description": "Gen 9 team matchup matrix with Pok\u00e9mon Showdown data-backed battle-order estimates and move priority.",
+  "description": "Gen 9 team matchup matrix with a native team builder, Smogon meta-set presets, and Showdown paste import/export.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

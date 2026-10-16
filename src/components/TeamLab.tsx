@@ -140,11 +140,13 @@ export default function TeamLab() {
           onRowStageChange={(index, stat, value) => updateStage(index, stat, value, swapped ? "right" : "left")}
           onColStageChange={(index, stat, value) => updateStage(index, stat, value, swapped ? "left" : "right")}
           onResetStages={() => { setStagesA(ZERO_STAGES()); setStagesB(ZERO_STAGES()); }}
+          onResetRowStages={index => (swapped ? setStagesB : setStagesA)(prev => prev.map((stage, i) => i === index ? { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 } : stage))}
+          onResetColStages={index => (swapped ? setStagesA : setStagesB)(prev => prev.map((stage, i) => i === index ? { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 } : stage))}
           onRowPokemonChange={(index, patch) => updatePokemon(swapped ? "right" : "left", index, patch)}
           onColPokemonChange={(index, patch) => updatePokemon(swapped ? "left" : "right", index, patch)}
         />
       </div>
-      <TeamPastePanel left={left} right={right} open={teamsOpen} onClose={() => setTeamsOpen(false)} onImport={importTeam} />
+      <TeamPastePanel left={left} right={right} open={teamsOpen} onClose={() => setTeamsOpen(false)} onImport={importTeam} onEditTeam={(side, team) => { if (side === "left") { setLeft(team); setMovesA(previous => reconcileMoves(team, previous)); } else { setRight(team); setMovesB(previous => reconcileMoves(team, previous)); } }} />
     </main>
   );
 }

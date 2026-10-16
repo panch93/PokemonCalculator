@@ -367,3 +367,30 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 .matrix .reset-stages-button span { font-size: 1rem; }
 .matrix .reset-stages-button small { font-size: .65rem; }
 .matrix .speed-multiplier { display: none !important; }
+
+
+/* Individual stat-stage reset and compact full-matrix reset. */
+.matrix .reset-all-stages-button { min-width: 30px; width: 30px; padding: 4px 0; font-size: 1.1rem; }
+.matrix .reset-one-stage-button { grid-column: 1 / -1; justify-self: end; width: 22px; min-width: 22px; height: 20px; padding: 0; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: var(--muted); font-size: .9rem; line-height: 1; }
+.matrix .reset-one-stage-button:hover { color: var(--text); border-color: var(--accent); }
+
+/* Native team editor with Showdown-style meta-set presets. */
+.builder-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 12px 0; padding: 10px; border: 1px solid var(--border); border-radius: 9px; }
+.mode-toggle { display: inline-flex; padding: 3px; gap: 3px; border-radius: 8px; background: var(--surface-2, #0c1017); }
+.mode-toggle button { padding: 6px 12px; font-size: .78rem; }
+.mode-toggle button.active { background: var(--accent); color: #fff; }
+.format-picker { display: inline-flex; align-items: center; gap: 7px; font-size: .76rem; }
+.format-picker select { min-width: 130px; }
+.preset-status { color: var(--muted); font-size: .72rem; }
+.builder-team { max-height: 65vh; overflow: auto; }
+.builder-pokemon { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--border); border-radius: 8px; padding: 9px; }
+.builder-pokemon-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.builder-pokemon-heading strong { font-size: .8rem; }
+.builder-pokemon-heading select { max-width: 58%; min-width: 145px; font-size: .72rem; }
+.builder-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.builder-fields label, .builder-moves label, .builder-evs label { display: flex; min-width: 0; flex-direction: column; gap: 3px; color: var(--muted); font-size: .66rem; }
+.builder-fields input, .builder-fields select, .builder-moves input, .builder-evs input { width: 100%; min-width: 0; padding: 5px 6px; font-size: .72rem; }
+.builder-moves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.builder-evs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+.builder-evs input { padding: 4px 2px; text-align: center; }
+@media (max-width: 760px) { .builder-team { max-height: none; } .builder-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .builder-evs { grid-template-columns: repeat(3, minmax(0, 1fr)); } .builder-pokemon-heading { align-items: flex-start; flex-direction: column; } .builder-pokemon-heading select { max-width: 100%; width: 100%; } }

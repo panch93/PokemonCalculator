@@ -1,38 +1,177 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Dex } from "@pkmn/dex";
 import { exportTeam, parseTeamPaste } from "../lib/team-parser";
-import { Team } from "../lib/types";
+import { PokemonSet, Stats, Team } from "../lib/types";
 
-type Props = { left: Team; right: Team; open: boolean; onClose: () => void; onImport: (side: "left" | "right", team: Team) => void };
+type Side = "left" | "right";
+type Props = {
+  left: Team; right: Team; open: boolean; onClose: () => void;
+  onImport: (side: Side, team: Team) => void;
+  onEditTeam: (side: Side, team: Team) => void;
+};
+type RawSet = Record<string, unknown>;
+type SetDatabase = Record<string, Record<string, RawSet>>;
+const FORMATS = [
+  { value: "gen9ou", label: "Gen 9 OU" }, { value: "gen9uu", label: "Gen 9 UU" },
+  { value: "gen9ubers", label: "Gen 9 Ubers" }, { value: "gen9ru", label: "Gen 9 RU" },
+  { value: "gen9nu", label: "Gen 9 NU" }, { value: "gen9pu", label: "Gen 9 PU" },
+  { value: "gen9monotype", label: "Gen 9 Monotype" }, { value: "gen9doublesou", label: "Gen 9 Doubles OU" },
+];
+const DEFAULT_STATS: Stats = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+const STAT_KEYS: Record<string, keyof Stats> = { hp: "hp", atk: "atk", def: "def", spa: "spa", spd: "spd", spe: "spe" };
+const cleanId = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+const firstValue = (value: unknown): string => {
+  if (Array.isArray(value)) return value.length ? firstValue(value[0]) : "";
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  return "";
+};
+function parsePresetStats(value: unknown, defaults: Stats): Stats {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { ...defaults };
+  const output = { ...defaults };
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    const stat = STAT_KEYS[key.toLowerCase()];
+    if (stat && Number.isFinite(Number(raw))) output[stat] = Math.max(0, Math.min(252, Number(raw)));
+  }
+  return output;
+}
+function blankTeamSlot(index: number): PokemonSet {
+  return { name: `Empty Slot ${index + 1}`, species: "Pikachu", item: "", ability: "", nature: "Hardy", level: 100, teraType: "", importedTeraType: "", evs: { ...DEFAULT_STATS }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: ["", "", "", ""] };
+}
+function paddedTeam(team: Team): Team {
+  const output = team.slice(0, 6).map(p => ({ ...p, evs: { ...DEFAULT_STATS, ...p.evs }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31, ...p.ivs }, moves: [...p.moves, "", "", "", ""].slice(0, 4) }));
+  while (output.length < 6) output.push(blankTeamSlot(output.length));
+  return output;
+}
+function applyPreset(pokemon: PokemonSet, preset: RawSet): PokemonSet {
+  const movesValue = preset.Moves ?? preset.moves;
+  const moves = (Array.isArray(movesValue) ? movesValue : movesValue ? [movesValue] : [])
+    .map(firstValue).filter(Boolean).slice(0, 4);
+  while (moves.length < 4) moves.push("");
+  const tera = firstValue(preset["Tera Type"] ?? preset.teraType ?? preset.tera);
+  return {
+    ...pokemon,
+    item: firstValue(preset.Item ?? preset.item) || pokemon.item,
+    ability: firstValue(preset.Ability ?? preset.ability) || pokemon.ability,
+    nature: firstValue(preset.Nature ?? preset.nature) || pokemon.nature,
+    level: Number(preset.Level ?? preset.level) || pokemon.level || 100,
+    evs: parsePresetStats(preset.EVs ?? preset.evs, DEFAULT_STATS),
+    ivs: parsePresetStats(preset.IVs ?? preset.ivs, { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }),
+    moves,
+    ...(tera ? { importedTeraType: tera, teraType: "" } : {}),
+  };
+}
 
-export default function TeamPastePanel({ left, right, open, onClose, onImport }: Props) {
+export default function TeamPastePanel({ left, right, open, onClose, onImport, onEditTeam }: Props) {
+  const [mode, setMode] = useState<"builder" | "paste">("builder");
   const [textA, setTextA] = useState("");
   const [textB, setTextB] = useState("");
-  useEffect(() => {
-    if (open) { setTextA(exportTeam(left)); setTextB(exportTeam(right)); }
-  }, [open, left, right]);
+  const [builderA, setBuilderA] = useState<Team>(() => paddedTeam(left));
+  const [builderB, setBuilderB] = useState<Team>(() => paddedTeam(right));
+  const [format, setFormat] = useState("gen9ou");
+  const [setDatabase, setSetDatabase] = useState<SetDatabase | null>(null);
+  const [setStatus, setSetStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [selectedPresets, setSelectedPresets] = useState<Record<string, string>>({});
 
-  const importNow = (side: "left" | "right") => {
-    const parsed = parseTeamPaste(side === "left" ? textA : textB);
-    if (parsed.length) onImport(side, parsed);
+  useEffect(() => {
+    if (open) {
+      setTextA(exportTeam(left)); setTextB(exportTeam(right));
+      setBuilderA(paddedTeam(left)); setBuilderB(paddedTeam(right));
+    }
+    // Load the current teams only when the modal opens, not after each field edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || mode !== "builder") return;
+    const controller = new AbortController();
+    setSetStatus("loading"); setSetDatabase(null);
+    fetch(`https://pkmn.github.io/smogon/data/sets/${format}.json`, { signal: controller.signal })
+      .then(response => { if (!response.ok) throw new Error(`Preset data returned ${response.status}`); return response.json(); })
+      .then(data => { if (!controller.signal.aborted) { setSetDatabase(data as SetDatabase); setSetStatus("ready"); } })
+      .catch(error => { if (!controller.signal.aborted) { setSetStatus("error"); setSetDatabase(null); } });
+    return () => controller.abort();
+  }, [open, mode, format]);
+
+  const speciesOptions = useMemo(() => {
+    try {
+      const table = Dex.species as unknown as { all: () => Array<{ name: string; exists?: boolean; isNonstandard?: string }> };
+      return table.all().filter(s => s.exists !== false && !s.isNonstandard).map(s => s.name).sort((a, b) => a.localeCompare(b));
+    } catch { return [...new Set([...left, ...right].map(p => p.species).filter(Boolean))].sort(); }
+  }, [left, right]);
+
+  const getPresets = (pokemon: PokemonSet): [string, RawSet][] => {
+    if (!setDatabase) return [];
+    const speciesEntry = Object.entries(setDatabase).find(([name]) => cleanId(name) === cleanId(pokemon.species) || cleanId(name) === cleanId(pokemon.name));
+    if (!speciesEntry || !speciesEntry[1] || typeof speciesEntry[1] !== "object") return [];
+    return Object.entries(speciesEntry[1]).filter((entry): entry is [string, RawSet] => Boolean(entry[1]) && typeof entry[1] === "object");
   };
-  const download = (side: "left" | "right") => {
+
+  const updateBuilderPokemon = (side: Side, index: number, patch: Partial<PokemonSet>) => {
+    const current = side === "left" ? builderA : builderB;
+    const next = current.map((pokemon, i) => i === index ? { ...pokemon, ...patch } : pokemon);
+    if (side === "left") setBuilderA(next); else setBuilderB(next);
+    onEditTeam(side, next);
+  };
+  const changeSpecies = (side: Side, index: number, species: string) => {
+    const current = side === "left" ? builderA : builderB;
+    const old = current[index];
+    const nextName = species.trim() || old.species;
+    setSelectedPresets(previous => { const next = { ...previous }; delete next[`${side}-${index}`]; return next; });
+    updateBuilderPokemon(side, index, { species: nextName, name: old.name.startsWith("Empty Slot") ? nextName : old.name, ability: "", item: "", moves: ["", "", "", ""], nature: "Hardy", evs: { ...DEFAULT_STATS }, teraType: "", importedTeraType: "" });
+  };
+  const updateStat = (side: Side, index: number, stat: keyof Stats, value: string, kind: "evs" | "ivs") => {
+    const team = side === "left" ? builderA : builderB;
+    const pokemon = team[index];
+    const max = kind === "evs" ? 252 : 31;
+    updateBuilderPokemon(side, index, { [kind]: { ...pokemon[kind], [stat]: Math.max(0, Math.min(max, Number(value) || 0)) } } as Partial<PokemonSet>);
+  };
+  const download = (side: Side) => {
     const text = exportTeam(side === "left" ? left : right);
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url; anchor.download = side === "left" ? "team-a.txt" : "team-b.txt"; anchor.click();
-    URL.revokeObjectURL(url);
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = side === "left" ? "team-a.txt" : "team-b.txt"; anchor.click(); URL.revokeObjectURL(url);
+  };
+  const importNow = (side: Side) => {
+    const parsed = parseTeamPaste(side === "left" ? textA : textB);
+    if (parsed.length) onImport(side, parsed);
   };
   if (!open) return null;
+
+  const renderBuilderTeam = (side: Side, team: Team) => <section className="team-editor builder-team">
+    <div className="team-editor-heading"><h3>{side === "left" ? "Team A" : "Team B"}</h3><span>6 Pokémon · live edits</span></div>
+    {team.map((pokemon, index) => {
+      const presets = getPresets(pokemon);
+      const presetKey = `${side}-${index}`;
+      return <article className="builder-pokemon" key={`${side}-${index}`}>
+        <div className="builder-pokemon-heading"><strong>{index + 1}. {pokemon.name || pokemon.species}</strong><select aria-label={`${pokemon.species} meta set`} value={selectedPresets[presetKey] || ""} disabled={!presets.length} onChange={event => {
+          const key = event.target.value; setSelectedPresets(previous => ({ ...previous, [presetKey]: key }));
+          const chosen = presets.find(([name]) => name === key)?.[1]; if (chosen) updateBuilderPokemon(side, index, applyPreset(pokemon, chosen));
+        }}><option value="">{setStatus === "loading" ? "Loading meta sets…" : presets.length ? "Choose meta set…" : "No preset available"}</option>{presets.map(([name]) => <option key={name} value={name}>{name}</option>)}</select></div>
+        <div className="builder-fields">
+          <label>Species<input list="pokemon-species-options" value={pokemon.species} onChange={event => changeSpecies(side, index, event.target.value)} /></label>
+          <label>Nickname<input value={pokemon.name} onChange={event => updateBuilderPokemon(side, index, { name: event.target.value })} /></label>
+          <label>Item<input value={pokemon.item} onChange={event => updateBuilderPokemon(side, index, { item: event.target.value })} /></label>
+          <label>Ability<input value={pokemon.ability} onChange={event => updateBuilderPokemon(side, index, { ability: event.target.value })} /></label>
+          <label>Nature<select value={pokemon.nature} onChange={event => updateBuilderPokemon(side, index, { nature: event.target.value })}>{["Hardy","Lonely","Brave","Adamant","Naughty","Bold","Docile","Relaxed","Impish","Lax","Timid","Hasty","Serious","Jolly","Naive","Modest","Mild","Quiet","Bashful","Rash","Calm","Gentle","Sassy","Careful","Quirky"].map(n => <option key={n}>{n}</option>)}</select></label>
+          <label>Level<input type="number" min="1" max="100" value={pokemon.level} onChange={event => updateBuilderPokemon(side, index, { level: Math.max(1, Math.min(100, Number(event.target.value) || 100)) })} /></label>
+        </div>
+        <div className="builder-moves">{[0,1,2,3].map(moveIndex => <label key={moveIndex}>Move {moveIndex + 1}<input value={pokemon.moves[moveIndex] || ""} onChange={event => { const moves = [...pokemon.moves]; moves[moveIndex] = event.target.value; updateBuilderPokemon(side, index, { moves }); }} /></label>)}</div>
+        <div className="builder-evs">{([ ["HP","hp"],["Atk","atk"],["Def","def"],["SpA","spa"],["SpD","spd"],["Spe","spe"] ] as const).map(([label, stat]) => <label key={stat}>{label}<input aria-label={`${pokemon.species} ${label} EVs`} type="number" min="0" max="252" step="4" value={pokemon.evs[stat]} onChange={event => updateStat(side, index, stat, event.target.value, "evs")} /></label>)}</div>
+      </article>;
+    })}
+    <div className="button-row"><button onClick={() => download(side)}>Export team</button><button onClick={() => navigator.clipboard?.writeText(exportTeam(side === "left" ? builderA : builderB))}>Copy Showdown paste</button></div>
+  </section>;
+
   return <div className="teams-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="teams-modal panel" role="dialog" aria-modal="true" aria-labelledby="teams-modal-title">
-      <div className="panel-title-row"><div><h2 id="teams-modal-title">Teams · Import / Export</h2><p>Manage both teams side by side using Pokémon Showdown format.</p></div><button onClick={onClose} aria-label="Close teams">Close ×</button></div>
-      <div className="teams-two-column">
+      <div className="panel-title-row"><div><h2 id="teams-modal-title">Teams · Teambuilder / Paste</h2><p>Edit sets directly or import/export Pokémon Showdown text.</p></div><button onClick={onClose} aria-label="Close teams">Close ×</button></div>
+      <div className="builder-toolbar"><div className="mode-toggle" role="group" aria-label="Team editing mode"><button className={mode === "builder" ? "active" : ""} onClick={() => setMode("builder")}>Teambuilder</button><button className={mode === "paste" ? "active" : ""} onClick={() => setMode("paste")}>Paste</button></div>{mode === "builder" && <label className="format-picker">Meta format<select value={format} onChange={event => { setFormat(event.target.value); setSelectedPresets({}); }} >{FORMATS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>}<small className="preset-status">{mode === "builder" ? setStatus === "loading" ? "Loading Smogon sets…" : setStatus === "error" ? "Smogon set data unavailable; manual editing still works." : "Presets from Smogon usage sets" : "Standard Showdown team paste format"}</small></div>
+      {mode === "builder" ? <><datalist id="pokemon-species-options">{speciesOptions.map(name => <option key={name} value={name} />)}</datalist><div className="teams-two-column">{renderBuilderTeam("left", builderA)}{renderBuilderTeam("right", builderB)}</div></> : <div className="teams-two-column">
         <section className="team-editor"><div className="team-editor-heading"><h3>Team A</h3><span>{left.length}/6 Pokémon</span></div><textarea aria-label="Team A Showdown text" value={textA} onChange={e => setTextA(e.target.value)} spellCheck={false}/><div className="button-row"><button className="primary" onClick={() => importNow("left")}>Import Team A</button><button onClick={() => download("left")}>Export Team A</button><button onClick={() => navigator.clipboard?.writeText(exportTeam(left))}>Copy current</button></div></section>
         <section className="team-editor"><div className="team-editor-heading"><h3>Team B</h3><span>{right.length}/6 Pokémon</span></div><textarea aria-label="Team B Showdown text" value={textB} onChange={e => setTextB(e.target.value)} spellCheck={false}/><div className="button-row"><button className="primary" onClick={() => importNow("right")}>Import Team B</button><button onClick={() => download("right")}>Export Team B</button><button onClick={() => navigator.clipboard?.writeText(exportTeam(right))}>Copy current</button></div></section>
-      </div>
+      </div>}
     </section>
   </div>;
 }
