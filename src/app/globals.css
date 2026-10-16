@@ -467,3 +467,13 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 .damage-item-autocomplete { display: flex; align-items: stretch; }
 .damage-item-autocomplete > input { flex: 1; min-width: 0; padding-right: 28px; }
 .damage-item-autocomplete .item-dropdown-toggle { flex: 0 0 26px; margin-left: -26px; z-index: 1; padding: 0; border: 0; background: transparent; color: var(--text); cursor: pointer; }
+
+/* Shared autocomplete keyboard selection and matrix quick-edit affordances. */
+.builder-autocomplete-options button.autocomplete-active,
+.builder-autocomplete-options button[aria-selected="true"] { background: var(--surface-2, #252c38); outline: 1px solid var(--border); }
+.clickable-matrix-set, .clickable-matrix-move { cursor: pointer; }
+.clickable-matrix-set:hover, .clickable-matrix-move:hover { text-decoration: underline; text-underline-offset: 2px; }
+.clickable-matrix-set:focus-visible, .clickable-matrix-move:focus-visible { outline: 2px solid var(--accent, #78a9ff); outline-offset: 2px; }
+.builder-autocomplete { display: flex; align-items: stretch; position: relative; min-width: 0; }
+.builder-autocomplete > input { flex: 1; min-width: 0; }
+.builder-autocomplete .autocomplete-dropdown-toggle { flex: 0 0 24px; padding: 0 4px; border: 1px solid var(--border); border-left: 0; border-radius: 0 5px 5px 0; background: var(--surface-2, #252c38); color: var(--text); cursor: pointer; }

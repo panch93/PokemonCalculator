@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Dex } from "@pkmn/dex";
 import { exportTeam, parseTeamPaste } from "../lib/team-parser";
 import { PokemonSet, Stats, Team } from "../lib/types";
+import AutocompleteInput from "./AutocompleteInput";
 
 type Side = "left" | "right";
 type Props = {
@@ -29,21 +30,6 @@ const NATURE_EFFECTS: Record<string, { plus?: string; minus?: string }> = {
   Calm: { plus: "SpD", minus: "Atk" }, Gentle: { plus: "SpD", minus: "Def" }, Sassy: { plus: "SpD", minus: "Spe" }, Careful: { plus: "SpD", minus: "SpA" }, Quirky: {},
 };
 const NATURES = Object.keys(NATURE_EFFECTS);
-type AutocompleteInputProps = {
-  value: string; options: string[]; onChange: (value: string) => void; ariaLabel?: string;
-};
-function AutocompleteInput({ value, options, onChange, ariaLabel }: AutocompleteInputProps) {
-  const [open, setOpen] = useState(false);
-  const matches = useMemo(() => {
-    const query = value.trim().toLowerCase();
-    return (query ? options.filter(option => option.toLowerCase().includes(query)) : options);
-  }, [options, value]);
-  return <span className="builder-autocomplete">
-    <input aria-label={ariaLabel} value={value} onFocus={() => setOpen(true)} onChange={event => { onChange(event.target.value); setOpen(true); }} onKeyDown={event => { if (event.key === "Escape") setOpen(false); if (event.key === "ArrowDown" && matches.length) setOpen(true); }} />
-    {open && matches.length > 0 && <span className="builder-autocomplete-options" role="listbox">{matches.map(option => <button type="button" role="option" key={option} onMouseDown={event => event.preventDefault()} onClick={() => { onChange(option); setOpen(false); }}>{option}</button>)}</span>}
-  </span>;
-}
-
 const cleanId = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 const firstValue = (value: unknown): string => {
   if (Array.isArray(value)) return value.length ? firstValue(value[0]) : "";
