@@ -21,6 +21,14 @@ const FORMATS = [
 ];
 const DEFAULT_STATS: Stats = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 const STAT_KEYS: Record<string, keyof Stats> = { hp: "hp", atk: "atk", def: "def", spa: "spa", spd: "spd", spe: "spe" };
+const NATURE_EFFECTS: Record<string, { plus?: string; minus?: string }> = {
+  Hardy: {}, Lonely: { plus: "Atk", minus: "Def" }, Brave: { plus: "Atk", minus: "Spe" }, Adamant: { plus: "Atk", minus: "SpA" }, Naughty: { plus: "Atk", minus: "SpD" },
+  Bold: { plus: "Def", minus: "Atk" }, Docile: {}, Relaxed: { plus: "Def", minus: "Spe" }, Impish: { plus: "Def", minus: "SpA" }, Lax: { plus: "Def", minus: "SpD" },
+  Timid: { plus: "Spe", minus: "Atk" }, Hasty: { plus: "Spe", minus: "Def" }, Serious: {}, Jolly: { plus: "Spe", minus: "SpA" }, Naive: { plus: "Spe", minus: "SpD" },
+  Modest: { plus: "SpA", minus: "Atk" }, Mild: { plus: "SpA", minus: "Def" }, Quiet: { plus: "SpA", minus: "Spe" }, Bashful: {}, Rash: { plus: "SpA", minus: "SpD" },
+  Calm: { plus: "SpD", minus: "Atk" }, Gentle: { plus: "SpD", minus: "Def" }, Sassy: { plus: "SpD", minus: "Spe" }, Careful: { plus: "SpD", minus: "SpA" }, Quirky: {},
+};
+const NATURES = Object.keys(NATURE_EFFECTS);
 const cleanId = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 const firstValue = (value: unknown): string => {
   if (Array.isArray(value)) return value.length ? firstValue(value[0]) : "";
@@ -40,7 +48,7 @@ function blankTeamSlot(index: number): PokemonSet {
   return { name: `Empty Slot ${index + 1}`, species: "Pikachu", item: "", ability: "", nature: "Hardy", level: 100, teraType: "", importedTeraType: "", evs: { ...DEFAULT_STATS }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: ["", "", "", ""] };
 }
 function paddedTeam(team: Team): Team {
-  const output = team.slice(0, 6).map(p => ({ ...p, evs: { ...DEFAULT_STATS, ...p.evs }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31, ...p.ivs }, moves: [...p.moves, "", "", "", ""].slice(0, 4) }));
+  const output = team.slice(0, 6).map(p => ({ ...p, evs: { ...DEFAULT_STATS, ...p.evs }, ivs: { ...p.ivs, hp: p.ivs?.hp ?? 31, atk: p.ivs?.atk ?? 31, def: p.ivs?.def ?? 31, spa: p.ivs?.spa ?? 31, spd: p.ivs?.spd ?? 31, spe: p.ivs?.spe ?? 31 }, moves: [...p.moves, "", "", "", ""].slice(0, 4) }));
   while (output.length < 6) output.push(blankTeamSlot(output.length));
   return output;
 }
@@ -94,12 +102,23 @@ export default function TeamPastePanel({ left, right, open, onClose, onImport, o
     return () => controller.abort();
   }, [open, mode, format]);
 
-  const speciesOptions = useMemo(() => {
-    try {
-      const table = Dex.species as unknown as { all: () => Array<{ name: string; exists?: boolean; isNonstandard?: string }> };
-      return table.all().filter(s => s.exists !== false && !s.isNonstandard).map(s => s.name).sort((a, b) => a.localeCompare(b));
-    } catch { return [...new Set([...left, ...right].map(p => p.species).filter(Boolean))].sort(); }
+  const dexOptions = useMemo(() => {
+    const all = (table: unknown): Array<{ name: string; exists?: boolean }> => {
+      try { return (table as { all: () => Array<{ name: string; exists?: boolean }> }).all().filter(entry => entry.exists !== false); }
+      catch { return []; }
+    };
+    const species = all(Dex.species).map(entry => entry.name).sort((a, b) => a.localeCompare(b));
+    const moves = all(Dex.moves).map(entry => entry.name).sort((a, b) => a.localeCompare(b));
+    const items = all(Dex.items).map(entry => entry.name).sort((a, b) => a.localeCompare(b));
+    return { species: species.length ? species : [...new Set([...left, ...right].map(p => p.species).filter(Boolean))].sort(), moves, items };
   }, [left, right]);
+  const speciesOptions = dexOptions.species;
+  const abilitiesForSpecies = (species: string): string[] => {
+    try {
+      const entry = (Dex.species as unknown as { get: (name: string) => { abilities?: Record<string, string> } }).get(species);
+      return [...new Set(Object.values(entry.abilities || {}).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    } catch { return []; }
+  };
 
   const getPresets = (pokemon: PokemonSet): [string, RawSet][] => {
     if (!setDatabase) return [];
@@ -152,12 +171,12 @@ export default function TeamPastePanel({ left, right, open, onClose, onImport, o
         <div className="builder-fields">
           <label>Species<input list="pokemon-species-options" value={pokemon.species} onChange={event => changeSpecies(side, index, event.target.value)} /></label>
           <label>Nickname<input value={pokemon.name} onChange={event => updateBuilderPokemon(side, index, { name: event.target.value })} /></label>
-          <label>Item<input value={pokemon.item} onChange={event => updateBuilderPokemon(side, index, { item: event.target.value })} /></label>
-          <label>Ability<input value={pokemon.ability} onChange={event => updateBuilderPokemon(side, index, { ability: event.target.value })} /></label>
-          <label>Nature<select value={pokemon.nature} onChange={event => updateBuilderPokemon(side, index, { nature: event.target.value })}>{["Hardy","Lonely","Brave","Adamant","Naughty","Bold","Docile","Relaxed","Impish","Lax","Timid","Hasty","Serious","Jolly","Naive","Modest","Mild","Quiet","Bashful","Rash","Calm","Gentle","Sassy","Careful","Quirky"].map(n => <option key={n}>{n}</option>)}</select></label>
+          <label>Item<input list="pokemon-item-options" value={pokemon.item} onChange={event => updateBuilderPokemon(side, index, { item: event.target.value })} /></label>
+          <label>Ability<input list={`pokemon-ability-options-${side}-${index}`} value={pokemon.ability} onChange={event => updateBuilderPokemon(side, index, { ability: event.target.value })} /><datalist id={`pokemon-ability-options-${side}-${index}`}>{abilitiesForSpecies(pokemon.species).map(ability => <option key={ability} value={ability} />)}</datalist></label>
+          <label>Nature<select value={pokemon.nature} onChange={event => updateBuilderPokemon(side, index, { nature: event.target.value })}>{NATURES.map(n => { const effect = NATURE_EFFECTS[n]; const suffix = effect.plus && effect.minus ? ` (+${effect.plus}, −${effect.minus})` : " (no stat change)"; return <option key={n} value={n}>{n}{suffix}</option>; })}</select><small className="nature-effect">{NATURE_EFFECTS[pokemon.nature]?.plus ? <><span className="nature-boost">+{NATURE_EFFECTS[pokemon.nature].plus}</span><span className="nature-separator"> / </span><span className="nature-hinder">−{NATURE_EFFECTS[pokemon.nature].minus}</span></> : <span className="nature-neutral">No stat change</span>}</small></label>
           <label>Level<input type="number" min="1" max="100" value={pokemon.level} onChange={event => updateBuilderPokemon(side, index, { level: Math.max(1, Math.min(100, Number(event.target.value) || 100)) })} /></label>
         </div>
-        <div className="builder-moves">{[0,1,2,3].map(moveIndex => <label key={moveIndex}>Move {moveIndex + 1}<input value={pokemon.moves[moveIndex] || ""} onChange={event => { const moves = [...pokemon.moves]; moves[moveIndex] = event.target.value; updateBuilderPokemon(side, index, { moves }); }} /></label>)}</div>
+        <div className="builder-moves">{[0,1,2,3].map(moveIndex => <label key={moveIndex}>Move {moveIndex + 1}<input list="pokemon-move-options" value={pokemon.moves[moveIndex] || ""} onChange={event => { const moves = [...pokemon.moves]; moves[moveIndex] = event.target.value; updateBuilderPokemon(side, index, { moves }); }} /></label>)}</div>
         <div className="builder-evs">{([ ["HP","hp"],["Atk","atk"],["Def","def"],["SpA","spa"],["SpD","spd"],["Spe","spe"] ] as const).map(([label, stat]) => <label key={stat}>{label}<input aria-label={`${pokemon.species} ${label} EVs`} type="number" min="0" max="252" step="4" value={pokemon.evs[stat]} onChange={event => updateStat(side, index, stat, event.target.value, "evs")} /></label>)}</div>
       </article>;
     })}
@@ -168,7 +187,7 @@ export default function TeamPastePanel({ left, right, open, onClose, onImport, o
     <section className="teams-modal panel" role="dialog" aria-modal="true" aria-labelledby="teams-modal-title">
       <div className="panel-title-row"><div><h2 id="teams-modal-title">Teams · Teambuilder / Paste</h2><p>Edit sets directly or import/export Pokémon Showdown text.</p></div><button onClick={onClose} aria-label="Close teams">Close ×</button></div>
       <div className="builder-toolbar"><div className="mode-toggle" role="group" aria-label="Team editing mode"><button className={mode === "builder" ? "active" : ""} onClick={() => setMode("builder")}>Teambuilder</button><button className={mode === "paste" ? "active" : ""} onClick={() => setMode("paste")}>Paste</button></div>{mode === "builder" && <label className="format-picker">Meta format<select value={format} onChange={event => { setFormat(event.target.value); setSelectedPresets({}); }} >{FORMATS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>}<small className="preset-status">{mode === "builder" ? setStatus === "loading" ? "Loading Smogon sets…" : setStatus === "error" ? "Smogon set data unavailable; manual editing still works." : "Presets from Smogon usage sets" : "Standard Showdown team paste format"}</small></div>
-      {mode === "builder" ? <><datalist id="pokemon-species-options">{speciesOptions.map(name => <option key={name} value={name} />)}</datalist><div className="teams-two-column">{renderBuilderTeam("left", builderA)}{renderBuilderTeam("right", builderB)}</div></> : <div className="teams-two-column">
+      {mode === "builder" ? <><datalist id="pokemon-species-options">{speciesOptions.map(name => <option key={name} value={name} />)}</datalist><datalist id="pokemon-move-options">{dexOptions.moves.map(name => <option key={name} value={name} />)}</datalist><datalist id="pokemon-item-options">{dexOptions.items.map(name => <option key={name} value={name} />)}</datalist><div className="teams-two-column">{renderBuilderTeam("left", builderA)}{renderBuilderTeam("right", builderB)}</div></> : <div className="teams-two-column">
         <section className="team-editor"><div className="team-editor-heading"><h3>Team A</h3><span>{left.length}/6 Pokémon</span></div><textarea aria-label="Team A Showdown text" value={textA} onChange={e => setTextA(e.target.value)} spellCheck={false}/><div className="button-row"><button className="primary" onClick={() => importNow("left")}>Import Team A</button><button onClick={() => download("left")}>Export Team A</button><button onClick={() => navigator.clipboard?.writeText(exportTeam(left))}>Copy current</button></div></section>
         <section className="team-editor"><div className="team-editor-heading"><h3>Team B</h3><span>{right.length}/6 Pokémon</span></div><textarea aria-label="Team B Showdown text" value={textB} onChange={e => setTextB(e.target.value)} spellCheck={false}/><div className="button-row"><button className="primary" onClick={() => importNow("right")}>Import Team B</button><button onClick={() => download("right")}>Export Team B</button><button onClick={() => navigator.clipboard?.writeText(exportTeam(right))}>Copy current</button></div></section>
       </div>}

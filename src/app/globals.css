@@ -329,7 +329,7 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 /* Stage controls sit below the identity text in a tidy two-row grid. */
 .matrix .stat-stage-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: stretch;
   justify-content: stretch;
   gap: 4px 5px;
@@ -371,7 +371,7 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 
 /* Individual stat-stage reset and compact full-matrix reset. */
 .matrix .reset-all-stages-button { min-width: 30px; width: 30px; padding: 4px 0; font-size: 1.1rem; }
-.matrix .reset-one-stage-button { grid-column: 1 / -1; justify-self: end; width: 22px; min-width: 22px; height: 20px; padding: 0; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: var(--muted); font-size: .9rem; line-height: 1; }
+.matrix .reset-one-stage-button { grid-column: auto; justify-self: center; align-self: center; width: 22px; min-width: 22px; height: 24px; padding: 0; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: var(--muted); font-size: .9rem; line-height: 1; }
 .matrix .reset-one-stage-button:hover { color: var(--text); border-color: var(--accent); }
 
 /* Native team editor with Showdown-style meta-set presets. */
@@ -394,3 +394,10 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 .builder-evs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
 .builder-evs input { padding: 4px 2px; text-align: center; }
 @media (max-width: 760px) { .builder-team { max-height: none; } .builder-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .builder-evs { grid-template-columns: repeat(3, minmax(0, 1fr)); } .builder-pokemon-heading { align-items: flex-start; flex-direction: column; } .builder-pokemon-heading select { max-width: 100%; width: 100%; } }
+
+/* Teambuilder autocomplete and nature stat effects. */
+.builder-fields label .nature-effect { display: flex; gap: 3px; min-height: 14px; font-size: .65rem; font-weight: 750; }
+.nature-boost { color: #48d597; }
+.nature-hinder { color: #ff7c86; }
+.nature-neutral { color: var(--muted); font-weight: 500; }
+.nature-separator { color: var(--muted); }
