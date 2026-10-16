@@ -401,3 +401,32 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 .nature-hinder { color: #ff7c86; }
 .nature-neutral { color: var(--muted); font-weight: 500; }
 .nature-separator { color: var(--muted); }
+
+
+/* v0.5.11 builder layout refinements */
+.builder-team .team-editor-heading { align-items: center; flex-wrap: wrap; }
+.builder-team-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.builder-team-actions button { padding: 5px 7px; font-size: .68rem; }
+.builder-moves { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.builder-evs-heading { display: flex; align-items: center; justify-content: space-between; margin: 7px 0 4px; font-size: .7rem; }
+.builder-evs-heading span { color: var(--muted); font-size: .68rem; }
+.builder-evs label.nature-boost-label, .builder-final-stats .nature-boost-label { color: #42c878; font-weight: 800; }
+.builder-evs label.nature-hinder-label, .builder-final-stats .nature-hinder-label { color: #f07878; font-weight: 800; }
+.builder-final-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px; margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--border); font-size: .68rem; }
+.builder-final-stats > strong { color: var(--muted); margin-right: 2px; }
+.builder-final-stats span { white-space: nowrap; }
+@media (max-width: 760px) { .builder-moves { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Stable matrix geometry: type/tera labels occupy the same vertical space. */
+.matrix { table-layout: auto; }
+.matrix .attacker-info-cell { width: 180px; min-width: 180px; }
+.matrix .attacker-move-cell { width: auto; min-width: 105px; }
+.matrix .defender-header { min-width: 135px; }
+.matrix .type-list { min-height: 20px; align-content: flex-start; }
+.matrix .attacker-info-cell > .type-list { min-height: 20px; }
+.matrix .defender-identity { min-height: 66px; align-items: flex-start; }
+.matrix .defender-identity .type-list { min-height: 20px; }
+.matrix .stat-stage-row { display: flex; align-items: center; justify-content: center; flex-wrap: nowrap; gap: 3px; }
+.matrix .reset-one-stage-button { flex: 0 0 22px; }
+
+.matrix .type-list, .matrix .attacker-info-cell > .type-list, .matrix .defender-identity .type-list { height: 32px; min-height: 32px; overflow: hidden; }
