@@ -324,3 +324,46 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 .matrix .matrix-pokemon-controls select { width: 53px; max-width: 53px; padding: 2px; font-size: .6rem; }
 .matrix .matrix-pokemon-controls select { width: 42px; max-width: 42px; padding: 2px 1px; font-size: .56rem; }
 .matrix .matrix-pokemon-controls label { font-size: .55rem; }
+
+
+/* Stage controls sit below the identity text in a tidy two-row grid. */
+.matrix .stat-stage-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  justify-content: stretch;
+  gap: 4px 5px;
+  width: 100%;
+  margin: 6px auto 1px;
+}
+.matrix .stat-stage-row label {
+  display: grid;
+  grid-template-columns: 1fr;
+  justify-items: center;
+  align-content: start;
+  gap: 2px;
+  min-width: 0;
+  font-size: .62rem;
+  line-height: 1.1;
+}
+.matrix .stat-stage-row select {
+  width: 100%;
+  max-width: 64px;
+  min-width: 0;
+  padding: 3px 2px;
+  font-size: .68rem;
+}
+.matrix .reset-stages-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 66px;
+  width: auto;
+  padding: 4px 7px;
+  font-size: .8rem;
+  line-height: 1;
+}
+.matrix .reset-stages-button span { font-size: 1rem; }
+.matrix .reset-stages-button small { font-size: .65rem; }
+.matrix .speed-multiplier { display: none !important; }
