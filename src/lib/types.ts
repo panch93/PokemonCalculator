@@ -12,6 +12,9 @@ export type PokemonSet = {
   teraType?: string;
   importedTeraType?: string;
   dead?: boolean;
+  currentHp?: number;
+  boostedStat?: "atk" | "def" | "spa" | "spd" | "spe" | "";
+  alliesFainted?: number;
   status?: "" | "brn" | "par" | "psn" | "tox" | "slp" | "frz";
   evs: Stats;
   ivs: Stats;

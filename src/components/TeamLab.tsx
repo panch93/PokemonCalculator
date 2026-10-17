@@ -67,7 +67,7 @@ export default function TeamLab() {
 
   const matchupsA = useMemo<(Matchup | null)[][]>(() => left.map((attacker, row) => right.map((defender, col) => {
     const moves = attacker.moves.filter(Boolean).slice(0, 4)
-      .map(move => calculateMove(attacker, defender, move, field, stagesA[row], stagesB[col], critical))
+      .map(move => calculateMove({ ...attacker, alliesFainted: left.filter((p, i) => i !== row && p.dead).length }, { ...defender, alliesFainted: right.filter((p, i) => i !== col && p.dead).length }, move, field, stagesA[row], stagesB[col], critical))
       .filter((value): value is NonNullable<typeof value> => Boolean(value));
     const selectedMove = movesA[row];
     return { attacker, defender, moves, best: moves.find(m => m.move === selectedMove) || moves[0] };
@@ -75,7 +75,7 @@ export default function TeamLab() {
 
   const matchupsB = useMemo<(Matchup | null)[][]>(() => right.map((attacker, row) => left.map((defender, col) => {
     const moves = attacker.moves.filter(Boolean).slice(0, 4)
-      .map(move => calculateMove(attacker, defender, move, field, stagesB[row], stagesA[col], critical))
+      .map(move => calculateMove({ ...attacker, alliesFainted: right.filter((p, i) => i !== row && p.dead).length }, { ...defender, alliesFainted: left.filter((p, i) => i !== col && p.dead).length }, move, field, stagesB[row], stagesA[col], critical))
       .filter((value): value is NonNullable<typeof value> => Boolean(value));
     const selectedMove = movesB[row];
     return { attacker, defender, moves, best: moves.find(m => m.move === selectedMove) || moves[0] };

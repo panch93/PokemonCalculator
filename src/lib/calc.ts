@@ -51,10 +51,16 @@ function resolveCalcType(value?: string): CalcType | undefined {
   return isCalcType(trimmed) ? trimmed : undefined;
 }
 
-function makePokemon(set: PokemonSet, boosts: Partial<Record<"atk" | "def" | "spa" | "spd" | "spe", number>> = {}) {
+function makePokemon(set: PokemonSet, boosts: Partial<Record<"atk" | "def" | "spa" | "spd" | "spe", number>> = {}, fieldState?: FieldState) {
+  const abilityName = normalize(set.ability);
+  const proto = abilityName === "protosynthesis";
+  const quark = abilityName === "quarkdrive" || abilityName === "quark drive";
+  const selectedBoost = set.boostedStat;
+  const boostActive = (proto && (fieldState?.weather === "Sun" || hasItem(set, "Booster Energy"))) || (quark && (fieldState?.terrain === "Electric" || hasItem(set, "Booster Energy")));
+  const manualBoost = Boolean(boostActive && selectedBoost && ["atk", "def", "spa", "spd", "spe"].includes(selectedBoost));
   const pokemon = new Pokemon(gen, set.species, {
     item: set.item.trim() || undefined,
-    ability: set.ability.trim() || undefined,
+    ability: manualBoost ? undefined : (set.ability.trim() || undefined),
     status: set.status || undefined,
     nature: set.nature.trim() || undefined,
     level: set.level || 100,
@@ -65,6 +71,17 @@ function makePokemon(set: PokemonSet, boosts: Partial<Record<"atk" | "def" | "sp
   });
   // Selecting a Tera type means this set is Terastallized; blank/None leaves it normal.
   if (resolveCalcType(set.teraType)) (pokemon as unknown as { isTera: boolean }).isTera = true;
+  if (typeof set.currentHp === "number" && Number.isFinite(set.currentHp)) {
+    const current = Math.max(0, Math.min(pokemon.maxHP(), Math.floor(set.currentHp)));
+    (pokemon as unknown as { curHP: () => number }).curHP = () => current;
+  }
+  if (typeof set.alliesFainted === "number") (pokemon as unknown as { alliesFainted: number }).alliesFainted = Math.max(0, Math.min(5, set.alliesFainted));
+  if (manualBoost && selectedBoost) {
+    const rawStats = (pokemon as unknown as { rawStats?: Record<string, number> }).rawStats;
+    if (rawStats && typeof rawStats[selectedBoost] === "number") {
+      rawStats[selectedBoost] = Math.floor(rawStats[selectedBoost] * (selectedBoost === "spe" ? 1.5 : 1.3));
+    }
+  }
   return pokemon;
 }
 
@@ -210,8 +227,8 @@ export function calculateMove(
   if (cached !== undefined) return cached;
 
   try {
-    const attackerPokemon = makePokemon(attacker, { atk: attackerStages.atk, spa: attackerStages.spa });
-    const defenderPokemon = makePokemon(defender, { def: defenderStages.def, spd: defenderStages.spd });
+    const attackerPokemon = makePokemon(attacker, { atk: attackerStages.atk, spa: attackerStages.spa }, fieldState);
+    const defenderPokemon = makePokemon(defender, { def: defenderStages.def, spd: defenderStages.spd }, fieldState);
     const move = new Move(gen, moveName);
     if (critical) (move as unknown as { isCrit: boolean }).isCrit = true;
     const field = makeField(fieldState);
@@ -242,8 +259,9 @@ export function calculateMove(
       ? [...new Set(rawDamage as number[])].sort((a, b) => a - b)
       : undefined;
     const maxHp = defenderPokemon.maxHP();
-    const entryHazardDamage = getEntryHazardDamage(defender, defenderPokemon, fieldState);
-    const effectiveHp = Math.max(1, maxHp - entryHazardDamage);
+    const entryHazardDamage = defender.currentHp === undefined ? getEntryHazardDamage(defender, defenderPokemon, fieldState) : 0;
+    const currentHp = Math.max(1, Math.min(maxHp, Math.floor(defender.currentHp ?? maxHp)));
+    const effectiveHp = Math.max(1, currentHp - entryHazardDamage);
 
     const rawMinPct = (min / maxHp) * 100;
     const rawMaxPct = (max / maxHp) * 100;
@@ -358,6 +376,14 @@ export function getMoveDetails(moveName: string): MoveDetails | null {
   } catch {
     return null;
   }
+}
+
+export function getPokemonHp(set: PokemonSet): { current: number; max: number } {
+  try {
+    const pokemon = new Pokemon(gen, set.species, { level: set.level || 100, evs: set.evs, ivs: set.ivs, nature: set.nature || undefined });
+    const max = pokemon.maxHP();
+    return { max, current: Math.max(0, Math.min(max, Math.floor(set.currentHp ?? max))) };
+  } catch { return { current: Math.max(0, Math.floor(set.currentHp ?? 0)), max: 0 }; }
 }
 
 export function getPokemonTypes(set: PokemonSet): string[] {

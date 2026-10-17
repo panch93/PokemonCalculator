@@ -42,6 +42,21 @@ export function getEffectiveSpeed(p: PokemonSet, field: FieldState, side: "attac
   return Math.max(1, Math.floor(speed));
 }
 
+/** Speed stat from level, IVs, EVs and nature only; excludes battle stages, status, items, weather abilities and field effects. */
+export function getBaseSpeed(p: PokemonSet): number {
+  const species = Dex.species.get(p.species || p.name) as unknown as DexEntry;
+  const base = Number(species?.baseStats?.spe);
+  if (!Number.isFinite(base)) return 0;
+  const level = Math.max(1, Math.min(100, p.level || 100));
+  const iv = Math.max(0, Math.min(31, p.ivs?.spe ?? 31));
+  const ev = Math.max(0, Math.min(252, p.evs?.spe ?? 0));
+  let speed = Math.floor(Math.floor((2 * base + iv + Math.floor(ev / 4)) * level / 100) + 5);
+  const nature = Dex.natures.get(p.nature || "Serious") as unknown as DexEntry;
+  if (nature?.plus === "spe") speed = Math.floor(speed * 1.1);
+  if (nature?.minus === "spe") speed = Math.floor(speed * 0.9);
+  return Math.max(1, speed);
+}
+
 /** Move priority after common Gen 9 ability/terrain modifiers. */
 export function getEffectiveMovePriority(p: PokemonSet, moveName: string, field: FieldState): number {
   const move = Dex.moves.get(moveName) as unknown as DexEntry;
