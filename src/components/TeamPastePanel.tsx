@@ -78,7 +78,6 @@ export default function TeamPastePanel({ left, right, open, onClose, onImport, o
   const [textB, setTextB] = useState("");
   const [builderA, setBuilderA] = useState<Team>(() => paddedTeam(left));
   const [builderB, setBuilderB] = useState<Team>(() => paddedTeam(right));
-  const [format, setFormat] = useState("gen9ou");
   const [setDatabase, setSetDatabase] = useState<SetDatabase | null>(null);
   const [setStatus, setSetStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [selectedPresets, setSelectedPresets] = useState<Record<string, string>>({});
@@ -96,12 +95,21 @@ export default function TeamPastePanel({ left, right, open, onClose, onImport, o
     if (!open || mode !== "builder") return;
     const controller = new AbortController();
     setSetStatus("loading"); setSetDatabase(null);
-    fetch(`https://pkmn.github.io/smogon/data/sets/${format}.json`, { signal: controller.signal })
-      .then(response => { if (!response.ok) throw new Error(`Preset data returned ${response.status}`); return response.json(); })
-      .then(data => { if (!controller.signal.aborted) { setSetDatabase(data as SetDatabase); setSetStatus("ready"); } })
-      .catch(error => { if (!controller.signal.aborted) { setSetStatus("error"); setSetDatabase(null); } });
+    Promise.all(FORMATS.map(async format => {
+      const response = await fetch(`https://pkmn.github.io/smogon/data/sets/${format.value}.json`, { signal: controller.signal });
+      if (!response.ok) throw new Error(`Preset data returned ${response.status}`);
+      return { format, data: await response.json() as SetDatabase };
+    })).then(results => {
+      if (controller.signal.aborted) return;
+      const merged: SetDatabase = {};
+      for (const { format, data } of results) for (const [species, sets] of Object.entries(data)) {
+        merged[species] ||= {};
+        for (const [setName, set] of Object.entries(sets || {})) merged[species][`${format.label} · ${setName}`] = set;
+      }
+      setSetDatabase(merged); setSetStatus("ready");
+    }).catch(() => { if (!controller.signal.aborted) { setSetStatus("error"); setSetDatabase(null); } });
     return () => controller.abort();
-  }, [open, mode, format]);
+  }, [open, mode]);
 
   const dexOptions = useMemo(() => {
     const all = (table: unknown): Array<{ name: string; exists?: boolean }> => {
@@ -176,6 +184,7 @@ export default function TeamPastePanel({ left, right, open, onClose, onImport, o
           <label>Ability<AutocompleteInput ariaLabel={`${pokemon.species} ability`} options={abilitiesForSpecies(pokemon.species)} value={pokemon.ability} onChange={value => updateBuilderPokemon(side, index, { ability: value })} /></label>
           <label>Nature<select value={pokemon.nature} onChange={event => updateBuilderPokemon(side, index, { nature: event.target.value })}>{NATURES.map(n => { const effect = NATURE_EFFECTS[n]; return <option key={n} value={n}>{n}{effect.plus && effect.minus ? ` (+${effect.plus}, −${effect.minus})` : " (neutral)"}</option>; })}</select></label>
           <label>Level<input type="number" min="1" max="100" value={pokemon.level} onChange={event => updateBuilderPokemon(side, index, { level: Math.max(1, Math.min(100, Number(event.target.value) || 100)) })} /></label>
+          <label>Tera Type<select aria-label={`${pokemon.species} Tera type`} value={pokemon.teraType || ""} onChange={event => updateBuilderPokemon(side, index, { teraType: event.target.value })}><option value="">None</option>{["Normal","Fire","Water","Electric","Grass","Ice","Fighting","Poison","Ground","Flying","Psychic","Bug","Rock","Ghost","Dragon","Dark","Steel","Fairy","Stellar"].map(type => <option key={type} value={type}>{type}</option>)}</select></label>
         </div>
         <div className="builder-moves">{[0,1,2,3].map(moveIndex => <label key={moveIndex}>Move {moveIndex + 1}<AutocompleteInput ariaLabel={`${pokemon.species} move ${moveIndex + 1}`} options={dexOptions.moves} value={pokemon.moves[moveIndex] || ""} onChange={value => { const moves = [...pokemon.moves]; moves[moveIndex] = value; updateBuilderPokemon(side, index, { moves }); }} /></label>)}</div>
         <div className="builder-evs-heading"><strong>EVs</strong>{(() => { const remaining = 510 - Object.values(pokemon.evs).reduce((sum, value) => sum + value, 0); return <span className={remaining < 0 ? "evs-remaining-over" : ""}>Remaining: {remaining}</span>; })()}</div>
@@ -188,7 +197,7 @@ export default function TeamPastePanel({ left, right, open, onClose, onImport, o
   return <div className="teams-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="teams-modal panel" role="dialog" aria-modal="true" aria-labelledby="teams-modal-title">
       <div className="panel-title-row"><div><h2 id="teams-modal-title">Teams · Teambuilder / Paste</h2><p>Edit sets directly or import/export Pokémon Showdown text.</p></div><button onClick={onClose} aria-label="Close teams">Close ×</button></div>
-      <div className="builder-toolbar"><div className="mode-toggle" role="group" aria-label="Team editing mode"><button className={mode === "builder" ? "active" : ""} onClick={() => setMode("builder")}>Teambuilder</button><button className={mode === "paste" ? "active" : ""} onClick={() => setMode("paste")}>Paste</button></div>{mode === "builder" && <label className="format-picker">Meta format<select value={format} onChange={event => { setFormat(event.target.value); setSelectedPresets({}); }} >{FORMATS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>}<small className="preset-status">{mode === "builder" ? setStatus === "loading" ? "Loading Smogon sets…" : setStatus === "error" ? "Smogon set data unavailable; manual editing still works." : "Presets from Smogon usage sets" : "Standard Showdown team paste format"}</small></div>
+      <div className="builder-toolbar"><div className="mode-toggle" role="group" aria-label="Team editing mode"><button className={mode === "builder" ? "active" : ""} onClick={() => setMode("builder")}>Teambuilder</button><button className={mode === "paste" ? "active" : ""} onClick={() => setMode("paste")}>Paste</button></div><small className="preset-status">{mode === "builder" ? setStatus === "loading" ? "Loading Smogon sets…" : setStatus === "error" ? "Smogon set data unavailable; manual editing still works." : "Presets from Smogon usage sets" : "Standard Showdown team paste format"}</small></div>
       {mode === "builder" ? <><div className="teams-two-column">{renderBuilderTeam("left", builderA)}{renderBuilderTeam("right", builderB)}</div></> : <div className="teams-two-column">
         <section className="team-editor"><div className="team-editor-heading"><h3>Team A</h3><span>{left.length}/6 Pokémon</span></div><textarea aria-label="Team A Showdown text" value={textA} onChange={e => setTextA(e.target.value)} spellCheck={false}/><div className="button-row"><button className="primary" onClick={() => importNow("left")}>Import Team A</button><button onClick={() => download("left")}>Export Team A</button><button onClick={() => navigator.clipboard?.writeText(exportTeam(left))}>Copy current</button></div></section>
         <section className="team-editor"><div className="team-editor-heading"><h3>Team B</h3><span>{right.length}/6 Pokémon</span></div><textarea aria-label="Team B Showdown text" value={textB} onChange={e => setTextB(e.target.value)} spellCheck={false}/><div className="button-row"><button className="primary" onClick={() => importNow("right")}>Import Team B</button><button onClick={() => download("right")}>Export Team B</button><button onClick={() => navigator.clipboard?.writeText(exportTeam(right))}>Copy current</button></div></section>

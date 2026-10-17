@@ -477,3 +477,8 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 .builder-autocomplete { display: flex; align-items: stretch; position: relative; min-width: 0; }
 .builder-autocomplete > input { flex: 1; min-width: 0; }
 .builder-autocomplete .autocomplete-dropdown-toggle { flex: 0 0 24px; padding: 0 4px; border: 1px solid var(--border); border-left: 0; border-radius: 0 5px 5px 0; background: var(--surface-2, #252c38); color: var(--text); cursor: pointer; }
+
+
+/* v0.5.17: field-effect move indicators and compact EV max controls */
+.move-field-indicator { display: inline-block; margin-left: 4px; padding: 1px 4px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); font-size: .62rem; font-weight: 600; line-height: 1.3; vertical-align: middle; }
+.speed-editor-side label > button { align-self: flex-start; padding: 3px 7px; font-size: .7rem; }
