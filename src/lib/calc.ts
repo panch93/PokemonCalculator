@@ -265,8 +265,10 @@ export function calculateMove(
 
     const rawMinPct = (min / maxHp) * 100;
     const rawMaxPct = (max / maxHp) * 100;
-    const minPct = (min / effectiveHp) * 100;
-    const maxPct = (max / effectiveHp) * 100;
+    // Damage percentages are always relative to total maximum HP, as in the Smogon calculator.
+    // Current HP affects HP-sensitive mechanics and KO estimates, not the displayed damage percentage.
+    const minPct = rawMinPct;
+    const maxPct = rawMaxPct;
     const entryHazardPct = (entryHazardDamage / maxHp) * 100;
 
     const hazardText = entryHazardDamage > 0
@@ -326,7 +328,8 @@ export function calculateMove(
       effectiveHp,
       entryHazardDamage,
       entryHazardPct,
-      ko: koLabel(minPct, maxPct),
+      // KO estimates use the Pokémon's current HP, while the displayed damage percentages above remain max-HP based.
+      ko: koLabel((min / effectiveHp) * 100, (max / effectiveHp) * 100),
       description: `${baseDescription}${appendedHazardText}${residualNotes ? ` ${residualNotes}` : ""}`,
     });
   } catch {
@@ -375,6 +378,26 @@ export function getMoveDetails(moveName: string): MoveDetails | null {
     };
   } catch {
     return null;
+  }
+}
+
+
+/** Resolve the stat automatically selected by Protosynthesis / Quark Drive from the Pokémon's unboosted battle stats. */
+export function getAutoBoostedStat(set: PokemonSet): NonNullable<PokemonSet["boostedStat"]> {
+  try {
+    const pokemon = new Pokemon(gen, set.species, {
+      item: set.item.trim() || undefined,
+      nature: set.nature.trim() || undefined,
+      level: set.level || 100,
+      evs: set.evs,
+      ivs: set.ivs,
+    });
+    const stats = (pokemon as unknown as { stats?: Record<string, number> }).stats || {};
+    // Pokémon Showdown's tie priority for these abilities: Speed, Special Attack, Attack, Special Defense, Defense.
+    const priority = ["spe", "spa", "atk", "spd", "def"] as const;
+    return priority.reduce((best, stat) => (Number(stats[stat] || 0) > Number(stats[best] || 0) ? stat : best), priority[0]);
+  } catch {
+    return "spe";
   }
 }
 
