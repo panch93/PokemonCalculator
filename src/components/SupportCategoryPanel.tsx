@@ -1,26 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Dex } from "@pkmn/dex";
 import { Team, PokemonSet } from "../lib/types";
 import categoriesData from "../data/support-categories.json";
 import { getSpeciesLearnset } from "../lib/learnsets";
 import { getMoveDescription } from "../lib/move-descriptions";
 import { getAbilityDescription } from "../lib/item-ability-descriptions";
+import PokemonSprite from "./PokemonSprite";
 
 type Category = { id: string; label: string; moves: string[]; abilities: string[]; note?: string };
 type Entry = { key: string; species: string; move?: string; ability?: string; side: "Team A" | "Team B"; fainted: boolean };
 const CATEGORIES = categoriesData as Category[];
 const id = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-function spriteUrl(species: string) {
-  const slug = species.toLowerCase().replace(/♀/g, "-f").replace(/♂/g, "-m").replace(/[.’']/g, "").replace(/[ _]+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
-  return `https://play.pokemonshowdown.com/sprites/gen5/${slug}.png`;
-}
-function PokemonSprite({ species }: { species: string }) {
-  return <img className="support-pokemon-sprite" src={spriteUrl(species)} alt={species} title={species} loading="lazy" onError={event => { event.currentTarget.style.visibility = "hidden"; }} />;
-}
 
-export default function SupportCategoryPanel({ left, right, format }: { left: Team; right: Team; format: string }) {
+export default function SupportCategoryPanel({ left, right, format, onClose }: { left: Team; right: Team; format: string; onClose: () => void }) {
   const [teamFilter, setTeamFilter] = useState<"both" | "A" | "B">("both");
   const [pokemonFilter, setPokemonFilter] = useState<"living" | "all">("living");
   const [learnsets, setLearnsets] = useState<Record<string, Set<string> | null>>({});
@@ -57,8 +50,8 @@ export default function SupportCategoryPanel({ left, right, format }: { left: Te
     return { category, entries };
   }), [left, right, teamFilter, pokemonFilter, learnsets]);
 
-  return <section className="support-panel">
-    <div className="panel-title-row"><div><h2>Team Support</h2><p>Lists category moves from each Pokémon’s learnset, not just its currently equipped moves. Abilities use the Pokémon’s selected ability.</p></div></div>
+  return <div className="teams-modal-backdrop support-modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}><section className="panel support-panel teams-modal support-modal">
+    <div className="panel-title-row"><div><h2>Move Support</h2><p>Learnable category moves and selected abilities for the selected teams.</p></div><button type="button" onClick={onClose}>Close</button></div>
     <div className="support-filters" aria-label="Team Support filters">
       <div className="support-toggle-group" role="group" aria-label="Teams to show">
         <button type="button" className="active" aria-pressed="true" onClick={() => setTeamFilter(current => current === "both" ? "A" : current === "A" ? "B" : "both")}>Teams: {teamFilter === "both" ? "Both" : teamFilter === "A" ? "Team A" : "Team B"} · Change</button>
@@ -71,7 +64,7 @@ export default function SupportCategoryPanel({ left, right, format }: { left: Te
       {categoryEntries.map(({ category, entries }) => <section className="support-category-column" key={category.id}>
         <header className="support-category-heading"><h3>{category.label}</h3><span>{entries.length}</span></header>
         {entries.length === 0 ? <p className="support-empty">No available options</p> : <div className="support-category-entries">{entries.map(entry => <div className={`support-entry support-entry-line${entry.fainted ? " is-fainted" : ""}`} key={entry.key} title={`${entry.species} · ${entry.side}${entry.fainted ? " · Fainted" : ""}`}>
-          <PokemonSprite species={entry.species} />
+          <PokemonSprite species={entry.species} className="support-pokemon-sprite" />
           <span className="support-entry-option" title={entry.move ? `${entry.move} — ${getMoveDescription(entry.move) || "No move description available."}` : `${entry.ability} — ${getAbilityDescription(entry.ability || "")}`}>{entry.move || entry.ability}</span>
           {entry.ability && <span className="support-ability-marker" title="Selected ability">A</span>}
           <span className={`support-side-marker ${entry.side === "Team A" ? "team-a" : "team-b"}`} title={entry.side}>{entry.side === "Team A" ? "A" : "B"}</span>
@@ -79,5 +72,5 @@ export default function SupportCategoryPanel({ left, right, format }: { left: Te
       </section>)}
     </div>
     <p className="support-footnote">Format: {format}. Moves are listed when present in the species learnset available in the local Pokédex data; format bans and draft-specific restrictions are not yet fully validated. The Living Pokémon filter excludes fainted Pokémon; All Pokémon includes them.</p>
-  </section>;
+  </section></div>;
 }

@@ -578,3 +578,26 @@ select, select:focus, select option, datalist option {
 .hero-actions .learnset-status.ready { color:#6ee7b7; }
 .hero-actions .learnset-status.error { color:#fca5a5; }
 .hero-actions button:disabled { opacity:.65; cursor:wait; }
+
+/* Shared Pokémon sprite fallback and utility popups. */
+.sprite-fallback { display:inline-flex; align-items:center; justify-content:center; border-radius:50%; background:#273449; color:#dbeafe; font-size:9px; font-weight:800; }
+.support-modal-backdrop { z-index:1100; }
+.support-modal { width:min(1500px,96vw); max-height:92vh; }
+.support-modal .support-category-columns { grid-template-columns:repeat(8,minmax(0,1fr)); }
+.coverage-modal { width:min(980px,94vw); max-height:90vh; overflow:auto; }
+.coverage-controls { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:12px 0 16px; }
+.coverage-controls label { display:flex; align-items:center; gap:8px; }
+.coverage-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.coverage-columns > section { min-width:0; padding:12px; border:1px solid var(--border,#303846); border-radius:10px; background:#0c1017; }
+.coverage-columns h3 { display:flex; justify-content:space-between; margin:0 0 10px; font-size:14px; }
+.coverage-columns h3 span { color:var(--muted,#98a2b3); font-size:11px; }
+.coverage-entry { display:flex; align-items:center; gap:7px; min-height:28px; padding:3px 5px; border-radius:5px; font-size:12px; }
+.coverage-entry:hover { background:#202b3a; }
+.coverage-sprite { width:24px; height:24px; flex:0 0 24px; object-fit:contain; }
+.coverage-entry > span:nth-child(2) { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.coverage-entry small { width:16px; height:16px; flex:0 0 16px; display:inline-flex; align-items:center; justify-content:center; border-radius:4px; font-size:9px; font-weight:800; }
+.coverage-entry small.team-a { color:#eff6ff; background:#1d4ed8; }
+.coverage-entry small.team-b { color:#fff1f2; background:#9f1239; }
+.coverage-entry.is-fainted { opacity:.55; text-decoration:line-through; }
+@media(max-width:1100px) { .support-modal .support-category-columns { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+@media(max-width:760px) { .coverage-columns { grid-template-columns:1fr; } .support-modal .support-category-columns { grid-template-columns:repeat(2,minmax(0,1fr)); } }

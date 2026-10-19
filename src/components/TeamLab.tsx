@@ -7,7 +7,6 @@ import { FieldState, Matchup, StatStages, Team } from "../lib/types";
 import TeamPastePanel from "./TeamPastePanel";
 import MatchupMatrix from "./MatchupMatrix";
 import FieldPanel from "./FieldPanel";
-import SupportCategoryPanel from "./SupportCategoryPanel";
 import { getLearnsetModeLabel, loadFormatLearnsets } from "../lib/learnsets";
 
 const DEFAULT_FIELD: FieldState = {
@@ -178,7 +177,6 @@ export default function TeamLab() {
           onColPokemonChange={(index, patch) => updatePokemon(swapped ? "left" : "right", index, patch)}
         />
       </div>
-      <SupportCategoryPanel left={left} right={right} format={format} />
       <TeamPastePanel left={left} right={right} format={format} open={teamsOpen} onClose={() => setTeamsOpen(false)} onImport={importTeam} onEditTeam={(side, team) => { if (side === "left") { setLeft(team); setMovesA(previous => reconcileMoves(team, previous)); } else { setRight(team); setMovesB(previous => reconcileMoves(team, previous)); } }} />
     </main>
   );
