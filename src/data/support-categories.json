@@ -26,8 +26,7 @@
     ],
     "abilities": [
       "Magic Bounce"
-    ],
-    "note": "Magic Bounce prevents or reflects some hazard-setting moves; it does not clear hazards already on the field."
+    ]
   },
   {
     "id": "healing",

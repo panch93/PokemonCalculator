@@ -5,6 +5,7 @@ import { Dex } from "@pkmn/dex";
 import { exportTeam, parseTeamPaste } from "../lib/team-parser";
 import { PokemonSet, Stats, Team } from "../lib/types";
 import AutocompleteInput from "./AutocompleteInput";
+import { getSpeciesLearnset } from "../lib/learnsets";
 
 type Side = "left" | "right";
 type Props = {
@@ -81,6 +82,7 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
   const [setDatabase, setSetDatabase] = useState<SetDatabase | null>(null);
   const [setStatus, setSetStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [selectedPresets, setSelectedPresets] = useState<Record<string, string>>({});
+  const [learnsetsBySpecies, setLearnsetsBySpecies] = useState<Record<string, Set<string> | null>>({});
 
   useEffect(() => {
     if (open) {
@@ -111,6 +113,16 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
     return () => controller.abort();
   }, [open, mode]);
 
+  useEffect(() => {
+    if (!open || mode !== "builder") return;
+    let cancelled = false;
+    const species = [...new Set([...builderA, ...builderB].filter(p => !/^Empty Slot/.test(p.name) && p.species).map(p => p.species))];
+    Promise.all(species.map(async name => [cleanId(name), await getSpeciesLearnset(name)] as const)).then(entries => {
+      if (!cancelled) setLearnsetsBySpecies(previous => ({ ...previous, ...Object.fromEntries(entries) }));
+    }).catch(() => { /* keep autocomplete usable if learnset data cannot load */ });
+    return () => { cancelled = true; };
+  }, [open, mode, builderA, builderB]);
+
   const dexOptions = useMemo(() => {
     const all = (table: unknown): Array<{ name: string; exists?: boolean }> => {
       try { return (table as { all: () => Array<{ name: string; exists?: boolean }> }).all().filter(entry => entry.exists !== false); }
@@ -123,14 +135,15 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
   }, [left, right]);
   const speciesOptions = dexOptions.species;
   const legalMovesFor = (species: string) => {
-    try {
-      const learnsets = (Dex as unknown as { learnsets?: { get: (name: string) => { learnset?: Record<string, unknown> } } }).learnsets;
-      const entry = learnsets?.get(species);
-      if (!entry?.learnset) return dexOptions.moves;
-      return dexOptions.moves.filter(move => Boolean(entry.learnset?.[cleanId(move)]));
-    } catch { return dexOptions.moves; }
+    const learnset = learnsetsBySpecies[cleanId(species)];
+    if (!learnset) return dexOptions.moves;
+    return dexOptions.moves.filter(move => learnset.has(cleanId(move)));
   };
-  const moveIsLegal = (species: string, move: string) => !move || legalMovesFor(species).some(candidate => cleanId(candidate) === cleanId(move));
+  const moveIsLegal = (species: string, move: string) => {
+    if (!move) return true;
+    const learnset = learnsetsBySpecies[cleanId(species)];
+    return !learnset || learnset.has(cleanId(move));
+  };
   const abilitiesForSpecies = (species: string): string[] => {
     try {
       const entry = (Dex.species as unknown as { get: (name: string) => { abilities?: Record<string, string> } }).get(species);
