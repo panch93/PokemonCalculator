@@ -24,15 +24,22 @@ export default function SupportCategoryPanel({ left, right, format }: { left: Te
   const [teamFilter, setTeamFilter] = useState<"both" | "A" | "B">("both");
   const [pokemonFilter, setPokemonFilter] = useState<"living" | "all">("living");
   const [learnsets, setLearnsets] = useState<Record<string, Set<string> | null>>({});
+  const [learnsetRevision, setLearnsetRevision] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => setLearnsetRevision(value => value + 1);
+    window.addEventListener("ptl-learnsets-refreshed", refresh);
+    return () => window.removeEventListener("ptl-learnsets-refreshed", refresh);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     const species = [...new Set([...left, ...right].filter(p => !/^Empty Slot/.test(p.name) && p.species).map(p => p.species))];
-    Promise.all(species.map(async name => [id(name), await getSpeciesLearnset(name)] as const)).then(entries => {
+    Promise.all(species.map(async name => [id(name), await getSpeciesLearnset(name, format)] as const)).then(entries => {
       if (!cancelled) setLearnsets(previous => ({ ...previous, ...Object.fromEntries(entries) }));
     }).catch(() => { /* keep unknown learnsets unmarked rather than claiming illegality */ });
     return () => { cancelled = true; };
-  }, [left, right]);
+  }, [left, right, format, learnsetRevision]);
 
   const categoryEntries = useMemo(() => CATEGORIES.map(category => {
     const entries: Entry[] = ([{ label: "Team A" as const, team: left, code: "A" as const }, { label: "Team B" as const, team: right, code: "B" as const }])

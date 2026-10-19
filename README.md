@@ -73,3 +73,7 @@ The current model is intentionally a 6v6 singles analysis lab. It does not yet s
 - A compact metadata summary remains as a defensive fallback for moves absent from the bundled data.
 - The GitHub Pages workflow now installs dependencies, runs `npm run typecheck`, smoke-tests canonical descriptions for Tackle, Earthquake, Leech Seed, and Salt Cure, and only then runs the static production build. Removed npm caching because this archive does not include a lockfile; this avoids setup-node cache failures caused by a missing lockfile.
 - `@pkmn/dex` is pinned to version `0.10.11` for reproducible dependency resolution. Update that version deliberately to consume newer pkmn/ps data, then validate typecheck and production build before deploying.
+
+### Learnset and format legality data
+
+The app loads the live global Pokémon Showdown `learnsets.json` table and caches it per selected format for UI consistency. Pokémon Showdown does not expose a general public REST endpoint that resolves arbitrary custom draft formats (such as Champions NatDex Draft) into a complete, validated per-species move legality table. Until a format-specific validator/ruleset source is configured, move legality therefore means **species learnset membership**, not draft bans or format-specific restrictions. The status indicator intentionally labels this fallback. Changing the selected format selects/creates that format's cache entry; the manual refresh button refreshes the underlying live learnset data.

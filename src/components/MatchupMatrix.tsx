@@ -210,14 +210,20 @@ function allItemNames() {
 
 export default function MatchupMatrix(props: Props) {
   const [learnsetsBySpecies, setLearnsetsBySpecies] = useState<Record<string, Set<string> | null>>({});
+  const [learnsetRevision, setLearnsetRevision] = useState(0);
+  useEffect(() => {
+    const refresh = () => setLearnsetRevision(value => value + 1);
+    window.addEventListener("ptl-learnsets-refreshed", refresh);
+    return () => window.removeEventListener("ptl-learnsets-refreshed", refresh);
+  }, []);
   useEffect(() => {
     let cancelled = false;
     const species = [...new Set([...props.left, ...props.right].filter(p => p.species).map(p => p.species))];
-    Promise.all(species.map(async name => [name.toLowerCase().replace(/[^a-z0-9]/g, ""), await getSpeciesLearnset(name)] as const)).then(entries => {
+    Promise.all(species.map(async name => [name.toLowerCase().replace(/[^a-z0-9]/g, ""), await getSpeciesLearnset(name, props.format)] as const)).then(entries => {
       if (!cancelled) setLearnsetsBySpecies(previous => ({ ...previous, ...Object.fromEntries(entries) }));
     }).catch(() => { /* legality remains unknown until learnset data is available */ });
     return () => { cancelled = true; };
-  }, [props.left, props.right]);
+  }, [props.left, props.right, props.format, learnsetRevision]);
   const { left, right, matchups, selected, swapped, rowStages, colStages, fieldState, format } = props;
   const [speedEditor, setSpeedEditor] = useState<SpeedEditor | null>(null);
   const [moveEditor, setMoveEditor] = useState<MoveEditor | null>(null);

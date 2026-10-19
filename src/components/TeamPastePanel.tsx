@@ -83,6 +83,13 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
   const [setStatus, setSetStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [selectedPresets, setSelectedPresets] = useState<Record<string, string>>({});
   const [learnsetsBySpecies, setLearnsetsBySpecies] = useState<Record<string, Set<string> | null>>({});
+  const [learnsetRevision, setLearnsetRevision] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => setLearnsetRevision(value => value + 1);
+    window.addEventListener("ptl-learnsets-refreshed", refresh);
+    return () => window.removeEventListener("ptl-learnsets-refreshed", refresh);
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -117,11 +124,11 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
     if (!open || mode !== "builder") return;
     let cancelled = false;
     const species = [...new Set([...builderA, ...builderB].filter(p => !/^Empty Slot/.test(p.name) && p.species).map(p => p.species))];
-    Promise.all(species.map(async name => [cleanId(name), await getSpeciesLearnset(name)] as const)).then(entries => {
+    Promise.all(species.map(async name => [cleanId(name), await getSpeciesLearnset(name, format)] as const)).then(entries => {
       if (!cancelled) setLearnsetsBySpecies(previous => ({ ...previous, ...Object.fromEntries(entries) }));
     }).catch(() => { /* keep autocomplete usable if learnset data cannot load */ });
     return () => { cancelled = true; };
-  }, [open, mode, builderA, builderB]);
+  }, [open, mode, builderA, builderB, format, learnsetRevision]);
 
   const dexOptions = useMemo(() => {
     const all = (table: unknown): Array<{ name: string; exists?: boolean }> => {

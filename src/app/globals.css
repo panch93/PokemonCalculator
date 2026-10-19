@@ -574,3 +574,7 @@ select, select:focus, select option, datalist option {
 .support-category-column .support-empty { font-size:10px; }
 @media (max-width: 1000px) { .support-category-columns { grid-template-columns:repeat(4,minmax(0,1fr)); } }
 @media (max-width: 620px) { .support-category-columns { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+.hero-actions .learnset-status { align-self:center; font-size:11px; color:var(--muted,#98a2b3); }
+.hero-actions .learnset-status.ready { color:#6ee7b7; }
+.hero-actions .learnset-status.error { color:#fca5a5; }
+.hero-actions button:disabled { opacity:.65; cursor:wait; }
