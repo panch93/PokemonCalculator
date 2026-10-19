@@ -13,7 +13,7 @@ type Entry = { key: string; species: string; move?: string; ability?: string; si
 const CATEGORIES = categoriesData as Category[];
 const id = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 function spriteUrl(species: string) {
-  const slug = species.toLowerCase().replace(/♀/g, "-f").replace(/♂/g, "-m").replace(/[.’']/g, "").replace(/[^a-z0-9-]/g, "").replace(/-/g, "");
+  const slug = species.toLowerCase().replace(/♀/g, "-f").replace(/♂/g, "-m").replace(/[.’']/g, "").replace(/[ _]+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
   return `https://play.pokemonshowdown.com/sprites/gen5/${slug}.png`;
 }
 function PokemonSprite({ species }: { species: string }) {

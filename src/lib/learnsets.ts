@@ -13,10 +13,17 @@ function unwrapLearnsets(value: unknown): LearnsetMap {
   const root = value as Record<string, unknown>;
   const nested = (root.learnsets ?? root.Learnsets ?? root.data ?? root) as Record<string, unknown>;
   const output: LearnsetMap = {};
-  for (const [key, raw] of Object.entries(nested || {})) {
+  // Some public data builds wrap the species table one level deeper.
+  const speciesTable = ((nested as Record<string, unknown>).pokemon ?? (nested as Record<string, unknown>).species ?? nested) as Record<string, unknown>;
+  for (const [key, raw] of Object.entries(speciesTable || {})) {
     if (!raw || typeof raw !== "object") continue;
     const entry = raw as Record<string, unknown>;
-    const learnset = (entry.learnset ?? entry.Learnset ?? entry) as Record<string, unknown>;
+    // Formes can be marked `inherit: true` and contain no own moves. Preserve
+    // them as empty entries; getSpeciesLearnset will merge their base learnset.
+    const learnsetValue = entry.learnset ?? entry.Learnset;
+    const learnset = (learnsetValue && typeof learnsetValue === "object")
+      ? learnsetValue as Record<string, unknown>
+      : entry.inherit === true ? {} : entry;
     if (learnset && typeof learnset === "object") output[cleanId(key)] = learnset;
   }
   return output;
@@ -96,16 +103,32 @@ export function getLearnsetModeLabel(_format: string): string {
 
 export async function getSpeciesLearnset(species: string, format = "championsnatdexdraft"): Promise<Set<string> | null> {
   const table = await loadFormatLearnsets(format);
-  const key = cleanId(species);
-  let entry = table[key];
-  if (!entry) {
-    try {
-      const speciesEntry = Dex.species.get(species) as unknown as { name?: string; baseSpecies?: string; forme?: string };
-      entry = table[cleanId(speciesEntry.name || "")] || table[cleanId(speciesEntry.baseSpecies || "")];
-    } catch { /* unknown species */ }
+  const candidates = new Set<string>([cleanId(species)]);
+  try {
+    const speciesEntry = Dex.species.get(species) as unknown as {
+      id?: string; name?: string; baseSpecies?: string; forme?: string; changesFrom?: string;
+    };
+    for (const value of [speciesEntry.id, speciesEntry.name, speciesEntry.baseSpecies, speciesEntry.changesFrom]) {
+      if (value) candidates.add(cleanId(value));
+    }
+  } catch { /* aliases may still resolve directly by their normalized ID */ }
+
+  // Form-specific entries sometimes contain only `inherit: true`, or have a
+  // partial learnset. Merge the canonical forme and base species so these
+  // Pokémon don't get every move incorrectly marked illegal.
+  const moves = new Set<string>();
+  let found = false;
+  const metadataKeys = new Set(["inherit", "eventdata", "encounters", "exists", "species", "name", "id", "learnset", "basespecies", "forme"]);
+  for (const candidate of candidates) {
+    const entry = table[candidate];
+    if (!entry) continue;
+    found = true;
+    for (const move of Object.keys(entry)) {
+      const moveId = cleanId(move);
+      if (moveId && !metadataKeys.has(moveId)) moves.add(moveId);
+    }
   }
-  if (!entry) return null;
-  return new Set(Object.keys(entry).map(cleanId));
+  return found ? moves : null;
 }
 
 export function isMoveInLearnset(learnset: Set<string> | null | undefined, move: string): boolean | null {
