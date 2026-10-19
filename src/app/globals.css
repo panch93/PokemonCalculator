@@ -525,3 +525,27 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 .support-footnote { margin-top: 12px; line-height: 1.45; }
 
 .unburden-speed-indicator { margin: -4px 0 0; padding: 5px 7px; border-radius: 5px; background: rgba(74, 222, 128, .12); color: var(--text); font-size: .75rem; font-weight: 600; }
+
+/* Keep native dropdowns readable in the dark battle-lab theme. */
+select, select:focus, select option, datalist option {
+  color: #f3f4f6;
+  background-color: #0c1017;
+  color-scheme: dark;
+}
+
+/* Team support is a bottom-of-page, multi-column category overview. */
+.support-panel { margin: 22px 0 0; background: var(--panel, #111722); color: var(--text, #f3f4f6); }
+.support-category-columns { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.support-category-column { min-width: 0; border: 1px solid var(--border, #303846); background: rgba(5, 9, 16, .35); border-radius: 10px; padding: 10px; }
+.support-category-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border, #303846); }
+.support-category-heading h3 { font-size: 13px; line-height: 1.35; margin: 0; }
+.support-category-heading > span { flex: 0 0 auto; font-size: 10px; border-radius: 99px; padding: 2px 6px; background: #252f3e; color: #d8e2f0; }
+.support-category-entries { display: flex; flex-direction: column; gap: 8px; }
+.support-category-column .support-entry { background: #111925; border-color: #303b4a; }
+.support-category-column .support-tag { color: #e8edf5; background: #263244; }
+.support-category-column .support-tag.ability { background: #18372e; color: #d6f7e8; }
+.support-category-column .support-empty, .support-category-column .support-note { line-height: 1.45; margin: 8px 0; }
+.support-panel .support-footnote { margin-top: 14px; }
+@media (max-width: 1250px) { .support-category-columns { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .support-category-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .support-category-columns { grid-template-columns: minmax(0, 1fr); } }
