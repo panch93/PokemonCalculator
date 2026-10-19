@@ -31,6 +31,8 @@ export function getEffectiveSpeed(p: PokemonSet, field: FieldState, side: "attac
   // (paralysis, Tailwind, Trick Room, weather abilities activated by other sources) is not represented.
   if (p.status === "par" && !ability(p, "Quick Feet")) speed = Math.floor(speed * 0.5);
   if (ability(p, "Quick Feet") && p.status) speed = Math.floor(speed * 1.5);
+  // In this team-planning UI, a missing item is treated as Unburden having activated.
+  if (ability(p, "Unburden") && !p.item.trim()) speed *= 2;
   if (item(p, "Choice Scarf")) speed = Math.floor(speed * 1.5);
   if (item(p, "Iron Ball") || item(p, "Macho Brace") || ["Power Anklet", "Power Band", "Power Belt", "Power Bracer", "Power Lens", "Power Weight"].some(x => item(p, x))) speed = Math.floor(speed * 0.5);
   if (ability(p, "Swift Swim") && field.weather === "Rain") speed *= 2;

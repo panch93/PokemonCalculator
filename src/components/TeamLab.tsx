@@ -7,6 +7,7 @@ import { FieldState, Matchup, StatStages, Team } from "../lib/types";
 import TeamPastePanel from "./TeamPastePanel";
 import MatchupMatrix from "./MatchupMatrix";
 import FieldPanel from "./FieldPanel";
+import SupportCategoryPanel from "./SupportCategoryPanel";
 
 const DEFAULT_FIELD: FieldState = {
   weather: "", terrain: "", defenderStealthRock: false, defenderSpikes: 0, defenderReflect: false,
@@ -17,7 +18,7 @@ const ZERO_STAGES = (): StatStages[] => Array.from({ length: 6 }, () => ({ atk: 
 const initialMoves = (team: Team) => team.map(p => p.moves.find(Boolean) || "");
 const STORAGE_KEY = "pokemon-team-lab-v0.3.0";
 
-type SavedState = { schemaVersion?: number; field?: FieldState; teamA?: Team; teamB?: Team; movesA?: string[]; movesB?: string[]; stagesA?: StatStages[]; stagesB?: StatStages[]; swapped?: boolean; critical?: boolean };
+type SavedState = { schemaVersion?: number; generation?: number; field?: FieldState; teamA?: Team; teamB?: Team; movesA?: string[]; movesB?: string[]; stagesA?: StatStages[]; stagesB?: StatStages[]; swapped?: boolean; critical?: boolean };
 
 export default function TeamLab() {
   const [left, setLeft] = useState<Team>(sampleTeamA);
@@ -32,6 +33,9 @@ export default function TeamLab() {
   const [stagesB, setStagesB] = useState<StatStages[]>(ZERO_STAGES);
   const [storageReady, setStorageReady] = useState(false);
   const [teamsOpen, setTeamsOpen] = useState(false);
+  const [format, setFormat] = useState("championsnatdexdraft");
+  const [mechanics, setMechanics] = useState({ tera: true });
+  const [generation, setGeneration] = useState(9);
 
   useEffect(() => {
     try {
@@ -44,6 +48,7 @@ export default function TeamLab() {
         const savedA = normalizeTeam(saved.teamA, resetLegacyTera) || sampleTeamA;
         const savedB = normalizeTeam(saved.teamB, resetLegacyTera) || sampleTeamB;
         setLeft(savedA); setRight(savedB);
+        if (typeof saved.generation === "number" && saved.generation >= 1 && saved.generation <= 9) setGeneration(saved.generation);
         if (saved.field) setField({ ...DEFAULT_FIELD, ...saved.field, tailwindSide: saved.field.tailwindSide || "", trickRoom: Boolean(saved.field.trickRoom) });
         if (saved.movesA) setMovesA(reconcileMoves(savedA, saved.movesA));
         else setMovesA(initialMoves(savedA));
@@ -61,25 +66,25 @@ export default function TeamLab() {
   useEffect(() => {
     if (!storageReady) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 3, teamA: left, teamB: right, field, movesA, movesB, stagesA, stagesB, swapped, critical }));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 4, generation, teamA: left, teamB: right, field, movesA, movesB, stagesA, stagesB, swapped, critical }));
     } catch { /* The app still works if storage is disabled or full. */ }
-  }, [left, right, field, movesA, movesB, stagesA, stagesB, swapped, critical, storageReady]);
+  }, [left, right, field, movesA, movesB, stagesA, stagesB, swapped, critical, generation, storageReady]);
 
   const matchupsA = useMemo<(Matchup | null)[][]>(() => left.map((attacker, row) => right.map((defender, col) => {
     const moves = attacker.moves.filter(Boolean).slice(0, 4)
-      .map(move => calculateMove({ ...attacker, alliesFainted: left.filter((p, i) => i !== row && p.dead).length }, { ...defender, alliesFainted: right.filter((p, i) => i !== col && p.dead).length }, move, field, stagesA[row], stagesB[col], critical))
+      .map(move => calculateMove({ ...(mechanics.tera && generation === 9 ? attacker : { ...attacker, teraType: "" }), alliesFainted: left.filter((p, i) => i !== row && p.dead).length }, { ...(mechanics.tera && generation === 9 ? defender : { ...defender, teraType: "" }), alliesFainted: right.filter((p, i) => i !== col && p.dead).length }, move, field, stagesA[row], stagesB[col], critical, generation))
       .filter((value): value is NonNullable<typeof value> => Boolean(value));
     const selectedMove = movesA[row];
     return { attacker, defender, moves, best: moves.find(m => m.move === selectedMove) || moves[0] };
-  })), [left, right, field, stagesA, stagesB, movesA, critical]);
+  })), [left, right, field, stagesA, stagesB, movesA, critical, generation, mechanics.tera]);
 
   const matchupsB = useMemo<(Matchup | null)[][]>(() => right.map((attacker, row) => left.map((defender, col) => {
     const moves = attacker.moves.filter(Boolean).slice(0, 4)
-      .map(move => calculateMove({ ...attacker, alliesFainted: right.filter((p, i) => i !== row && p.dead).length }, { ...defender, alliesFainted: left.filter((p, i) => i !== col && p.dead).length }, move, field, stagesB[row], stagesA[col], critical))
+      .map(move => calculateMove({ ...(mechanics.tera && generation === 9 ? attacker : { ...attacker, teraType: "" }), alliesFainted: right.filter((p, i) => i !== row && p.dead).length }, { ...(mechanics.tera && generation === 9 ? defender : { ...defender, teraType: "" }), alliesFainted: left.filter((p, i) => i !== col && p.dead).length }, move, field, stagesB[row], stagesA[col], critical, generation))
       .filter((value): value is NonNullable<typeof value> => Boolean(value));
     const selectedMove = movesB[row];
     return { attacker, defender, moves, best: moves.find(m => m.move === selectedMove) || moves[0] };
-  })), [left, right, field, stagesA, stagesB, movesB, critical]);
+  })), [left, right, field, stagesA, stagesB, movesB, critical, generation, mechanics.tera]);
 
   const visibleMatchups = swapped ? matchupsB : matchupsA;
   const rowTeam = swapped ? right : left;
@@ -126,13 +131,17 @@ export default function TeamLab() {
   return (
     <main>
       <header className="hero">
-        <div><span className="eyebrow">BATTLE LAB / GEN 9</span><h1>Pokemon Team Lab</h1><p>6v6 matchup analysis powered by the Smogon damage calculator.</p></div>
+        <div><span className="eyebrow">BATTLE LAB / GEN {generation}</span><h1>Pokemon Team Lab</h1><p>6v6 matchup analysis powered by the Smogon damage calculator.</p>
+          <div className="top-rule-controls"><label>Mechanics Gen <select aria-label="Battle mechanics generation" value={generation} onChange={e => { const next = Number(e.target.value); setGeneration(next); if (next !== 9) setMechanics({ tera: false }); }}>{Array.from({ length: 9 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Gen {g}{g === 1 ? " · RBY" : g === 2 ? " · GSC" : g === 3 ? " · ADV" : g === 4 ? " · DPP" : g === 5 ? " · BW" : g === 6 ? " · XY" : g === 7 ? " · SM" : g === 8 ? " · SS" : " · SV"}</option>)}</select></label><label>Format <input list="team-lab-formats" value={format} onChange={e => setFormat(e.target.value)} aria-label="Battle format" /><datalist id="team-lab-formats">{["Champions NatDex Draft","Gen 9 OU","Gen 9 UU","Gen 9 Ubers","Gen 9 RU","Gen 9 NU","Gen 9 PU","Gen 9 Monotype","Gen 9 Doubles OU","National Dex"].map(x => <option key={x} value={x} />)}</datalist></label>
+          <details className="mechanics-menu"><summary>Battle mechanics</summary><div className="mechanics-options"><label><input type="checkbox" checked={mechanics.tera && generation === 9} disabled={generation !== 9} onChange={e => setMechanics({ tera: e.target.checked })} />Terastallization</label><small>Damage mechanics are passed to Smogon Calc using the selected generation. Terastallization is available only in Gen 9.</small></div></details></div>
+        </div>
         <div className="hero-actions"><button onClick={() => setTeamsOpen(true)}>Teams · Import / Export</button></div>
       </header>
+      <SupportCategoryPanel left={left} right={right} format={format} />
       <div className="workspace workspace-full">
         <FieldPanel value={field} onChange={setField} />
         <MatchupMatrix
-          left={rowTeam} right={colTeam} matchups={visibleMatchups} fieldState={field} selected={selected} swapped={swapped}
+          left={rowTeam} right={colTeam} generation={generation} matchups={visibleMatchups} fieldState={field} format={format} selected={selected} swapped={swapped}
           rowMoves={rowMoves} rowStages={rowStages} colStages={colStages} critical={critical} onCriticalChange={setCritical}
           onToggleSwap={() => { setSwapped(value => !value); setSelected(value => value ? ({ row: value.col, col: value.row }) : null); }}
           onSelect={(row, col) => setSelected({ row, col })}
@@ -146,7 +155,7 @@ export default function TeamLab() {
           onColPokemonChange={(index, patch) => updatePokemon(swapped ? "left" : "right", index, patch)}
         />
       </div>
-      <TeamPastePanel left={left} right={right} open={teamsOpen} onClose={() => setTeamsOpen(false)} onImport={importTeam} onEditTeam={(side, team) => { if (side === "left") { setLeft(team); setMovesA(previous => reconcileMoves(team, previous)); } else { setRight(team); setMovesB(previous => reconcileMoves(team, previous)); } }} />
+      <TeamPastePanel left={left} right={right} format={format} open={teamsOpen} onClose={() => setTeamsOpen(false)} onImport={importTeam} onEditTeam={(side, team) => { if (side === "left") { setLeft(team); setMovesA(previous => reconcileMoves(team, previous)); } else { setRight(team); setMovesB(previous => reconcileMoves(team, previous)); } }} />
     </main>
   );
 }

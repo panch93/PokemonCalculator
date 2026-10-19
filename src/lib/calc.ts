@@ -28,7 +28,8 @@ function getMoveDescription(
   return `${name} is a${category ? ` ${category.trim()}` : ""} ${type} move with ${power} base power and ${accuracy} accuracy.${priority} A full description is not available in the bundled Pokémon Showdown data.`;
 }
 
-const gen = Generations.get(9);
+const DEFAULT_GEN = 9;
+const getGen = (generation: number) => Generations.get(Math.max(1, Math.min(9, Math.round(generation || DEFAULT_GEN))));
 
 const TYPE_NAMES = [
   "Normal", "Fighting", "Flying", "Poison", "Ground", "Rock", "Bug", "Ghost",
@@ -51,7 +52,8 @@ function resolveCalcType(value?: string): CalcType | undefined {
   return isCalcType(trimmed) ? trimmed : undefined;
 }
 
-function makePokemon(set: PokemonSet, boosts: Partial<Record<"atk" | "def" | "spa" | "spd" | "spe", number>> = {}, fieldState?: FieldState) {
+function makePokemon(set: PokemonSet, generation = DEFAULT_GEN, boosts: Partial<Record<"atk" | "def" | "spa" | "spd" | "spe", number>> = {}, fieldState?: FieldState) {
+  const gen = getGen(generation);
   const abilityName = normalize(set.ability);
   const proto = abilityName === "protosynthesis";
   const quark = abilityName === "quarkdrive" || abilityName === "quark drive";
@@ -219,16 +221,18 @@ export function calculateMove(
   attackerStages: StatStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 },
   defenderStages: StatStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 },
   critical = false,
+  generation = DEFAULT_GEN,
 ): DamageSummary | null {
   if (!moveName.trim()) return null;
 
-  const key = cacheKey(attacker, defender, moveName, fieldState, attackerStages, defenderStages, critical);
+  const key = `${generation}|${cacheKey(attacker, defender, moveName, fieldState, attackerStages, defenderStages, critical)}`;
   const cached = getCached(key);
   if (cached !== undefined) return cached;
 
   try {
-    const attackerPokemon = makePokemon(attacker, { atk: attackerStages.atk, spa: attackerStages.spa }, fieldState);
-    const defenderPokemon = makePokemon(defender, { def: defenderStages.def, spd: defenderStages.spd }, fieldState);
+    const gen = getGen(generation);
+    const attackerPokemon = makePokemon(attacker, generation, { atk: attackerStages.atk, spa: attackerStages.spa }, fieldState);
+    const defenderPokemon = makePokemon(defender, generation, { def: defenderStages.def, spd: defenderStages.spd }, fieldState);
     const move = new Move(gen, moveName);
     if (critical) (move as unknown as { isCrit: boolean }).isCrit = true;
     const field = makeField(fieldState);
@@ -359,8 +363,9 @@ export function koLabel(minPct: number, maxPct: number) {
 }
 
 /** Return generation-specific move metadata from the same data bundled with @smogon/calc. */
-export function getMoveDetails(moveName: string): MoveDetails | null {
+export function getMoveDetails(moveName: string, generation = DEFAULT_GEN): MoveDetails | null {
   try {
+    const gen = getGen(generation);
     const move = new Move(gen, moveName) as unknown as Record<string, unknown>;
     const moveTable = (gen as unknown as { moves?: { get?: (name: string) => unknown } }).moves;
     const raw = (moveTable?.get?.(moveName) || {}) as Record<string, unknown>;
@@ -383,8 +388,9 @@ export function getMoveDetails(moveName: string): MoveDetails | null {
 
 
 /** Resolve the stat automatically selected by Protosynthesis / Quark Drive from the Pokémon's unboosted battle stats. */
-export function getAutoBoostedStat(set: PokemonSet): NonNullable<PokemonSet["boostedStat"]> {
+export function getAutoBoostedStat(set: PokemonSet, generation = DEFAULT_GEN): NonNullable<PokemonSet["boostedStat"]> {
   try {
+    const gen = getGen(generation);
     const pokemon = new Pokemon(gen, set.species, {
       item: set.item.trim() || undefined,
       nature: set.nature.trim() || undefined,
@@ -401,16 +407,18 @@ export function getAutoBoostedStat(set: PokemonSet): NonNullable<PokemonSet["boo
   }
 }
 
-export function getPokemonHp(set: PokemonSet): { current: number; max: number } {
+export function getPokemonHp(set: PokemonSet, generation = DEFAULT_GEN): { current: number; max: number } {
   try {
+    const gen = getGen(generation);
     const pokemon = new Pokemon(gen, set.species, { level: set.level || 100, evs: set.evs, ivs: set.ivs, nature: set.nature || undefined });
     const max = pokemon.maxHP();
     return { max, current: Math.max(0, Math.min(max, Math.floor(set.currentHp ?? max))) };
   } catch { return { current: Math.max(0, Math.floor(set.currentHp ?? 0)), max: 0 }; }
 }
 
-export function getPokemonTypes(set: PokemonSet): string[] {
+export function getPokemonTypes(set: PokemonSet, generation = DEFAULT_GEN): string[] {
   try {
+    const gen = getGen(generation);
     return [...new Pokemon(gen, set.species, {
       item: set.item.trim() || undefined,
       ability: set.ability.trim() || undefined,
