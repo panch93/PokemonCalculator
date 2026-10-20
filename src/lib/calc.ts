@@ -29,7 +29,10 @@ function getMoveDescription(
 }
 
 const DEFAULT_GEN = 9;
-const getGen = (generation: number) => Generations.get(Math.max(1, Math.min(9, Math.round(generation || DEFAULT_GEN))));
+const getGen = (generation: number) => {
+  const generationNum = Math.max(1, Math.min(9, Math.round(generation || DEFAULT_GEN))) as Parameters<typeof Generations.get>[0];
+  return Generations.get(generationNum);
+};
 
 const TYPE_NAMES = [
   "Normal", "Fighting", "Flying", "Poison", "Ground", "Rock", "Bug", "Ghost",

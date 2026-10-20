@@ -1,6 +1,6 @@
 {
   "name": "pokemon-team-lab",
-  "version": "0.5.29",
+  "version": "0.5.30",
   "private": true,
   "description": "Multi-generation team matchup matrix with a native team builder with autocomplete, Smogon meta-set presets, and Showdown paste import/export.",
   "scripts": {
