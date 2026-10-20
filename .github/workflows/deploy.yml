@@ -32,6 +32,9 @@ jobs:
       - name: Type-check
         run: npm run typecheck
 
+      - name: Run automated tests
+        run: npm test
+
       - name: Verify bundled move descriptions
         run: npm run check:move-data
 

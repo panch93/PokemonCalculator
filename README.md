@@ -1,79 +1,67 @@
-# Pokemon Team Lab
+# Pokémon Team Lab — v1.0.0
 
-A GitHub-ready Next.js static web app for 6v6 Pokémon matchup analysis using `@smogon/calc`.
+A browser-based Pokémon team matchup lab built with Next.js, React, TypeScript, `@smogon/calc`, and Pokémon Showdown's data and validation logic from `@pkmn/sim`.
 
-## Features in v0.3.0
+## Features
 
-- Corrected all React client-component directives.
-- Narrowed Tera types before passing them to `@smogon/calc`, avoiding GitHub's strict TypeScript error.
-- Added type-safe handling around the current calculator API.
-- Added a calculation cache so repeated matchup calculations are reused.
-- Added deferred rendering for the 36-cell matchup matrix so field controls stay responsive.
-- Stealth Rock and Spikes now affect the displayed KO percentage through entry-hazard HP loss.
-- Raw move damage percentage is still shown separately.
-- Heavy-Duty Boots and Magic Guard prevent the modeled entry-hazard damage.
-- Spikes only apply to grounded targets.
-- Move Explorer automatically recalculates when its selected move, field, attacker, or defender changes.
-- KO tiers use a green-to-red scale, with separate styling for no-damage results.
-- The matrix can swap attacking and defending teams.
-- Pokémon types and move type/category are displayed; move hover tooltips include power, accuracy, PP, priority, and the bundled description when available.
-- Each attacking row has one selected move from that Pokémon’s four imported move slots. Field changes preserve the selected move.
-- Attack and Defence stat stages can be set from −6 to +6 and are passed to `@smogon/calc` through its Pokémon `boosts` option. These controls currently represent physical Attack and physical Defence (`atk` and `def`), not Special Attack or Special Defence.
-- Imported teams, selected moves, stat stages, and matrix orientation are persisted in browser local storage.
-- Multi-hit damage ranges aggregate per-hit damage rolls instead of treating each hit as the full move’s damage.
+- 6v6 matchup matrix with damage ranges, estimated KO tiers, type matchups, and move details.
+- Generation-aware damage calculations for generations 1–9. Pokémon Champions can be selected for exploration, but the installed damage calculator does **not** provide a dedicated Champions engine; this mode currently falls back to Gen 9 damage mechanics.
+- Team builder with Pokémon, moves, abilities, items, EVs/IVs, nature, Tera type, and field controls.
+- Showdown paste import/export and browser-local persistence.
+- Move coverage and support-category panels, sprites, speed/priority helpers, weather and terrain modifiers, and entry-hazard estimates.
+- Format legality report powered by the bundled Pokémon Showdown `TeamValidator` from `@pkmn/sim` for formats explicitly listed in `src/lib/format-validation.ts`.
+- A separate species-learnset lookup used for move discovery. This data is **not** treated as format legality.
 
-## Run locally
+## Development
+
+Requirements: Node.js 20 or later.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the local URL printed by Next.js.
-
-For a production/static build:
+## Quality checks
 
 ```bash
+npm run typecheck
+npm test
+npm run check:move-data
+npm run check:field-effects
 npm run build
 ```
 
-The static output is written to `out/`.
+Or run the complete release gate:
 
-## GitHub Pages
-
-This repository includes:
-
-```text
-.github/workflows/deploy.yml
+```bash
+npm run check:release
 ```
 
-Push the repository to GitHub, then in:
+The GitHub Actions workflow runs type-checking, automated tests, data/mechanics checks, and a production build before publishing the static `out/` directory to GitHub Pages.
 
-**Settings → Pages → Build and deployment → Source → GitHub Actions**
+## Format legality behavior
 
-The workflow installs dependencies, builds the static site, and deploys `out/`.
+The selected format is resolved to a canonical Pokémon Showdown format ID, and the team's sets are passed to that format's bundled `TeamValidator`. The validator uses the format's rules and rule table, including learnset checks and applicable bans/clauses. An unsupported format is explicitly shown as **Not validated**; the app does not quietly substitute Gen 9 OU or treat the global learnset as a legal-move list.
 
-## Important calculator behavior
+The built-in list currently covers selected standard OU tiers and popular Gen 9 formats from the installed `@pkmn/sim` package. These bundled rules are not a live connection to the current Pokémon Showdown server, so tiering changes require a dependency update and test run. It is intentionally explicit because format data availability depends on the bundled Pokémon Showdown data. To add another format, add its canonical format ID to `SUPPORTED_FORMATS` and test that the installed `Dex` contains it. National Dex and custom draft formats require their corresponding format/ruleset data. **Champions NatDex Draft is not an official built-in Pokémon Showdown format and is not validated unless its custom rules are implemented.**
 
-`@smogon/calc` calculates the damage of a move against the supplied field state. Entry hazards are represented as side state in the calculator, but their switch-in HP loss is not itself returned as the move's `damage` array. This app therefore calculates the Gen 9 singles entry-hazard HP loss separately and uses the remaining HP for its hazard-adjusted KO percentage.
+The separate learnset panel is still useful for discovering species moves, but it is not a substitute for the format legality report. Species learnsets are loaded from the public Pokémon Showdown data file, with bundled Pokédex data as a fallback if the network request fails.
 
-The current model is intentionally a 6v6 singles analysis lab. It does not yet simulate an entire battle turn-by-turn, recovery across turns, or all switching sequences. The KO tiers are damage-range estimates, not a complete battle simulator.
+## Known limitations
 
+- This is a team-planning and damage-estimation tool, not a turn-by-turn battle simulator. It does not fully model switching sequences, recovery loops, or every conditional battle interaction.
+- The damage calculator does not yet include a dedicated Pokémon Champions engine.
+- Custom draft rules, custom bans, and National Dex legality require explicitly bundled ruleset/mod data before they can be validated accurately.
+- The format validator validates the complete team and reports validator messages. The small `Learnset?` marker beside a move is only a species-learnset hint; consult the Format legality report for selected-format legality.
+- Some field effects are modeled as estimates and are documented in the relevant UI notes.
 
-## Version 0.4.1 updates
+## Release checklist
 
-- Tera controls are restricted to the imported Tera type and None; Pokémon without an imported Tera type cannot change it.
-- The matchup matrix uses separate sprite, Pokémon details, and move columns, with compact single-line damage cells.
-- Move hover descriptions use a local move-summary catalog alongside the bundled calculator metadata.
+1. Run `npm run check:release` on the target Node version.
+2. Confirm the format validation tests against the bundled Pokémon Showdown data.
+3. Smoke-test team import/export, format changes, unsupported custom formats, and mobile layout.
+4. Review the GitHub Pages base path and deployment environment before tagging `v1.0.0`.
 
+## Data and licensing
 
-## Version 0.4.5 — move descriptions and deployment checks
-
-- Move hover descriptions now prefer the bundled `@pkmn/dex` move data maintained in the [pkmn/ps](https://github.com/pkmn/ps) project, using the canonical `desc` field and `shortDesc` fallback. The data is bundled at build time; the website does not make live requests to GitHub when a move is hovered.
-- A compact metadata summary remains as a defensive fallback for moves absent from the bundled data.
-- The GitHub Pages workflow now installs dependencies, runs `npm run typecheck`, smoke-tests canonical descriptions for Tackle, Earthquake, Leech Seed, and Salt Cure, and only then runs the static production build. Removed npm caching because this archive does not include a lockfile; this avoids setup-node cache failures caused by a missing lockfile.
-- `@pkmn/dex` is pinned to version `0.10.11` for reproducible dependency resolution. Update that version deliberately to consume newer pkmn/ps data, then validate typecheck and production build before deploying.
-
-### Learnset and format legality data
-
-The app loads the live global Pokémon Showdown `learnsets.json` table and caches it per selected format for UI consistency. Pokémon Showdown does not expose a general public REST endpoint that resolves arbitrary custom draft formats (such as Champions NatDex Draft) into a complete, validated per-species move legality table. Until a format-specific validator/ruleset source is configured, move legality therefore means **species learnset membership**, not draft bans or format-specific restrictions. The status indicator intentionally labels this fallback. Changing the selected format selects/creates that format's cache entry; the manual refresh button refreshes the underlying live learnset data.
+Pokémon names and battle data are sourced from Pokémon Showdown / `@pkmn` projects. Damage calculations use `@smogon/calc`. Consult each upstream project's license and terms when redistributing or deploying this application.

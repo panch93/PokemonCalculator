@@ -71,6 +71,6 @@ export default function SupportCategoryPanel({ left, right, format, onClose }: {
         </div>)}</div>}
       </section>)}
     </div>
-    <p className="support-footnote">Format: {format}. Moves are listed when present in the species learnset available in the local Pokédex data; format bans and draft-specific restrictions are not yet fully validated. The Living Pokémon filter excludes fainted Pokémon; All Pokémon includes them.</p>
+    <p className="support-footnote">Moves shown here come from species learnset data, not format-specific move legality. Use the Format legality report to validate complete teams against supported Pokémon Showdown rules. Custom draft formats are not validated unless their rules are explicitly configured. The Living Pokémon filter excludes fainted Pokémon; All Pokémon includes them.</p>
   </section></div>;
 }

@@ -5,8 +5,6 @@ const cleanId = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "")
 const LEARNSETS_URL = "https://play.pokemonshowdown.com/data/learnsets.json";
 let learnsetsPromise: Promise<LearnsetMap> | null = null;
 let resolvedLearnsets: LearnsetMap | null = null;
-const formatLearnsetCache = new Map<string, LearnsetMap>();
-const formatKey = (format: string) => cleanId(format || "championsnatdexdraft") || "championsnatdexdraft";
 
 function unwrapLearnsets(value: unknown): LearnsetMap {
   if (!value || typeof value !== "object") return {};
@@ -48,7 +46,6 @@ export async function loadLearnsets(forceRefresh = false): Promise<LearnsetMap> 
   if (forceRefresh) {
     resolvedLearnsets = null;
     learnsetsPromise = null;
-    formatLearnsetCache.clear();
   }
   if (resolvedLearnsets) return resolvedLearnsets;
   if (!learnsetsPromise) {
@@ -80,25 +77,17 @@ export async function loadLearnsets(forceRefresh = false): Promise<LearnsetMap> 
 }
 
 /**
- * Format-scoped cache. Pokémon Showdown publishes the global species learnset as
- * a public data file, but does not expose a generic public REST endpoint that
- * resolves arbitrary custom format rules into per-species legal moves. Until a
- * format's rules are available to validate, keep the full learnset as the safe
- * fallback and cache it separately by selected format. This avoids re-fetching
- * on team edits while allowing format changes to invalidate format-specific UI.
+ * Pokémon Showdown publishes a global species learnset table, not a per-format
+ * table. Format legality is handled separately by format-validation.ts using
+ * the Pokémon Showdown TeamValidator. This function intentionally does not
+ * pretend the same learnset data is different for each selected format.
  */
-export async function loadFormatLearnsets(format: string, forceRefresh = false): Promise<LearnsetMap> {
-  const key = formatKey(format);
-  if (forceRefresh) formatLearnsetCache.delete(key);
-  const cached = formatLearnsetCache.get(key);
-  if (cached && !forceRefresh) return cached;
-  const table = await loadLearnsets(forceRefresh);
-  formatLearnsetCache.set(key, table);
-  return table;
+export async function loadFormatLearnsets(_format: string, forceRefresh = false): Promise<LearnsetMap> {
+  return loadLearnsets(forceRefresh);
 }
 
 export function getLearnsetModeLabel(_format: string): string {
-  return "Full species learnset (format-specific bans unavailable)";
+  return "Species learnset loaded · format legality checked separately";
 }
 
 export async function getSpeciesLearnset(species: string, format = "championsnatdexdraft"): Promise<Set<string> | null> {
