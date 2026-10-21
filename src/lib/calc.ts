@@ -96,9 +96,9 @@ function makePokemon(set: PokemonSet, generation = DEFAULT_GEN, boosts: Partial<
  * of which team is attacking. Never reuse a Field instance: the calc engine
  * clones and can mutate side conditions for abilities such as Infiltrator.
  */
-function makeField(state: FieldState) {
+function makeField(state: FieldState, doubles = false) {
   return new Field({
-    gameType: "Singles",
+    gameType: doubles ? "Doubles" : "Singles",
     weather: state.weather || undefined,
     terrain: state.terrain || undefined,
     defenderSide: {
@@ -191,8 +191,9 @@ function cacheKey(
   attackerStages: StatStages,
   defenderStages: StatStages,
   critical: boolean,
+  doubles: boolean,
 ) {
-  return JSON.stringify([attacker, defender, moveName, fieldState, attackerStages, defenderStages, critical]);
+  return JSON.stringify([attacker, defender, moveName, fieldState, attackerStages, defenderStages, critical, doubles]);
 }
 
 const CACHE_LIMIT = 1500;
@@ -225,10 +226,11 @@ export function calculateMove(
   defenderStages: StatStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 },
   critical = false,
   generation = DEFAULT_GEN,
+  doubles = false,
 ): DamageSummary | null {
   if (!moveName.trim()) return null;
 
-  const key = `${generation}|${cacheKey(attacker, defender, moveName, fieldState, attackerStages, defenderStages, critical)}`;
+  const key = `${generation}|${cacheKey(attacker, defender, moveName, fieldState, attackerStages, defenderStages, critical, doubles)}`;
   const cached = getCached(key);
   if (cached !== undefined) return cached;
 
@@ -238,7 +240,7 @@ export function calculateMove(
     const defenderPokemon = makePokemon(defender, generation, { def: defenderStages.def, spd: defenderStages.spd }, fieldState);
     const move = new Move(gen, moveName);
     if (critical) (move as unknown as { isCrit: boolean }).isCrit = true;
-    const field = makeField(fieldState);
+    const field = makeField(fieldState, doubles);
     const result = calculate(gen, attackerPokemon, defenderPokemon, move, field);
 
     const range = damageRange((result as unknown as { damage?: unknown }).damage);

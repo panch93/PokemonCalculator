@@ -9,7 +9,7 @@ import MatchupMatrix from "./MatchupMatrix";
 import FieldPanel from "./FieldPanel";
 import { getLearnsetModeLabel, loadFormatLearnsets } from "../lib/learnsets";
 import FormatLegalityPanel from "./FormatLegalityPanel";
-import { getAvailableShowdownFormats } from "../lib/format-validation";
+import FormatSelector from "./FormatSelector";
 
 const DEFAULT_FIELD: FieldState = {
   weather: "", terrain: "", defenderStealthRock: false, defenderSpikes: 0, defenderReflect: false,
@@ -97,19 +97,19 @@ export default function TeamLab() {
 
   const matchupsA = useMemo<(Matchup | null)[][]>(() => left.map((attacker, row) => right.map((defender, col) => {
     const moves = attacker.moves.filter(Boolean).slice(0, 4)
-      .map(move => calculateMove({ ...(mechanics.tera && generation === 9 ? attacker : { ...attacker, teraType: "" }), alliesFainted: left.filter((p, i) => i !== row && p.dead).length }, { ...(mechanics.tera && generation === 9 ? defender : { ...defender, teraType: "" }), alliesFainted: right.filter((p, i) => i !== col && p.dead).length }, move, field, stagesA[row], stagesB[col], critical, generation))
+      .map(move => calculateMove({ ...(mechanics.tera && generation === 9 ? attacker : { ...attacker, teraType: "" }), alliesFainted: left.filter((p, i) => i !== row && p.dead).length }, { ...(mechanics.tera && generation === 9 ? defender : { ...defender, teraType: "" }), alliesFainted: right.filter((p, i) => i !== col && p.dead).length }, move, field, stagesA[row], stagesB[col], critical, generation, mechanics.doubles))
       .filter((value): value is NonNullable<typeof value> => Boolean(value));
     const selectedMove = movesA[row];
     return { attacker, defender, moves, best: moves.find(m => m.move === selectedMove) || moves[0] };
-  })), [left, right, field, stagesA, stagesB, movesA, critical, generation, mechanics.tera]);
+  })), [left, right, field, stagesA, stagesB, movesA, critical, generation, mechanics.tera, mechanics.doubles]);
 
   const matchupsB = useMemo<(Matchup | null)[][]>(() => right.map((attacker, row) => left.map((defender, col) => {
     const moves = attacker.moves.filter(Boolean).slice(0, 4)
-      .map(move => calculateMove({ ...(mechanics.tera && generation === 9 ? attacker : { ...attacker, teraType: "" }), alliesFainted: right.filter((p, i) => i !== row && p.dead).length }, { ...(mechanics.tera && generation === 9 ? defender : { ...defender, teraType: "" }), alliesFainted: left.filter((p, i) => i !== col && p.dead).length }, move, field, stagesB[row], stagesA[col], critical, generation))
+      .map(move => calculateMove({ ...(mechanics.tera && generation === 9 ? attacker : { ...attacker, teraType: "" }), alliesFainted: right.filter((p, i) => i !== row && p.dead).length }, { ...(mechanics.tera && generation === 9 ? defender : { ...defender, teraType: "" }), alliesFainted: left.filter((p, i) => i !== col && p.dead).length }, move, field, stagesB[row], stagesA[col], critical, generation, mechanics.doubles))
       .filter((value): value is NonNullable<typeof value> => Boolean(value));
     const selectedMove = movesB[row];
     return { attacker, defender, moves, best: moves.find(m => m.move === selectedMove) || moves[0] };
-  })), [left, right, field, stagesA, stagesB, movesB, critical, generation, mechanics.tera]);
+  })), [left, right, field, stagesA, stagesB, movesB, critical, generation, mechanics.tera, mechanics.doubles]);
 
   const visibleMatchups = swapped ? matchupsB : matchupsA;
   const rowTeam = swapped ? right : left;
@@ -157,7 +157,7 @@ export default function TeamLab() {
     <main>
       <header className="hero">
         <div><span className="eyebrow">BATTLE LAB / {generation === 10 ? "CHAMPIONS" : `GEN ${generation}`}</span><h1>Pokemon Team Lab</h1><p>6v6 matchup analysis powered by the Smogon damage calculator.</p>
-          <div className="top-rule-controls"><label>Mechanics Gen <select aria-label="Battle mechanics generation" value={generation} onChange={e => { const next = Number(e.target.value); setGeneration(next); if (next !== 9) setMechanics(previous => ({ ...previous, tera: false })); }}>{Array.from({ length: 9 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Gen {g}{g === 1 ? " · RBY" : g === 2 ? " · GSC" : g === 3 ? " · ADV" : g === 4 ? " · DPP" : g === 5 ? " · BW" : g === 6 ? " · XY" : g === 7 ? " · SM" : g === 8 ? " · SS" : " · SV"}</option>)}<option value={10}>Pokémon Champions</option></select></label><label>Format <select value={format} onChange={e => setFormat(e.target.value)} aria-label="Battle format">{getAvailableShowdownFormats().map(x => <option key={x.id} value={x.label}>{x.label}</option>)}<option value="Champions NatDex Draft">Champions NatDex Draft (not validated)</option></select></label>
+          <div className="top-rule-controls"><label>Mechanics Gen <select aria-label="Battle mechanics generation" value={generation} onChange={e => { const next = Number(e.target.value); setGeneration(next); if (next !== 9) setMechanics(previous => ({ ...previous, tera: false })); }}>{Array.from({ length: 9 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Gen {g}{g === 1 ? " · RBY" : g === 2 ? " · GSC" : g === 3 ? " · ADV" : g === 4 ? " · DPP" : g === 5 ? " · BW" : g === 6 ? " · XY" : g === 7 ? " · SM" : g === 8 ? " · SS" : " · SV"}</option>)}<option value={10}>Pokémon Champions</option></select></label><label>Format <FormatSelector value={format} onChange={setFormat} /></label>
           <details className="mechanics-menu"><summary>Battle mechanics</summary><div className="mechanics-options"><label><input type="checkbox" checked={mechanics.tera && generation === 9} disabled={generation !== 9} onChange={e => setMechanics(previous => ({ ...previous, tera: e.target.checked }))} />Terastallization</label><label><input type="checkbox" checked={mechanics.doubles} onChange={e => setMechanics(previous => ({ ...previous, doubles: e.target.checked }))} />Doubles mechanics</label><small>Generations 1–9 use their Smogon Calc generation. Champions is listed as a selectable mode, but the installed @smogon/calc 0.12.0 does not include its dedicated engine, so damage currently falls back to Gen 9 mechanics. Terastallization is available only in Gen 9.</small></div></details></div>
         </div>
         <div className="hero-actions"><button type="button" onClick={refreshTeamLearnsets} disabled={learnsetStatus === "loading"}>{learnsetStatus === "loading" ? "Loading learnsets…" : "Refresh team learnsets"}</button><span className={`learnset-status ${learnsetStatus}`} role="status">{learnsetStatus === "loading" ? "Learnsets loading" : learnsetStatus === "ready" ? getLearnsetModeLabel(format) : "Learnsets unavailable"}</span><button onClick={() => setTeamsOpen(true)}>Teams · Import / Export</button></div>

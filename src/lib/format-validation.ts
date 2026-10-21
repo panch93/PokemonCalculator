@@ -5,11 +5,16 @@ import type { PokemonSet, Team } from "./types";
  * Formats deliberately mirror named Pokémon Showdown formats. Custom formats
  * (including draft leagues) need an explicit ruleset and are never guessed.
  */
-export const DRAFT_FORMATS = [
-  { label: "Gen 9 Draft (Standard Draft rules)", id: "gen9ou@@@Standard Draft" },
-  { label: "Gen 9 National Dex Draft (Standard Draft rules)", id: "gen9nationaldex@@@Standard Draft" },
-  { label: "Gen 8 Draft (Standard Draft rules)", id: "gen8ou@@@Standard Draft" },
+const BASE_DRAFT_FORMATS = [
+  ["gen9ou", "Gen 9 Draft"], ["gen9nationaldex", "Gen 9 National Dex Draft"],
+  ["gen9uu", "Gen 9 UU Draft"], ["gen9ru", "Gen 9 RU Draft"], ["gen9nu", "Gen 9 NU Draft"], ["gen9pu", "Gen 9 PU Draft"],
+  ["gen8ou", "Gen 8 OU Draft"], ["gen8nationaldex", "Gen 8 National Dex Draft"], ["gen7ou", "Gen 7 OU Draft"],
+  ["gen6ou", "Gen 6 OU Draft"], ["gen5ou", "Gen 5 OU Draft"], ["gen4ou", "Gen 4 OU Draft"], ["gen3ou", "Gen 3 OU Draft"],
 ] as const;
+export const DRAFT_FORMATS = [
+  ...BASE_DRAFT_FORMATS.map(([base, label]) => ({ label: `${label} (Standard Draft rules)`, id: `${base}@@@Standard Draft` })),
+  { label: "Champions NatDex Draft", id: "championsnatdexdraft" },
+];
 
 const CURATED_FORMATS = [
   { label: "Gen 9 OU", id: "gen9ou" }, { label: "Gen 9 Ubers", id: "gen9ubers" },
@@ -50,6 +55,7 @@ export function getAvailableShowdownFormats(): { label: string; id: string }[] {
   });
   const drafts = DRAFT_FORMATS.filter(candidate => {
     const [base] = candidate.id.split("@@@");
+    if (candidate.id === "championsnatdexdraft") return true;
     try { const format = Dex.formats.get(base); return Boolean(format && format.effectType === "Format" && format.exists); }
     catch { return false; }
   });
