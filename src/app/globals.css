@@ -628,7 +628,13 @@ select, select:focus, select option, datalist option {
 .matrix .damage-bar-track { position: relative; display: block; grid-column: 1 / -1; height: 6px; overflow: hidden; border-radius: 999px; background: #10151d; box-shadow: inset 0 0 0 1px #ffffff16; }
 .matrix .damage-bar-minimum, .matrix .damage-bar-range { position: absolute; top: 0; bottom: 0; left: 0; border-radius: inherit; }
 .matrix .damage-bar-minimum { z-index: 1; background: #64748b; opacity: .98; }
-.matrix .damage-bar-range { z-index: 2; background: #94a3b8; opacity: .48; }
+.matrix .damage-bar-range { z-index: 2; opacity: .38; }
+.matrix .damage-bar-range.ko-1 { background: #22c55e; }
+.matrix .damage-bar-range.ko-2 { background: #84cc16; }
+.matrix .damage-bar-range.ko-3 { background: #eab308; }
+.matrix .damage-bar-range.ko-4 { background: #f97316; }
+.matrix .damage-bar-range.ko-5 { background: #f43f5e; }
+.matrix .damage-bar-range.ko-none { background: #64748b; }
 .matrix .damage-bar-minimum.ko-1 { background: #22c55e; }
 .matrix .damage-bar-minimum.ko-2 { background: #84cc16; }
 .matrix .damage-bar-minimum.ko-3 { background: #eab308; }

@@ -6,13 +6,13 @@ import { isEverythingFormat, validateTeamForFormat } from "../lib/format-validat
 
 export default function FormatLegalityPanel({ teamA, teamB, format }: { teamA: Team; teamB: Team; format: string }) {
   const [expanded, setExpanded] = useState(true);
-  if (isEverythingFormat(format)) return null;
+  // Keep every hook unconditional: switching to Everything! must not change hook order.
   const validationA = useMemo(() => validateTeamForFormat(teamA, format), [teamA, format]);
   const validationB = useMemo(() => validateTeamForFormat(teamB, format), [teamB, format]);
   const validations = [{ label: "Team A", result: validationA }, { label: "Team B", result: validationB }];
 
   const hasErrors = validations.some(({ result }) => !result.supported || result.issues.length > 0);
-  if (!hasErrors) return null;
+  if (isEverythingFormat(format) || !hasErrors) return null;
 
   return <section className="format-validation panel" aria-labelledby="format-validation-title">
     <div className="panel-title-row">

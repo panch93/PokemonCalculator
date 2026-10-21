@@ -12,6 +12,7 @@ import PokemonSprite from "./PokemonSprite";
 import { typeMatchupSummary } from "../lib/pokemon-visuals";
 import SupportCategoryPanel from "./SupportCategoryPanel";
 import CoveragePanel from "./CoveragePanel";
+import DamageRangeBar, { getKoClass } from "./DamageRangeBar";
 
 type Props = {
   left: PokemonSet[]; right: PokemonSet[]; generation: number; format: string; doubles: boolean; matchups: (Matchup | null)[][]; fieldState: FieldState;
@@ -134,15 +135,6 @@ function moveFieldIndicators(pokemon: PokemonSet, move: string, field: FieldStat
   if (item === "expert belt") tags.push("Expert Belt if super effective");
   if (item === "metronome") tags.push("Metronome: consecutive-use boost");
   return [...new Set(tags)];
-}
-function koClass(ko: string) {
-  if (ko === "No damage") return "ko-none";
-  const tier = ko.includes(" · ") ? ko.split(" · ").pop() || ko : ko;
-  if (tier.includes("1HKO") || tier.includes("OHKO")) return "ko-1";
-  if (tier.includes("2HKO")) return "ko-2";
-  if (tier.includes("3HKO")) return "ko-3";
-  if (tier.includes("4HKO")) return "ko-4";
-  return "ko-5";
 }
 function formatMoveTooltip(name: string, pokemon?: PokemonSet, field?: FieldState) {
   const d = getMoveDetails(name);
@@ -336,7 +328,7 @@ ${result.ko}
 ${result.description}` : move ? `${formatMoveTooltip(move, poke, fieldState)}
 
 No direct damage result for this move.` : "No move assigned";
-              return <td key={col} className={`${right[col]?.dead ? "fainted-cell" : ""} ${right[col]?.teraType ? "tera-defender-cell" : ""}`}><div className="matchup-cell-layout"><button title={title} disabled={!move} className={`matrix-cell compact-cell ${result ? koClass(result.ko) : "ko-none"} ${active ? "active" : ""} ${poke.dead || right[col]?.dead ? "fainted-cell" : ""}`} onClick={() => { props.onSelect(row, col); if (move && details && ["Physical", "Special"].includes(details.category)) openMoveEditor(row, col, move); }}>{result ? <span className="damage-inline"><span className="damage-bar-track" aria-label={`Damage ${result.minPct.toFixed(1)} to ${result.maxPct.toFixed(1)} percent${result.critMaxPct !== undefined ? `; critical range ${result.critMinPct?.toFixed(1)} to ${result.critMaxPct.toFixed(1)} percent` : ""}`}><span className={`damage-bar-minimum ${koClass(result.ko)}`} style={{ width: `${Math.max(0, Math.min(100, result.minPct))}%` }} /><span className="damage-bar-range" style={{ left: `${Math.max(0, Math.min(100, result.minPct))}%`, width: `${Math.max(0, Math.min(100, result.maxPct) - Math.max(0, result.minPct))}%` }} />{result.critMaxPct !== undefined && <span className="damage-bar-crit" title={`Calculator critical range: ${result.critMinPct?.toFixed(1)}–${result.critMaxPct.toFixed(1)}%`} style={{ left: `${Math.max(0, Math.min(100, result.critMaxPct))}%` }} />}</span><strong>{result.minPct.toFixed(1)}–{result.maxPct.toFixed(1)}%</strong><em>{result.ko}</em></span> : <span>—</span>}</button>{move && defenderFieldIndicators(right[col], move, fieldState, props.generation).map(tag => <span className="move-field-indicator cell-field-indicator" key={tag} title={`Defender-side damage modifier: ${tag}`}>{tag}</span>)}{move && <button type="button" className={`turn-order speed-arrow ${order}`} title={`Edit matchup Speed. ${orderLabel}. Effective Speed: ${attackerSpeed} vs ${defenderSpeed}.`} aria-label={`Edit Speed matchup: ${poke.name} versus ${right[col].name}`} onClick={() => openSpeedEditor(row, col)}>{order === "attacker" ? "←" : order === "defender" ? "↑" : "↔"}</button>}</div></td>;
+              return <td key={col} className={`${right[col]?.dead ? "fainted-cell" : ""} ${right[col]?.teraType ? "tera-defender-cell" : ""}`}><div className="matchup-cell-layout"><button title={title} disabled={!move} className={`matrix-cell compact-cell ${result ? getKoClass(result.ko) : "ko-none"} ${active ? "active" : ""} ${poke.dead || right[col]?.dead ? "fainted-cell" : ""}`} onClick={() => { props.onSelect(row, col); if (move && details && ["Physical", "Special"].includes(details.category)) openMoveEditor(row, col, move); }}>{result ? <DamageRangeBar result={result} /> : <span>—</span>}</button>{move && defenderFieldIndicators(right[col], move, fieldState, props.generation).map(tag => <span className="move-field-indicator cell-field-indicator" key={tag} title={`Defender-side damage modifier: ${tag}`}>{tag}</span>)}{move && <button type="button" className={`turn-order speed-arrow ${order}`} title={`Edit matchup Speed. ${orderLabel}. Effective Speed: ${attackerSpeed} vs ${defenderSpeed}.`} aria-label={`Edit Speed matchup: ${poke.name} versus ${right[col].name}`} onClick={() => openSpeedEditor(row, col)}>{order === "attacker" ? "←" : order === "defender" ? "↑" : "↔"}</button>}</div></td>;
             })}
           </tr>;
         });

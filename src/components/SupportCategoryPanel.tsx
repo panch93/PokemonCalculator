@@ -8,6 +8,7 @@ import { getSpeciesLearnset } from "../lib/learnsets";
 import { getMoveDescription } from "../lib/move-descriptions";
 import { getAbilityDescription } from "../lib/item-ability-descriptions";
 import PokemonSprite from "./PokemonSprite";
+import CycleToggleButton from "./CycleToggleButton";
 
 type Category = { id: string; label: string; moves: string[]; abilities: string[]; note?: string; doubles?: boolean };
 type Entry = { key: string; species: string; move?: string; ability?: string; side: "Team A" | "Team B"; fainted: boolean };
@@ -61,10 +62,10 @@ export default function SupportCategoryPanel({ left, right, format, doubles, onC
     <div className="panel-title-row"><div><h2>Move Support</h2><p>Learnable category moves and selected abilities for the selected teams.</p></div><button type="button" onClick={onClose}>Close</button></div>
     <div className="support-filters" aria-label="Team Support filters">
       <div className="support-toggle-group" role="group" aria-label="Teams to show">
-        <button type="button" className="active" aria-pressed="true" onClick={() => setTeamFilter(current => current === "both" ? "A" : current === "A" ? "B" : "both")}>Teams: {teamFilter === "both" ? "Both" : teamFilter === "A" ? "Team A" : "Team B"} · Change</button>
+        <CycleToggleButton className="active" label="Teams" value={teamFilter === "both" ? "Both" : teamFilter === "A" ? "Team A" : "Team B"} onClick={() => setTeamFilter(current => current === "both" ? "A" : current === "A" ? "B" : "both")} />
       </div>
       <div className="support-toggle-group" role="group" aria-label="Pokémon status filter">
-        <button type="button" className="active" aria-pressed="true" onClick={() => setPokemonFilter(current => current === "living" ? "all" : "living")}>Pokémon: {pokemonFilter === "living" ? "Living only" : "All, including fainted"} · Change</button>
+        <CycleToggleButton className="active" label="Pokémon" value={pokemonFilter === "living" ? "Living only" : "All, including fainted"} onClick={() => setPokemonFilter(current => current === "living" ? "all" : "living")} />
       </div>
     </div>
     <div className="support-category-columns">
