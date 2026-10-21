@@ -27,8 +27,8 @@ export default function DamageRangeBar({ result }: Props) {
         className="damage-bar-track"
         aria-label={`Damage ${result.minPct.toFixed(1)} to ${result.maxPct.toFixed(1)} percent${result.critMaxPct !== undefined ? `; critical range ${result.critMinPct?.toFixed(1)} to ${result.critMaxPct.toFixed(1)} percent` : ""}`}
       >
+        <span className={`damage-bar-range ${colorClass}`} style={{ width: `${maximum}%` }} />
         <span className={`damage-bar-minimum ${colorClass}`} style={{ width: `${minimum}%` }} />
-        <span className={`damage-bar-range ${colorClass}`} style={{ left: `${minimum}%`, width: `${Math.max(0, maximum - minimum)}%` }} />
         {criticalMaximum !== undefined && (
           <span
             className="damage-bar-crit"

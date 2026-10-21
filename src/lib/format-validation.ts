@@ -12,7 +12,7 @@ const CURATED_FORMATS = [
   { label: "[Gen 4] OU", id: "gen4ou" }, { label: "[Gen 3] OU", id: "gen3ou" },
   { label: "[Gen 2] OU", id: "gen2ou" }, { label: "[Gen 1] OU", id: "gen1ou" },
 ] as const;
-export type ShowdownFormatOption = { label: string; id: string; section?: string; source?: "remote" | "bundled"; mod?: string; gameType?: string; searchShow?: boolean; challengeShow?: boolean; team?: string; ruleset?: string[]; banlist?: string[] };
+export type ShowdownFormatOption = { label: string; id: string; section?: string; source?: "remote" | "bundled"; mod?: string; gameType?: string; searchShow?: boolean; challengeShow?: boolean; team?: string; ruleset?: string[]; banlist?: string[]; remoteRuleset?: string[]; remoteBanlist?: string[]; remoteMod?: string; remoteGameType?: string; remoteTeam?: string };
 const EVERYTHING_FORMAT: ShowdownFormatOption = { label: "Everything!", id: "everything", section: "Custom", source: "remote" };
 let remoteFormats: ShowdownFormatOption[] = [];
 let availableFormatsCache: ShowdownFormatOption[] | null = null;
@@ -39,7 +39,26 @@ export function getAvailableShowdownFormats(): ShowdownFormatOption[] {
     }
   } catch { /* Keep the basic list if the bundled Dex cannot enumerate formats. */ }
   const byId = new Map<string, ShowdownFormatOption>();
-  for (const format of [...CURATED_FORMATS, ...local, ...remoteFormats]) byId.set(format.id, format);
+  for (const format of CURATED_FORMATS) byId.set(format.id, { ...format, source: "bundled" });
+  for (const format of local) byId.set(format.id, format);
+  // Keep every upstream catalog entry visible, but do not let remote metadata
+  // overwrite the installed simulator's local identity/rules. That distinction
+  // prevents a newer format definition from being falsely validated by stale rules.
+  for (const format of remoteFormats) {
+    const bundled = byId.get(format.id);
+    byId.set(format.id, bundled ? {
+      ...bundled,
+      label: format.label || bundled.label,
+      section: format.section || bundled.section,
+      searchShow: format.searchShow,
+      challengeShow: format.challengeShow,
+      remoteRuleset: format.remoteRuleset ?? format.ruleset,
+      remoteBanlist: format.remoteBanlist ?? format.banlist,
+      remoteMod: format.mod,
+      remoteGameType: format.gameType,
+      remoteTeam: format.team,
+    } : format);
+  }
   availableFormatsCache = [EVERYTHING_FORMAT, ...[...byId.values()].sort((a, b) => {
     const sectionCompare = (a.section || "").localeCompare(b.section || "");
     return sectionCompare || a.label.localeCompare(b.label);
@@ -57,9 +76,26 @@ export function resolveShowdownFormat(input: string): FormatResolution {
   const selected = getAvailableShowdownFormats().find(format => normalize(format.label) === normalized || normalize(format.id) === normalized);
   if (!selected) return { supported: false, id: null, label: input.trim() || "No format selected", reason: "This format is not present in the fetched or bundled Pokémon Showdown format catalog." };
   try {
-    const format = Dex.formats.get(selected.id);
+    const format = Dex.formats.get(selected.id) as unknown as {
+      id?: string; name?: string; effectType?: string; exists?: boolean;
+      mod?: string; gameType?: string; team?: string; ruleset?: string[]; banlist?: string[];
+    };
     if (!format || format.effectType !== "Format" || !format.exists) {
-      return { supported: false, id: null, label: selected.label, reason: `The format exists in the fetched Pokémon Showdown catalog, but the installed validator does not contain its executable rules (${selected.id}). It is not safe to guess legality.` };
+      return { supported: false, id: null, label: selected.label, reason: `This format is in the live catalog, but the installed Pokémon Showdown simulator does not include its executable rules (${selected.id}). The format remains searchable, but legality cannot be safely inferred.` };
+    }
+    if (selected.source === "remote") {
+      return { supported: false, id: null, label: selected.label, reason: `This format is newer than or absent from the installed simulator (${selected.id}). The live catalog is informational; validation requires a matching Pokémon Showdown simulator build.` };
+    }
+    const sameList = (upstream: string[] | undefined, localList: string[] | undefined) => {
+      if (!upstream?.length) return true; // Some format entries are defined by callbacks rather than explicit lists.
+      const ids = (values: string[]) => values.map(normalize).sort();
+      return JSON.stringify(ids(upstream)) === JSON.stringify(ids(localList || []));
+    };
+    if ((selected.remoteMod && format.mod && selected.remoteMod !== format.mod) ||
+        (selected.remoteGameType && format.gameType && selected.remoteGameType !== format.gameType) ||
+        (selected.remoteTeam && format.team && selected.remoteTeam !== format.team) ||
+        !sameList(selected.remoteRuleset, format.ruleset) || !sameList(selected.remoteBanlist, format.banlist)) {
+      return { supported: false, id: null, label: selected.label, reason: `The live Pokémon Showdown definition for ${selected.label} differs from the installed simulator's rules. Validation is disabled to avoid false legality results; update the simulator data to validate this format.` };
     }
   } catch {
     return { supported: false, id: null, label: selected.label, reason: `The installed validator does not contain executable rules for ${selected.label}. It is not safe to guess legality.` };

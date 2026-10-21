@@ -5,7 +5,6 @@ import { Dex } from "@pkmn/dex";
 import { exportTeam, parseTeamPaste } from "../lib/team-parser";
 import { PokemonSet, Stats, Team } from "../lib/types";
 import AutocompleteInput from "./AutocompleteInput";
-import { getSpeciesLearnset } from "../lib/learnsets";
 
 type Side = "left" | "right";
 type Props = {
@@ -82,14 +81,6 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
   const [setDatabase, setSetDatabase] = useState<SetDatabase | null>(null);
   const [setStatus, setSetStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [selectedPresets, setSelectedPresets] = useState<Record<string, string>>({});
-  const [learnsetsBySpecies, setLearnsetsBySpecies] = useState<Record<string, Set<string> | null>>({});
-  const [learnsetRevision, setLearnsetRevision] = useState(0);
-
-  useEffect(() => {
-    const refresh = () => setLearnsetRevision(value => value + 1);
-    window.addEventListener("ptl-learnsets-refreshed", refresh);
-    return () => window.removeEventListener("ptl-learnsets-refreshed", refresh);
-  }, []);
 
   useEffect(() => {
     if (open) {
@@ -120,16 +111,6 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
     return () => controller.abort();
   }, [open, mode]);
 
-  useEffect(() => {
-    if (!open || mode !== "builder") return;
-    let cancelled = false;
-    const species = [...new Set([...builderA, ...builderB].filter(p => !/^Empty Slot/.test(p.name) && p.species).map(p => p.species))];
-    Promise.all(species.map(async name => [cleanId(name), await getSpeciesLearnset(name, format)] as const)).then(entries => {
-      if (!cancelled) setLearnsetsBySpecies(previous => ({ ...previous, ...Object.fromEntries(entries) }));
-    }).catch(() => { /* keep autocomplete usable if learnset data cannot load */ });
-    return () => { cancelled = true; };
-  }, [open, mode, builderA, builderB, format, learnsetRevision]);
-
   const dexOptions = useMemo(() => {
     const all = (table: unknown): Array<{ name: string; exists?: boolean }> => {
       try { return (table as { all: () => Array<{ name: string; exists?: boolean }> }).all().filter(entry => entry.exists !== false); }
@@ -141,16 +122,7 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
     return { species: species.length ? species : [...new Set([...left, ...right].map(p => p.species).filter(Boolean))].sort(), moves, items };
   }, [left, right]);
   const speciesOptions = dexOptions.species;
-  const legalMovesFor = (species: string) => {
-    const learnset = learnsetsBySpecies[cleanId(species)];
-    if (!learnset) return dexOptions.moves;
-    return dexOptions.moves.filter(move => learnset.has(cleanId(move)));
-  };
-  const moveIsLegal = (species: string, move: string) => {
-    if (!move) return true;
-    const learnset = learnsetsBySpecies[cleanId(species)];
-    return !learnset || learnset.has(cleanId(move));
-  };
+  const legalMovesFor = (_species: string) => dexOptions.moves;
   const abilitiesForSpecies = (species: string): string[] => {
     try {
       const entry = (Dex.species as unknown as { get: (name: string) => { abilities?: Record<string, string> } }).get(species);
@@ -215,7 +187,7 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
           <label>Level<input type="number" min="1" max="100" value={pokemon.level} onChange={event => updateBuilderPokemon(side, index, { level: Math.max(1, Math.min(100, Number(event.target.value) || 100)) })} /></label>
           <label>Tera Type<select aria-label={`${pokemon.species} Tera type`} value={pokemon.teraType || ""} onChange={event => updateBuilderPokemon(side, index, { teraType: event.target.value })}><option value="">None</option>{["Normal","Fire","Water","Electric","Grass","Ice","Fighting","Poison","Ground","Flying","Psychic","Bug","Rock","Ghost","Dragon","Dark","Steel","Fairy","Stellar"].map(type => <option key={type} value={type}>{type}</option>)}</select></label>
         </div>
-        <div className="builder-moves">{[0,1,2,3].map(moveIndex => <label key={moveIndex}>Move {moveIndex + 1}<AutocompleteInput ariaLabel={`${pokemon.species} move ${moveIndex + 1}`} clearOnFocus options={legalMovesFor(pokemon.species)} value={pokemon.moves[moveIndex] || ""} onChange={value => { const moves = [...pokemon.moves]; moves[moveIndex] = value; updateBuilderPokemon(side, index, { moves }); }} />{pokemon.moves[moveIndex] && !moveIsLegal(pokemon.species, pokemon.moves[moveIndex]) && <span className="move-illegal-indicator" title={`Move is not in ${pokemon.species} species learnset; check the Format legality report for format rules`}>Learnset?</span>}</label>)}</div>
+        <div className="builder-moves">{[0,1,2,3].map(moveIndex => <label key={moveIndex}>Move {moveIndex + 1}<AutocompleteInput ariaLabel={`${pokemon.species} move ${moveIndex + 1}`} clearOnFocus options={legalMovesFor(pokemon.species)} value={pokemon.moves[moveIndex] || ""} onChange={value => { const moves = [...pokemon.moves]; moves[moveIndex] = value; updateBuilderPokemon(side, index, { moves }); }} /></label>)}</div>
         <div className="builder-evs-heading"><strong>EVs</strong>{(() => { const remaining = 510 - Object.values(pokemon.evs).reduce((sum, value) => sum + value, 0); return <span className={remaining < 0 ? "evs-remaining-over" : ""}>Remaining: {remaining}</span>; })()}</div>
         <div className="builder-evs">{([ ["HP","hp"],["Atk","atk"],["Def","def"],["SpA","spa"],["SpD","spd"],["Spe","spe"] ] as const).map(([label, stat]) => <label key={stat} className={NATURE_EFFECTS[pokemon.nature]?.plus === label ? "nature-boost-label" : NATURE_EFFECTS[pokemon.nature]?.minus === label ? "nature-hinder-label" : ""}>{label}<input aria-label={`${pokemon.species} ${label} EVs`} type="number" min="0" max="252" step="4" value={pokemon.evs[stat]} onChange={event => updateStat(side, index, stat, event.target.value, "evs")} /></label>)}</div>
         <div className="builder-final-stats"><strong>Final stats</strong>{(() => { const entry = (Dex.species as unknown as { get: (name: string) => { baseStats?: Record<string, number> } }).get(pokemon.species); const base = entry.baseStats || {}; const nature = NATURE_EFFECTS[pokemon.nature] || {}; const labels: Record<string, string> = { hp: "HP", atk: "Atk", def: "Def", spa: "SpA", spd: "SpD", spe: "Spe" }; return (["hp","atk","def","spa","spd","spe"] as const).map(stat => { const b = Number(base[stat] || 1), iv = Number(pokemon.ivs?.[stat] ?? 31), ev = Number(pokemon.evs[stat] || 0); const core = Math.floor((2*b + iv + Math.floor(ev/4))*pokemon.level/100); const value = stat === "hp" ? (cleanId(pokemon.species) === "shedinja" ? 1 : core + pokemon.level + 10) : Math.floor((core + 5) * (nature.plus === labels[stat] ? 1.1 : nature.minus === labels[stat] ? 0.9 : 1)); return <span key={stat} className={nature.plus === labels[stat] ? "nature-boost-label" : nature.minus === labels[stat] ? "nature-hinder-label" : ""}>{labels[stat]} <b>{value}</b></span>; }); })()}</div>
@@ -225,7 +197,7 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
 
   return <div className="teams-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="teams-modal panel" role="dialog" aria-modal="true" aria-labelledby="teams-modal-title">
-      <div className="panel-title-row"><div><h2 id="teams-modal-title">Teams · Teambuilder / Paste</h2><p>Format: {format}. Moves are checked against the species learnset; custom-format bans may require additional rules data.</p></div><button onClick={onClose} aria-label="Close teams">Close ×</button></div>
+      <div className="panel-title-row"><div><h2 id="teams-modal-title">Teams · Teambuilder / Paste</h2><p>Format: {format}. Format legality is checked separately when the selected format is supported by the installed Showdown validator.</p></div><button onClick={onClose} aria-label="Close teams">Close ×</button></div>
       <div className="builder-toolbar"><div className="mode-toggle" role="group" aria-label="Team editing mode"><button className={mode === "builder" ? "active" : ""} onClick={() => setMode("builder")}>Teambuilder</button><button className={mode === "paste" ? "active" : ""} onClick={() => setMode("paste")}>Paste</button></div><small className="preset-status">{mode === "builder" ? setStatus === "loading" ? "Loading Smogon sets…" : setStatus === "error" ? "Smogon set data unavailable; manual editing still works." : "Presets from Smogon usage sets" : "Standard Showdown team paste format"}</small></div>
       {mode === "builder" ? <><div className="teams-two-column">{renderBuilderTeam("left", builderA)}{renderBuilderTeam("right", builderB)}</div></> : <div className="teams-two-column">
         <section className="team-editor"><div className="team-editor-heading"><h3>Team A</h3><span>{left.length}/6 Pokémon</span></div><textarea aria-label="Team A Showdown text" value={textA} onChange={e => setTextA(e.target.value)} spellCheck={false}/><div className="button-row"><button className="primary" onClick={() => importNow("left")}>Import Team A</button><button onClick={() => download("left")}>Export Team A</button><button onClick={() => navigator.clipboard?.writeText(exportTeam(left))}>Copy current</button></div></section>

@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 
 const SOURCE_URL = "https://raw.githubusercontent.com/smogon/pokemon-showdown/master/config/formats.ts";
 const RULESETS_URL = "https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/rulesets.ts";
-type FormatEntry = { id: string; label: string; section: string; mod?: string; gameType?: string; searchShow?: boolean; challengeShow?: boolean; team?: string; ruleset: string[]; banlist: string[]; source: "remote" };
+type FormatEntry = { id: string; label: string; section: string; mod?: string; gameType?: string; searchShow?: boolean; challengeShow?: boolean; team?: string; ruleset: string[]; banlist: string[]; remoteRuleset: string[]; remoteBanlist: string[]; source: "remote" };
 const toID = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "");
 
 function property(block: string, key: string): string | undefined {
@@ -34,7 +34,7 @@ function parseFormats(source: string): FormatEntry[] {
       id: property(block, "id") || toID(label), label, section,
       mod: property(block, "mod"), gameType: property(block, "gameType"),
       searchShow: boolProperty("searchShow"), challengeShow: boolProperty("challengeShow"), team: property(block, "team"),
-      ruleset: stringArray(block, "ruleset"), banlist: stringArray(block, "banlist"), source: "remote",
+      ruleset: [], banlist: [], remoteRuleset: stringArray(block, "ruleset"), remoteBanlist: stringArray(block, "banlist"), source: "remote",
     });
   }
   const unique = new Map<string, FormatEntry>();
