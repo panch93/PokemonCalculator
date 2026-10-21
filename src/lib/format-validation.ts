@@ -1,100 +1,68 @@
 import { Dex, TeamValidator } from "@pkmn/sim";
 import type { PokemonSet, Team } from "./types";
 
-/**
- * Formats deliberately mirror named Pokémon Showdown formats. Custom formats
- * (including draft leagues) need an explicit ruleset and are never guessed.
- */
-const BASE_DRAFT_FORMATS = [
-  ["gen9ou", "Gen 9 Draft"], ["gen9nationaldex", "Gen 9 National Dex Draft"],
-  ["gen9uu", "Gen 9 UU Draft"], ["gen9ru", "Gen 9 RU Draft"], ["gen9nu", "Gen 9 NU Draft"], ["gen9pu", "Gen 9 PU Draft"],
-  ["gen8ou", "Gen 8 OU Draft"], ["gen8nationaldex", "Gen 8 National Dex Draft"], ["gen7ou", "Gen 7 OU Draft"],
-  ["gen6ou", "Gen 6 OU Draft"], ["gen5ou", "Gen 5 OU Draft"], ["gen4ou", "Gen 4 OU Draft"], ["gen3ou", "Gen 3 OU Draft"],
-] as const;
-export const DRAFT_FORMATS = [
-  ...BASE_DRAFT_FORMATS.map(([base, label]) => ({ label: `${label} (Standard Draft rules)`, id: `${base}@@@Standard Draft` })),
-  { label: "Champions NatDex Draft", id: "championsnatdexdraft" },
-];
-
+/** Showdown's current format catalog is fetched at runtime; bundled formats are a fallback. */
 const CURATED_FORMATS = [
-  { label: "Gen 9 OU", id: "gen9ou" }, { label: "Gen 9 Ubers", id: "gen9ubers" },
-  { label: "Gen 9 UU", id: "gen9uu" }, { label: "Gen 9 RU", id: "gen9ru" },
-  { label: "Gen 9 NU", id: "gen9nu" }, { label: "Gen 9 PU", id: "gen9pu" },
-  { label: "Gen 9 Monotype", id: "gen9monotype" }, { label: "Gen 9 Doubles OU", id: "gen9doublesou" },
-  { label: "Gen 8 OU", id: "gen8ou" }, { label: "Gen 7 OU", id: "gen7ou" },
-  { label: "Gen 6 OU", id: "gen6ou" }, { label: "Gen 5 OU", id: "gen5ou" },
-  { label: "Gen 4 OU", id: "gen4ou" }, { label: "Gen 3 OU", id: "gen3ou" },
-  { label: "Gen 2 OU", id: "gen2ou" }, { label: "Gen 1 OU", id: "gen1ou" },
+  { label: "[Gen 9] OU", id: "gen9ou" }, { label: "[Gen 9] Ubers", id: "gen9ubers" },
+  { label: "[Gen 9] UU", id: "gen9uu" }, { label: "[Gen 9] RU", id: "gen9ru" },
+  { label: "[Gen 9] NU", id: "gen9nu" }, { label: "[Gen 9] PU", id: "gen9pu" },
+  { label: "[Gen 9] Monotype", id: "gen9monotype" }, { label: "[Gen 9] Doubles OU", id: "gen9doublesou" },
+  { label: "[Gen 8] OU", id: "gen8ou" }, { label: "[Gen 7] OU", id: "gen7ou" },
+  { label: "[Gen 6] OU", id: "gen6ou" }, { label: "[Gen 5] OU", id: "gen5ou" },
+  { label: "[Gen 4] OU", id: "gen4ou" }, { label: "[Gen 3] OU", id: "gen3ou" },
+  { label: "[Gen 2] OU", id: "gen2ou" }, { label: "[Gen 1] OU", id: "gen1ou" },
 ] as const;
-export const SUPPORTED_FORMATS = [...CURATED_FORMATS, ...DRAFT_FORMATS] as const;
+export type ShowdownFormatOption = { label: string; id: string; section?: string; source?: "remote" | "bundled"; mod?: string; gameType?: string; searchShow?: boolean; challengeShow?: boolean; team?: string; ruleset?: string[]; banlist?: string[] };
+const EVERYTHING_FORMAT: ShowdownFormatOption = { label: "Everything!", id: "everything", section: "Custom", source: "remote" };
+let remoteFormats: ShowdownFormatOption[] = [];
+let availableFormatsCache: ShowdownFormatOption[] | null = null;
+export function setRemoteShowdownFormats(formats: ShowdownFormatOption[]) {
+  remoteFormats = formats.filter(format => format.id && format.label && format.id !== "everything");
+  availableFormatsCache = null;
+}
 
 export type FormatResolution =
   | { supported: true; id: string; label: string }
   | { supported: false; id: null; label: string; reason: string };
 
 const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
-let availableFormatsCache: { label: string; id: string }[] | null = null;
 
-/** Only expose formats actually present in the bundled Pokémon Showdown data. */
-export function getAvailableShowdownFormats(): { label: string; id: string }[] {
+/** Includes formats hidden from ladder search, especially draft and test formats. */
+export function getAvailableShowdownFormats(): ShowdownFormatOption[] {
   if (availableFormatsCache) return availableFormatsCache;
-  const discovered: { label: string; id: string }[] = [];
-  const curatedLabels = new Map<string, string>(CURATED_FORMATS.map(format => [format.id, format.label]));
+  const local: ShowdownFormatOption[] = [];
   try {
-    const all = (Dex.formats as unknown as { all: () => Array<{ id: string; name: string; effectType?: string; exists?: boolean; challengeShow?: boolean; searchShow?: boolean; team?: string }> }).all();
+    const all = (Dex.formats as unknown as { all: () => Array<{ id: string; name: string; effectType?: string; exists?: boolean; challengeShow?: boolean; searchShow?: boolean; team?: string; mod?: string; gameType?: string }> }).all();
     for (const format of all) {
       if (!format.id || !format.name || format.effectType !== "Format" || format.exists === false) continue;
-      // Teambuilder lists playable formats, not hidden aliases or random-team generators.
-      if (format.challengeShow === false || format.searchShow === false || format.team) continue;
-      discovered.push({ label: curatedLabels.get(format.id) || format.name, id: format.id });
+      local.push({ label: format.name, id: format.id, source: "bundled", mod: format.mod, gameType: format.gameType, searchShow: format.searchShow, challengeShow: format.challengeShow, team: format.team });
     }
-  } catch { /* The curated list below remains a safe fallback for older Dex builds. */ }
-  const source = discovered.length ? discovered : CURATED_FORMATS.filter(candidate => {
-    try { const format = Dex.formats.get(candidate.id); return Boolean(format && format.effectType === "Format" && format.exists); }
-    catch { return false; }
-  });
-  const drafts = DRAFT_FORMATS.filter(candidate => {
-    const [base] = candidate.id.split("@@@");
-    if (candidate.id === "championsnatdexdraft") return true;
-    try { const format = Dex.formats.get(base); return Boolean(format && format.effectType === "Format" && format.exists); }
-    catch { return false; }
-  });
-  const byId = new Map<string, { label: string; id: string }>();
-  for (const candidate of [...source, ...drafts]) byId.set(candidate.id, candidate);
-  availableFormatsCache = [...byId.values()].sort((a, b) => a.label.localeCompare(b.label));
+  } catch { /* Keep the basic list if the bundled Dex cannot enumerate formats. */ }
+  const byId = new Map<string, ShowdownFormatOption>();
+  for (const format of [...CURATED_FORMATS, ...local, ...remoteFormats]) byId.set(format.id, format);
+  availableFormatsCache = [EVERYTHING_FORMAT, ...[...byId.values()].sort((a, b) => {
+    const sectionCompare = (a.section || "").localeCompare(b.section || "");
+    return sectionCompare || a.label.localeCompare(b.label);
+  })];
   return availableFormatsCache;
 }
 
+export function isEverythingFormat(input: string) {
+  return normalize(input) === "everything";
+}
+
 export function resolveShowdownFormat(input: string): FormatResolution {
+  if (isEverythingFormat(input)) return { supported: false, id: null, label: "Everything!", reason: "Everything! is an unrestricted analysis mode; format-specific legality is intentionally not applied." };
   const normalized = normalize(input);
   const selected = getAvailableShowdownFormats().find(format => normalize(format.label) === normalized || normalize(format.id) === normalized);
-  if (!selected) {
-    return {
-      supported: false,
-      id: null,
-      label: input.trim() || "No format selected",
-      reason: "This format is not available in the bundled Pokémon Showdown rules. Choose a listed format or add an explicit ruleset for this custom format.",
-    };
-  }
-
+  if (!selected) return { supported: false, id: null, label: input.trim() || "No format selected", reason: "This format is not present in the fetched or bundled Pokémon Showdown format catalog." };
   try {
-    const baseId = selected.id.split("@@@")[0];
-    const format = Dex.formats.get(baseId);
+    const format = Dex.formats.get(selected.id);
     if (!format || format.effectType !== "Format" || !format.exists) {
-      return {
-        supported: false,
-        id: null,
-        label: selected.label,
-        reason: `The installed Pokémon Showdown data does not include ${selected.label}. Choose a format marked as supported or add this format's ruleset.`,
-      };
+      return { supported: false, id: null, label: selected.label, reason: `The format exists in the fetched Pokémon Showdown catalog, but the installed validator does not contain its executable rules (${selected.id}). It is not safe to guess legality.` };
     }
   } catch {
-    return {
-      supported: false,
-      id: null,
-      label: selected.label,
-      reason: `The installed Pokémon Showdown data does not include ${selected.label}. Choose a format marked as supported or add this format's ruleset.`,
-    };
+    return { supported: false, id: null, label: selected.label, reason: `The installed validator does not contain executable rules for ${selected.label}. It is not safe to guess legality.` };
   }
   return { supported: true, id: selected.id, label: selected.label };
 }
@@ -123,6 +91,7 @@ export type TeamFormatValidation = {
 };
 
 export function validateTeamForFormat(team: Team, formatInput: string): TeamFormatValidation {
+  if (isEverythingFormat(formatInput)) return { supported: false, formatLabel: "Everything!", valid: null, issues: [], message: "Unrestricted analysis mode; format legality is not checked." };
   const format = resolveShowdownFormat(formatInput);
   if (!format.supported) {
     return { supported: false, formatLabel: format.label, valid: null, issues: [], message: format.reason };

@@ -13,7 +13,7 @@ function set(overrides: Partial<PokemonSet> = {}): PokemonSet {
 }
 
 describe("Pokémon Showdown format resolution", () => {
-  it("exposes Gen 9 OU when it exists in the bundled Showdown data", () => {
+  it("exposes bundled formats as a fallback", () => {
     expect(getAvailableShowdownFormats().some(format => format.id === "gen9ou")).toBe(true);
   });
 
@@ -22,15 +22,12 @@ describe("Pokémon Showdown format resolution", () => {
     expect(resolveShowdownFormat("gen9ou")).toMatchObject({ supported: true, id: "gen9ou" });
   });
 
-
-  it("offers explicit draft presets backed by Showdown's Standard Draft rules", () => {
-    const draft = resolveShowdownFormat("Gen 9 Draft (Standard Draft rules)");
-    expect(draft.supported).toBe(true);
-    if (draft.supported) expect(draft.id).toBe("gen9ou@@@Standard Draft");
-    expect(getAvailableShowdownFormats().some(format => format.label.includes("Draft"))).toBe(true);
+  it("provides an explicit Everything! analysis mode without claiming legality", () => {
+    expect(resolveShowdownFormat("Everything!")).toMatchObject({ supported: false, label: "Everything!" });
+    expect(validateTeamForFormat([set()], "everything")).toMatchObject({ supported: false, valid: null, issues: [] });
   });
 
-  it("does not silently treat custom draft formats as standard formats", () => {
+  it("does not silently validate formats missing from the installed simulator", () => {
     const result = resolveShowdownFormat("Champions NatDex Draft");
     expect(result.supported).toBe(false);
     expect(validateTeamForFormat([set()], "Champions NatDex Draft")).toMatchObject({ supported: false, valid: null, issues: [] });

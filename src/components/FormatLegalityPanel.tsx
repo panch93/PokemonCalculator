@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import type { Team } from "../lib/types";
-import { validateTeamForFormat } from "../lib/format-validation";
+import { isEverythingFormat, validateTeamForFormat } from "../lib/format-validation";
 
 export default function FormatLegalityPanel({ teamA, teamB, format }: { teamA: Team; teamB: Team; format: string }) {
   const [expanded, setExpanded] = useState(true);
+  if (isEverythingFormat(format)) return null;
   const validationA = useMemo(() => validateTeamForFormat(teamA, format), [teamA, format]);
   const validationB = useMemo(() => validateTeamForFormat(teamB, format), [teamB, format]);
   const validations = [{ label: "Team A", result: validationA }, { label: "Team B", result: validationB }];
@@ -15,7 +16,7 @@ export default function FormatLegalityPanel({ teamA, teamB, format }: { teamA: T
 
   return <section className="format-validation panel" aria-labelledby="format-validation-title">
     <div className="panel-title-row">
-      <div><h2 id="format-validation-title">Format legality</h2><p>Bundled Showdown rules · {format}</p></div>
+      <div><h2 id="format-validation-title">Format legality</h2><p>Showdown rules · {format}</p></div>
       <button type="button" onClick={() => setExpanded(value => !value)} aria-expanded={expanded}>{expanded ? "Hide details" : "Show details"}</button>
     </div>
     <div className="format-validation-summary">

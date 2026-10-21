@@ -35,7 +35,7 @@ export default function TeamLab() {
   const [stagesB, setStagesB] = useState<StatStages[]>(ZERO_STAGES);
   const [storageReady, setStorageReady] = useState(false);
   const [teamsOpen, setTeamsOpen] = useState(false);
-  const [format, setFormat] = useState("Gen 9 OU");
+  const [format, setFormat] = useState("everything");
   const [mechanics, setMechanics] = useState({ tera: true, doubles: false });
   const [generation, setGeneration] = useState(9);
   const [learnsetStatus, setLearnsetStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -97,7 +97,14 @@ export default function TeamLab() {
 
   const matchupsA = useMemo<(Matchup | null)[][]>(() => left.map((attacker, row) => right.map((defender, col) => {
     const moves = attacker.moves.filter(Boolean).slice(0, 4)
-      .map(move => calculateMove({ ...(mechanics.tera && generation === 9 ? attacker : { ...attacker, teraType: "" }), alliesFainted: left.filter((p, i) => i !== row && p.dead).length }, { ...(mechanics.tera && generation === 9 ? defender : { ...defender, teraType: "" }), alliesFainted: right.filter((p, i) => i !== col && p.dead).length }, move, field, stagesA[row], stagesB[col], critical, generation, mechanics.doubles))
+      .map(move => {
+        const atk = { ...(mechanics.tera && generation === 9 ? attacker : { ...attacker, teraType: "" }), alliesFainted: left.filter((p, i) => i !== row && p.dead).length };
+        const def = { ...(mechanics.tera && generation === 9 ? defender : { ...defender, teraType: "" }), alliesFainted: right.filter((p, i) => i !== col && p.dead).length };
+        const damage = calculateMove(atk, def, move, field, stagesA[row], stagesB[col], critical, generation, mechanics.doubles);
+        if (!damage || critical) return damage;
+        const crit = calculateMove(atk, def, move, field, stagesA[row], stagesB[col], true, generation, mechanics.doubles);
+        return { ...damage, critMinPct: crit?.minPct, critMaxPct: crit?.maxPct };
+      })
       .filter((value): value is NonNullable<typeof value> => Boolean(value));
     const selectedMove = movesA[row];
     return { attacker, defender, moves, best: moves.find(m => m.move === selectedMove) || moves[0] };
@@ -105,7 +112,14 @@ export default function TeamLab() {
 
   const matchupsB = useMemo<(Matchup | null)[][]>(() => right.map((attacker, row) => left.map((defender, col) => {
     const moves = attacker.moves.filter(Boolean).slice(0, 4)
-      .map(move => calculateMove({ ...(mechanics.tera && generation === 9 ? attacker : { ...attacker, teraType: "" }), alliesFainted: right.filter((p, i) => i !== row && p.dead).length }, { ...(mechanics.tera && generation === 9 ? defender : { ...defender, teraType: "" }), alliesFainted: left.filter((p, i) => i !== col && p.dead).length }, move, field, stagesB[row], stagesA[col], critical, generation, mechanics.doubles))
+      .map(move => {
+        const atk = { ...(mechanics.tera && generation === 9 ? attacker : { ...attacker, teraType: "" }), alliesFainted: right.filter((p, i) => i !== row && p.dead).length };
+        const def = { ...(mechanics.tera && generation === 9 ? defender : { ...defender, teraType: "" }), alliesFainted: left.filter((p, i) => i !== col && p.dead).length };
+        const damage = calculateMove(atk, def, move, field, stagesB[row], stagesA[col], critical, generation, mechanics.doubles);
+        if (!damage || critical) return damage;
+        const crit = calculateMove(atk, def, move, field, stagesB[row], stagesA[col], true, generation, mechanics.doubles);
+        return { ...damage, critMinPct: crit?.minPct, critMaxPct: crit?.maxPct };
+      })
       .filter((value): value is NonNullable<typeof value> => Boolean(value));
     const selectedMove = movesB[row];
     return { attacker, defender, moves, best: moves.find(m => m.move === selectedMove) || moves[0] };

@@ -65,3 +65,8 @@ The separate learnset panel is still useful for discovering species moves, but i
 ## Data and licensing
 
 Pokémon names and battle data are sourced from Pokémon Showdown / `@pkmn` projects. Damage calculations use `@smogon/calc`. Consult each upstream project's license and terms when redistributing or deploying this application.
+
+
+## Live format data and legality limits
+
+The format picker fetches the current format catalog from Pokémon Showdown's upstream `config/formats.ts` and ruleset source from `data/rulesets.ts`, including formats with `searchShow: false`. Species learnsets are fetched from Pokémon Showdown's public learnset data. The default **Everything!** mode is for unrestricted analysis and does not claim format legality. A remote format is validated only when the installed `@pkmn/sim` package contains executable rules for that exact format; otherwise it is explicitly reported as not validated. Fetching configuration source alone cannot execute new simulator mods or custom validation callbacks, so this avoids pretending an unsupported format was checked.
