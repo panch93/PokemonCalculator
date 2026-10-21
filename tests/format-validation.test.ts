@@ -22,6 +22,14 @@ describe("Pokémon Showdown format resolution", () => {
     expect(resolveShowdownFormat("gen9ou")).toMatchObject({ supported: true, id: "gen9ou" });
   });
 
+
+  it("offers explicit draft presets backed by Showdown's Standard Draft rules", () => {
+    const draft = resolveShowdownFormat("Gen 9 Draft (Standard Draft rules)");
+    expect(draft.supported).toBe(true);
+    if (draft.supported) expect(draft.id).toBe("gen9ou@@@Standard Draft");
+    expect(getAvailableShowdownFormats().some(format => format.label.includes("Draft"))).toBe(true);
+  });
+
   it("does not silently treat custom draft formats as standard formats", () => {
     const result = resolveShowdownFormat("Champions NatDex Draft");
     expect(result.supported).toBe(false);

@@ -10,6 +10,9 @@ export default function FormatLegalityPanel({ teamA, teamB, format }: { teamA: T
   const validationB = useMemo(() => validateTeamForFormat(teamB, format), [teamB, format]);
   const validations = [{ label: "Team A", result: validationA }, { label: "Team B", result: validationB }];
 
+  const hasErrors = validations.some(({ result }) => !result.supported || result.issues.length > 0);
+  if (!hasErrors) return null;
+
   return <section className="format-validation panel" aria-labelledby="format-validation-title">
     <div className="panel-title-row">
       <div><h2 id="format-validation-title">Format legality</h2><p>Bundled Showdown rules · {format}</p></div>

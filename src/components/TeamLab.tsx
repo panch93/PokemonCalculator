@@ -36,7 +36,7 @@ export default function TeamLab() {
   const [storageReady, setStorageReady] = useState(false);
   const [teamsOpen, setTeamsOpen] = useState(false);
   const [format, setFormat] = useState("Gen 9 OU");
-  const [mechanics, setMechanics] = useState({ tera: true });
+  const [mechanics, setMechanics] = useState({ tera: true, doubles: false });
   const [generation, setGeneration] = useState(9);
   const [learnsetStatus, setLearnsetStatus] = useState<"loading" | "ready" | "error">("loading");
 
@@ -157,8 +157,8 @@ export default function TeamLab() {
     <main>
       <header className="hero">
         <div><span className="eyebrow">BATTLE LAB / {generation === 10 ? "CHAMPIONS" : `GEN ${generation}`}</span><h1>Pokemon Team Lab</h1><p>6v6 matchup analysis powered by the Smogon damage calculator.</p>
-          <div className="top-rule-controls"><label>Mechanics Gen <select aria-label="Battle mechanics generation" value={generation} onChange={e => { const next = Number(e.target.value); setGeneration(next); if (next !== 9) setMechanics({ tera: false }); }}>{Array.from({ length: 9 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Gen {g}{g === 1 ? " · RBY" : g === 2 ? " · GSC" : g === 3 ? " · ADV" : g === 4 ? " · DPP" : g === 5 ? " · BW" : g === 6 ? " · XY" : g === 7 ? " · SM" : g === 8 ? " · SS" : " · SV"}</option>)}<option value={10}>Pokémon Champions</option></select></label><label>Format <input list="team-lab-formats" value={format} onChange={e => setFormat(e.target.value)} aria-label="Battle format" /><datalist id="team-lab-formats">{getAvailableShowdownFormats().map(x => <option key={x.id} value={x.label} />)}<option value="Champions NatDex Draft" /></datalist></label>
-          <details className="mechanics-menu"><summary>Battle mechanics</summary><div className="mechanics-options"><label><input type="checkbox" checked={mechanics.tera && generation === 9} disabled={generation !== 9} onChange={e => setMechanics({ tera: e.target.checked })} />Terastallization</label><small>Generations 1–9 use their Smogon Calc generation. Champions is listed as a selectable mode, but the installed @smogon/calc 0.12.0 does not include its dedicated engine, so damage currently falls back to Gen 9 mechanics. Terastallization is available only in Gen 9.</small></div></details></div>
+          <div className="top-rule-controls"><label>Mechanics Gen <select aria-label="Battle mechanics generation" value={generation} onChange={e => { const next = Number(e.target.value); setGeneration(next); if (next !== 9) setMechanics(previous => ({ ...previous, tera: false })); }}>{Array.from({ length: 9 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Gen {g}{g === 1 ? " · RBY" : g === 2 ? " · GSC" : g === 3 ? " · ADV" : g === 4 ? " · DPP" : g === 5 ? " · BW" : g === 6 ? " · XY" : g === 7 ? " · SM" : g === 8 ? " · SS" : " · SV"}</option>)}<option value={10}>Pokémon Champions</option></select></label><label>Format <select value={format} onChange={e => setFormat(e.target.value)} aria-label="Battle format">{getAvailableShowdownFormats().map(x => <option key={x.id} value={x.label}>{x.label}</option>)}<option value="Champions NatDex Draft">Champions NatDex Draft (not validated)</option></select></label>
+          <details className="mechanics-menu"><summary>Battle mechanics</summary><div className="mechanics-options"><label><input type="checkbox" checked={mechanics.tera && generation === 9} disabled={generation !== 9} onChange={e => setMechanics(previous => ({ ...previous, tera: e.target.checked }))} />Terastallization</label><label><input type="checkbox" checked={mechanics.doubles} onChange={e => setMechanics(previous => ({ ...previous, doubles: e.target.checked }))} />Doubles mechanics</label><small>Generations 1–9 use their Smogon Calc generation. Champions is listed as a selectable mode, but the installed @smogon/calc 0.12.0 does not include its dedicated engine, so damage currently falls back to Gen 9 mechanics. Terastallization is available only in Gen 9.</small></div></details></div>
         </div>
         <div className="hero-actions"><button type="button" onClick={refreshTeamLearnsets} disabled={learnsetStatus === "loading"}>{learnsetStatus === "loading" ? "Loading learnsets…" : "Refresh team learnsets"}</button><span className={`learnset-status ${learnsetStatus}`} role="status">{learnsetStatus === "loading" ? "Learnsets loading" : learnsetStatus === "ready" ? getLearnsetModeLabel(format) : "Learnsets unavailable"}</span><button onClick={() => setTeamsOpen(true)}>Teams · Import / Export</button></div>
       </header>
@@ -166,7 +166,7 @@ export default function TeamLab() {
       <div className="workspace workspace-full">
         <FieldPanel value={field} onChange={setField} />
         <MatchupMatrix
-          left={rowTeam} right={colTeam} generation={generation} matchups={visibleMatchups} fieldState={field} format={format} selected={selected} swapped={swapped}
+          left={rowTeam} right={colTeam} doubles={mechanics.doubles} generation={generation} matchups={visibleMatchups} fieldState={field} format={format} selected={selected} swapped={swapped}
           rowMoves={rowMoves} rowStages={rowStages} colStages={colStages} critical={critical} onCriticalChange={setCritical}
           onToggleSwap={() => { setSwapped(value => !value); setSelected(value => value ? ({ row: value.col, col: value.row }) : null); }}
           onSelect={(row, col) => setSelected({ row, col })}
