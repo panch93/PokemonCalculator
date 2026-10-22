@@ -5,6 +5,14 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const lock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
 const failures = [];
+const obsoleteFiles = [
+  'src/lib/format-rule-compatibility.ts',
+  'src/lib/pkmn-sim-format-catalog-source.ts',
+  'src/lib/pkmn-sim-validation-provider.ts',
+];
+for (const relative of obsoleteFiles) {
+  if (fs.existsSync(path.join(root, relative))) failures.push(`${relative} is obsolete and must be deleted after removing @pkmn/sim`);
+}
 for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
   if (pkg[section]?.['@pkmn/sim']) failures.push(`package.json still declares @pkmn/sim in ${section}`);
 }

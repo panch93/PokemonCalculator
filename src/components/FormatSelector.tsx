@@ -2,60 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getAvailableShowdownFormats, setRemoteShowdownFormats, type ShowdownFormatOption } from "../lib/format-validation";
+import { fetchLiveShowdownFormats } from "../lib/showdown-format-config";
 
 type Props = { value: string; onChange: (value: string) => void };
-
-/** Parse format metadata from the upstream TypeScript source without evaluating it. */
-function parseUpstreamFormatCatalog(source: string): ShowdownFormatOption[] {
-  const formats: ShowdownFormatOption[] = [];
-  let section = "";
-  let i = source.lastIndexOf("export const Formats");
-  if (i < 0) return formats;
-  i = source.indexOf("=", i);
-  if (i < 0) return formats;
-  i = source.indexOf("[", i);
-  if (i < 0) return formats;
-  let depth = 0, quote = "", escaped = false, lineComment = false, blockComment = false;
-  let start = -1;
-  for (; i < source.length; i++) {
-    const c = source[i], n = source[i + 1];
-    if (lineComment) { if (c === "\n") lineComment = false; continue; }
-    if (blockComment) { if (c === "*" && n === "/") { blockComment = false; i++; } continue; }
-    if (quote) { if (escaped) escaped = false; else if (c === "\\") escaped = true; else if (c === quote) quote = ""; continue; }
-    if (c === "/" && n === "/") { lineComment = true; i++; continue; }
-    if (c === "/" && n === "*") { blockComment = true; i++; continue; }
-    if (c === "\"" || c === "'" || c === "`") { quote = c; continue; }
-    if (c === "{") { if (depth === 0) start = i; depth++; continue; }
-    if (c === "}") {
-      depth--;
-      if (depth === 0 && start >= 0) {
-        const block = source.slice(start, i + 1);
-        const name = readStringProperty(block, "name");
-        if (!name) { const nextSection = readStringProperty(block, "section"); if (nextSection) section = nextSection; }
-        else {
-          const id = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-          formats.push({ label: name, id, section, source: "remote", mod: readStringProperty(block, "mod") || undefined, gameType: readStringProperty(block, "gameType") || undefined, team: readStringProperty(block, "team") || undefined, searchShow: readBooleanProperty(block, "searchShow"), challengeShow: readBooleanProperty(block, "challengeShow"), ruleset: readStringArrayProperty(block, "ruleset"), banlist: readStringArrayProperty(block, "banlist") });
-        }
-        start = -1;
-      }
-    }
-    if (c === "]" && depth === 0) break;
-  }
-  return formats.filter((format, index, all) => all.findIndex(other => other.id === format.id) === index);
-}
-function readStringProperty(block: string, property: string): string | undefined {
-  const match = block.match(new RegExp("\\b" + property + "\\s*:\\s*(['\"])(.*?)\\1", "s"));
-  return match?.[2]?.replace(/\\\\(['\"\\])/g, "$1");
-}
-function readBooleanProperty(block: string, property: string): boolean | undefined {
-  const match = block.match(new RegExp("\\b" + property + "\\s*:\\s*(true|false)"));
-  return match ? match[1] === "true" : undefined;
-}
-function readStringArrayProperty(block: string, property: string): string[] | undefined {
-  const match = block.match(new RegExp("\\b" + property + "\\s*:\\s*\\[([\\s\\S]*?)\\]"));
-  if (!match) return undefined;
-  return [...match[1].matchAll(/['\"]((?:\\.|[^'\"\\])*)['\"]/g)].map(item => item[1].replace(/\\(['\"\\])/g, "$1"));
-}
 
 /** Searchable picker backed by the current upstream Pokémon Showdown format config. */
 export default function FormatSelector({ value, onChange }: Props) {
@@ -66,12 +15,9 @@ export default function FormatSelector({ value, onChange }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("https://raw.githubusercontent.com/smogon/pokemon-showdown/master/config/formats.ts", { cache: "no-store" })
-      .then(response => { if (!response.ok) throw new Error("Could not fetch current Showdown formats"); return response.text(); })
-      .then(source => {
+    fetchLiveShowdownFormats()
+      .then(fetched => {
         if (cancelled) return;
-        const fetched = parseUpstreamFormatCatalog(source);
-        if (!fetched.length) throw new Error("Could not parse current Showdown format catalog");
         setRemoteShowdownFormats(fetched);
         setFormats(getAvailableShowdownFormats());
         setCatalogStatus("live");
