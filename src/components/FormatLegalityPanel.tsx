@@ -12,7 +12,7 @@ export default function FormatLegalityPanel({ teamA, teamB, format }: { teamA: T
 
   return <section className="format-validation panel" aria-labelledby="format-validation-title">
     <div className="panel-title-row">
-      <div><h2 id="format-validation-title">Format legality</h2><p>Bundled Showdown rules · {format}</p></div>
+      <div><h2 id="format-validation-title">Format legality</h2><p>Live format metadata · {format}</p></div>
       <button type="button" onClick={() => setExpanded(value => !value)} aria-expanded={expanded}>{expanded ? "Hide details" : "Show details"}</button>
     </div>
     <div className="format-validation-summary">
@@ -26,7 +26,7 @@ export default function FormatLegalityPanel({ teamA, teamB, format }: { teamA: T
         <h3>{label}</h3>
         {!result.supported ? <p className="legality-unknown">{result.message || "This format is not configured for validation."}</p>
           : result.issues.length ? <ul>{result.issues.map((issue, index) => <li key={`${index}-${issue}`}>{issue}</li>)}</ul>
-          : <p className="legality-valid">This team passes the bundled Pokémon Showdown validator for {result.formatLabel}.</p>}
+          : <p className="legality-valid">This team passed the available legality checks for {result.formatLabel}.</p>}
       </div>)}
     </div>}
   </section>;

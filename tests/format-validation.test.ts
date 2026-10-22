@@ -13,7 +13,7 @@ function set(overrides: Partial<PokemonSet> = {}): PokemonSet {
 }
 
 describe("Pokémon Showdown format resolution", () => {
-  it("exposes Gen 9 OU when it exists in the bundled Showdown data", () => {
+  it("exposes Gen 9 OU in the fallback format list", () => {
     expect(getAvailableShowdownFormats().some(format => format.id === "gen9ou")).toBe(true);
   });
 
@@ -28,13 +28,10 @@ describe("Pokémon Showdown format resolution", () => {
     expect(validateTeamForFormat([set()], "Champions NatDex Draft")).toMatchObject({ supported: false, valid: null, issues: [] });
   });
 
-  it("uses the selected Showdown validator for team legality", () => {
+  it("does not infer legality while the official browser validator is unavailable", () => {
     const legal = validateTeamForFormat([set()], "Gen 9 OU");
-    expect(legal.supported).toBe(true);
-    expect(legal.valid).toBe(true);
+    expect(legal).toMatchObject({ supported: false, valid: null, issues: [] });
     const illegal = validateTeamForFormat([set({ moves: ["V-create"] })], "Gen 9 OU");
-    expect(illegal.supported).toBe(true);
-    expect(illegal.valid).toBe(false);
-    expect(illegal.issues.length).toBeGreaterThan(0);
+    expect(illegal).toMatchObject({ supported: false, valid: null, issues: [] });
   });
 });

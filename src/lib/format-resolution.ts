@@ -1,11 +1,10 @@
 import { findShowdownFormat } from "./format-catalog";
 import { isEverythingFormat } from "./format-normalization";
-import { getFormatCompatibilityIssue } from "./format-rule-compatibility";
 import type { FormatResolution } from "./format-types";
 
 export { isEverythingFormat } from "./format-normalization";
 
-/** Resolves a picker value only when the installed simulator can safely enforce its rules. */
+/** Resolves a format from the live or fallback display catalog. */
 export function resolveShowdownFormat(input: string): FormatResolution {
   if (isEverythingFormat(input)) {
     return {
@@ -25,8 +24,9 @@ export function resolveShowdownFormat(input: string): FormatResolution {
       reason: "This format is not present in the fetched or bundled Pokémon Showdown format catalog.",
     };
   }
+  if (selected.source === "remote") {
+    return { supported: false, id: null, label: selected.label, reason: `The format “${selected.label}” is listed in live upstream metadata, but its legality cannot be checked until a compatible browser validator is available.` };
+  }
 
-  const issue = getFormatCompatibilityIssue(selected);
-  if (issue) return { supported: false, id: null, label: selected.label, reason: issue };
   return { supported: true, id: selected.id, label: selected.label };
 }

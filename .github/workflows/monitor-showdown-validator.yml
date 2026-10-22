@@ -1,0 +1,174 @@
+name: Monitor Pokémon Showdown validator updates
+
+on:
+  schedule:
+    # Weekly check. Scheduled workflows run on the repository's default branch.
+    - cron: "23 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: showdown-validator-watch
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare upstream validator and legality data
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const upstreamOwner = "smogon";
+            const upstreamRepo = "pokemon-showdown";
+            const trackerTitle = "[Upstream watch] Pokémon Showdown validator";
+            const watchedPaths = [
+              "sim/team-validator.ts",
+              "sim/dex.ts",
+              "sim/dex-formats.ts",
+              "sim/dex-data.ts",
+              "sim/dex-species.ts",
+              "sim/dex-moves.ts",
+              "sim/dex-items.ts",
+              "sim/dex-abilities.ts",
+              "sim/prng.ts",
+              "sim/teams.ts",
+              "config/formats.ts",
+              "data/rulesets.ts",
+              "data/learnsets.ts",
+              "data/pokedex.ts",
+              "data/moves.ts",
+              "data/abilities.ts",
+              "data/items.ts",
+              "data/mods",
+            ];
+
+            const snapshots = {};
+            for (const path of watchedPaths) {
+              try {
+                const response = await github.rest.repos.listCommits({
+                  owner: upstreamOwner,
+                  repo: upstreamRepo,
+                  path,
+                  per_page: 1,
+                });
+                const commit = response.data[0];
+                snapshots[path] = commit ? {
+                  sha: commit.sha,
+                  url: commit.html_url,
+                  message: (commit.commit.message || "").split("\n")[0],
+                  date: commit.commit.committer?.date || commit.commit.author?.date || null,
+                } : null;
+              } catch (error) {
+                if (error.status === 404) {
+                  snapshots[path] = null;
+                } else {
+                  throw new Error(`Could not check upstream path ${path}: ${error.message}`);
+                }
+              }
+            }
+
+            const crypto = require("crypto");
+            const fingerprint = crypto.createHash("sha256")
+              .update(JSON.stringify(snapshots))
+              .digest("hex");
+            const stateMarker = `<!-- showdown-validator-watch-state:${Buffer.from(JSON.stringify({ fingerprint, snapshots })).toString("base64")} -->`;
+            const issues = await github.rest.issues.listForRepo({
+              owner, repo, state: "all", per_page: 100,
+            });
+            let tracker = issues.data.find(issue => !issue.pull_request && issue.title === trackerTitle);
+
+            if (!tracker) {
+              const body = [
+                "This issue stores the last-seen upstream commit for the Pokémon Showdown validator and legality data paths watched by the scheduled workflow.",
+                "",
+                "The first run establishes a baseline. Later changes to watched upstream paths create a separate **Action required** issue. This monitor detects source changes; it does not automatically transplant upstream code into the browser build or deploy an untested validator.",
+                "",
+                `Last checked: ${new Date().toISOString()}`,
+                "",
+                stateMarker,
+              ].join("\n");
+              const created = await github.rest.issues.create({ owner, repo, title: trackerTitle, body });
+              core.notice(`Initialized upstream watch baseline in issue #${created.data.number}.`);
+              return;
+            }
+
+            const markerMatch = tracker.body?.match(/<!-- showdown-validator-watch-state:([A-Za-z0-9+/=]+) -->/);
+            if (!markerMatch) {
+              const body = `${tracker.body || ""}\n\nLast checked: ${new Date().toISOString()}\n\n${stateMarker}`;
+              await github.rest.issues.update({ owner, repo, issue_number: tracker.number, body });
+              core.notice(`Initialized missing upstream watch state in issue #${tracker.number}; future changes will be reported.`);
+              return;
+            }
+
+            let previous;
+            try {
+              previous = JSON.parse(Buffer.from(markerMatch[1], "base64").toString("utf8"));
+            } catch {
+              throw new Error(`Could not parse saved upstream watch state in issue #${tracker.number}.`);
+            }
+
+            const changed = watchedPaths.filter(path =>
+              (previous.snapshots?.[path]?.sha || null) !== (snapshots[path]?.sha || null)
+            );
+            if (!changed.length) {
+              core.notice("No changes detected in watched Pokémon Showdown validator/data paths.");
+              return;
+            }
+
+            const lines = changed.map(path => {
+              const current = snapshots[path];
+              const oldSha = previous.snapshots?.[path]?.sha;
+              const oldText = oldSha ? `previous ${oldSha.slice(0, 12)}` : "no previous commit recorded";
+              const newText = current?.sha
+                ? `[${current.sha.slice(0, 12)}](${current.url})${current.message ? ` — ${current.message}` : ""}`
+                : "no commit returned";
+              return `- \`${path}\`: ${oldText} → ${newText}`;
+            });
+            const alertBody = [
+              "The scheduled upstream monitor detected changes in Pokémon Showdown code or data used for format legality validation.",
+              "",
+              "**This is a review reminder, not an automatic validator upgrade.** The browser-compatible validator adaptation must be reviewed and tested before updating the site. Do not deploy merely because upstream changed.",
+              "",
+              "### Changed upstream paths",
+              ...lines,
+              "",
+              "### Review checklist",
+              "- [ ] Inspect the linked upstream commits and determine whether browser validator code or data adapters need changes.",
+              "- [ ] Update the pinned upstream reference / browser adaptation if needed.",
+              "- [ ] Run `npm run typecheck`, `npm test`, and `npm run build`.",
+              "- [ ] Compare representative legal and illegal teams against official Pokémon Showdown validation.",
+              "- [ ] Review and merge the change before GitHub Pages deploys it.",
+              "",
+              `Detected: ${new Date().toISOString()}`,
+              "",
+              `Tracking issue: #${tracker.number}`,
+            ].join("\n");
+
+            const alert = await github.rest.issues.create({
+              owner,
+              repo,
+              title: `[Action required] Review Pokémon Showdown validator update (${new Date().toISOString().slice(0, 10)})`,
+              body: alertBody,
+            });
+            const updatedTrackerBody = (tracker.body || "")
+              .replace(/<!-- showdown-validator-watch-state:[A-Za-z0-9+/=]+ -->/, stateMarker)
+              .replace(/Last checked: .*?(?=\n|$)/, `Last checked: ${new Date().toISOString()}`);
+            await github.rest.issues.update({
+              owner,
+              repo,
+              issue_number: tracker.number,
+              body: updatedTrackerBody,
+            });
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: tracker.number,
+              body: `Detected upstream changes; created review reminder #${alert.data.number}. Watched-path state has been advanced to the latest commits.`,
+            });
+            core.notice(`Detected upstream changes and created issue #${alert.data.number}.`);

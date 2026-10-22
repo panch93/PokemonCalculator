@@ -1,6 +1,6 @@
 # Pokémon Team Lab — v1.0.0
 
-A browser-based Pokémon team matchup lab built with Next.js, React, TypeScript, `@smogon/calc`, live Pokémon Showdown data, and format validation via `@pkmn/sim`.
+A browser-based Pokémon team matchup lab built with Next.js, React, TypeScript, `@smogon/calc`, live Pokémon Showdown data, and a browser-only validation migration in progress.
 
 ## Features
 
@@ -9,7 +9,7 @@ A browser-based Pokémon team matchup lab built with Next.js, React, TypeScript,
 - Team builder with Pokémon, moves, abilities, items, EVs/IVs, nature, Tera type, and field controls.
 - Showdown paste import/export and browser-local persistence.
 - Move coverage and support-category panels, sprites, speed/priority helpers, weather and terrain modifiers, and entry-hazard estimates.
-- Format legality report powered by the bundled Pokémon Showdown `TeamValidator` from `@pkmn/sim` for formats explicitly listed in `src/lib/format-validation.ts`.
+- Live Pokémon Showdown format catalog metadata. Legality validation is explicitly marked unavailable while the official TeamValidator is adapted for browser execution; the app does not claim a team is legal based on metadata alone.
 - A separate species-learnset lookup used for move discovery. This data is **not** treated as format legality.
 
 
@@ -18,6 +18,10 @@ A browser-based Pokémon team matchup lab built with Next.js, React, TypeScript,
 Species, moves, learnsets, items, and abilities are loaded directly at runtime from the published Pokémon Showdown data service (`https://play.pokemonshowdown.com/data/`). The 25-nature table is fetched from the official upstream source at `https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/natures.ts` and parsed through a small, validated adapter. Requests bypass browser caching on app startup, so changes published upstream are reflected without rebuilding this static site. The app does not bundle a local `@pkmn/dex` snapshot.
 
 The data adapter is intentionally split into ID/table normalization, resource lookup, learnset inheritance, nature parsing, and remote loading modules under `src/lib/showdown-data/`. Unit tests cover ID normalization, nested source wrappers, alternate-form learnset merging, unknown species, and nature parsing. Runtime data loading requires an internet connection to Pokémon Showdown and GitHub; if either source is unavailable, the app displays a retry state rather than silently switching to stale bundled data.
+
+## Validator update monitoring
+
+The GitHub Actions workflow `.github/workflows/monitor-showdown-validator.yml` checks the official `smogon/pokemon-showdown` repository weekly for changes to validator and legality-data paths. Its first run creates a tracking issue as a baseline; later relevant source changes create an actionable GitHub issue with commit links and a regression-test checklist. It does not automatically transplant upstream code or deploy an untested validator. See [the update-monitoring guide](docs/SHOWDOWN-VALIDATOR-UPDATES.md) for setup and review steps. GitHub Actions must be enabled, and the repository token must be allowed to create issues.
 
 ## Development
 
@@ -48,9 +52,9 @@ The GitHub Actions workflow runs type-checking, automated tests, data/mechanics 
 
 ## Format legality behavior
 
-The selected format is resolved to a canonical Pokémon Showdown format ID, and the team's sets are passed to that format's bundled `TeamValidator`. The validator uses the format's rules and rule table, including learnset checks and applicable bans/clauses. An unsupported format is explicitly shown as **Not validated**; the app does not quietly substitute Gen 9 OU or treat the global learnset as a legal-move list.
+The selected format is resolved to a canonical Pokémon Showdown format ID. The official validator has not yet been ported to browser execution, so all formats are currently shown as **Not validated** rather than returning misleading legality results. The app does not quietly substitute Gen 9 OU or treat the global learnset as a legal-move list.
 
-The built-in list currently covers selected standard OU tiers and popular Gen 9 formats from the installed `@pkmn/sim` package. These bundled rules are not a live connection to the current Pokémon Showdown server, so tiering changes require a dependency update and test run. It is intentionally explicit because format data availability depends on the bundled Pokémon Showdown data. To add another format, add its canonical format ID to `SUPPORTED_FORMATS` and test that the installed `Dex` contains it. National Dex and custom draft formats require their corresponding format/ruleset data. **Champions NatDex Draft is not an official built-in Pokémon Showdown format and is not validated unless its custom rules are implemented.**
+The format picker fetches the current upstream `config/formats.ts` metadata directly in the browser, with a small fallback list when upstream is unavailable. Format metadata is not executable legality logic. Full format legality remains disabled until a browser-compatible port of the official Pokémon Showdown validator is available and passes differential tests.
 
 The separate learnset panel is still useful for discovering species moves, but it is not a substitute for the format legality report. Species learnsets are loaded from the live public Pokémon Showdown data file; if the network request fails, the app asks the user to retry instead of falling back to a bundled snapshot.
 
@@ -59,13 +63,13 @@ The separate learnset panel is still useful for discovering species moves, but i
 - This is a team-planning and damage-estimation tool, not a turn-by-turn battle simulator. It does not fully model switching sequences, recovery loops, or every conditional battle interaction.
 - The damage calculator does not yet include a dedicated Pokémon Champions engine.
 - Custom draft rules, custom bans, and National Dex legality require explicitly bundled ruleset/mod data before they can be validated accurately.
-- The format validator validates the complete team and reports validator messages. The small `Learnset?` marker beside a move is only a species-learnset hint; consult the Format legality report for selected-format legality.
+- Full format legality validation is temporarily unavailable during the browser-port migration. The small `Learnset?` marker beside a move is only a species-learnset hint and is not a format legality result.
 - Some field effects are modeled as estimates and are documented in the relevant UI notes.
 
 ## Release checklist
 
 1. Run `npm run check:release` on the target Node version.
-2. Confirm the format validation tests against the bundled Pokémon Showdown data.
+2. Confirm the browser validator differential tests against official Pokémon Showdown results before re-enabling legality claims.
 3. Smoke-test team import/export, format changes, unsupported custom formats, and mobile layout.
 4. Review the GitHub Pages base path and deployment environment before tagging `v1.0.0`.
 

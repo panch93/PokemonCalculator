@@ -9,7 +9,7 @@ import {
 import type { PokemonSet, Team } from "../src/lib/types";
 
 /**
- * Characterization tests for the current @pkmn/sim-backed implementation.
+ * Contract tests for the validation facade during the browser migration.
  * These describe observable behavior that the Phase 2 replacement must retain.
  * Keep the fixtures deliberately small and avoid testing internal simulator APIs.
  */
@@ -35,7 +35,7 @@ function cloneTeam(team: Team): Team {
 beforeEach(() => setRemoteShowdownFormats([]));
 afterEach(() => setRemoteShowdownFormats([]));
 
-describe("format validation contract before @pkmn/sim removal", () => {
+describe("format validation contract during browser-validator migration", () => {
   it("keeps Everything! as an explicit unrestricted mode at the top of the format list", () => {
     const formats = getAvailableShowdownFormats();
     expect(formats[0]).toMatchObject({ id: "everything", label: "Everything!" });
@@ -82,7 +82,7 @@ describe("format validation contract before @pkmn/sim removal", () => {
     });
   });
 
-  it("refuses validation when remote rules metadata conflicts with the local validator", () => {
+  it("keeps live rule metadata informational until an executable browser validator exists", () => {
     setRemoteShowdownFormats([{
       id: "gen9ou",
       label: "[Gen 9] OU",
@@ -91,18 +91,18 @@ describe("format validation contract before @pkmn/sim removal", () => {
     }]);
 
     const resolution = resolveShowdownFormat("gen9ou");
-    expect(resolution.supported).toBe(false);
-    if (!resolution.supported) expect(resolution.reason).toMatch(/differs from the installed simulator/i);
+    expect(resolution).toMatchObject({ supported: true, id: "gen9ou" });
+    const validation = validateTeamForFormat([charizard()], "gen9ou");
+    expect(validation).toMatchObject({ supported: false, valid: null, issues: [] });
   });
 
-  it("validates legal and illegal teams using the selected format's rules", () => {
+  it("never claims a team is legal until the browser-compatible official validator is ready", () => {
     const legal = validateTeamForFormat([charizard()], "gen9ou");
-    expect(legal).toMatchObject({ supported: true, valid: true, issues: [] });
+    expect(legal).toMatchObject({ supported: false, valid: null, issues: [] });
+    expect(legal.message).toMatch(/browser execution|browser-compatible|temporarily unavailable/i);
 
     const illegal = validateTeamForFormat([charizard({ moves: ["V-create"] })], "gen9ou");
-    expect(illegal.supported).toBe(true);
-    expect(illegal.valid).toBe(false);
-    expect(illegal.issues.length).toBeGreaterThan(0);
+    expect(illegal).toMatchObject({ supported: false, valid: null, issues: [] });
   });
 
   it("does not mutate the caller's team while validating", () => {

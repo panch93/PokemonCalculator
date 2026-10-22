@@ -1,4 +1,3 @@
-import { pkmnSimFormatCatalogSource } from "./pkmn-sim-format-catalog-source";
 import { EVERYTHING_FORMAT, type ShowdownFormatOption } from "./format-types";
 import { normalizeFormatIdentifier } from "./format-normalization";
 
@@ -23,16 +22,12 @@ export function setRemoteShowdownFormats(formats: ShowdownFormatOption[]): void 
 }
 
 
-/** Combines installed executable formats with remote-only informational entries. */
+/** Combines a small display fallback with the live upstream format catalog. */
 export function getAvailableShowdownFormats(): ShowdownFormatOption[] {
   if (availableFormatsCache) return availableFormatsCache;
 
-  const local = pkmnSimFormatCatalogSource.getFormats();
-
   const byId = new Map<string, ShowdownFormatOption>();
   for (const format of CURATED_FORMATS) byId.set(format.id, { ...format, source: "bundled" });
-  for (const format of local) byId.set(format.id, format);
-
   for (const format of remoteFormats) {
     const bundled = byId.get(format.id);
     byId.set(format.id, bundled ? {
