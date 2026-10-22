@@ -1,6 +1,6 @@
 {
   "name": "pokemon-team-lab",
-  "version": "1.0.5",
+  "version": "1.0.0",
   "private": true,
   "description": "Pok\u00e9mon team matchup analysis with Showdown team import/export and format-aware legality validation.",
   "scripts": {
@@ -15,7 +15,6 @@
     "check:release": "npm run typecheck && npm test && npm run check:move-data && npm run check:field-effects && npm run build"
   },
   "dependencies": {
-    "@pkmn/dex": "0.10.11",
     "@pkmn/sim": "0.10.11",
     "@smogon/calc": "0.12.0",
     "next": "16.4.0",

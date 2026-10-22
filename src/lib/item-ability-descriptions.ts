@@ -1,28 +1,18 @@
-import { Dex } from "@pkmn/dex";
-
-type DescribedEntry = { exists?: boolean; desc?: unknown; shortDesc?: unknown };
+import { getAbility, getItem } from "./showdown-data";
 
 function getDescription(kind: "ability" | "item", name: string): string | undefined {
-  const cleanName = name.trim();
-  if (!cleanName) return undefined;
-
-  try {
-    const entry = (kind === "ability" ? Dex.abilities.get(cleanName) : Dex.items.get(cleanName)) as unknown as DescribedEntry;
-    if (entry?.exists === false) return undefined;
-    if (typeof entry?.shortDesc === "string" && entry.shortDesc.trim()) return entry.shortDesc.trim();
-    if (typeof entry?.desc === "string" && entry.desc.trim()) return entry.desc.trim();
-  } catch {
-    // Custom or unrecognized names may not exist in the bundled Pokédex.
-  }
-  return undefined;
+  if (!name.trim()) return undefined;
+  const entry = kind === "ability" ? getAbility(name) : getItem(name);
+  const description = entry?.shortDesc || entry?.desc;
+  return typeof description === "string" && description.trim() ? description.trim() : undefined;
 }
 
 export function getAbilityDescription(name: string): string {
-  return getDescription("ability", name) ?? (name.trim() ? "No ability description is available in the bundled Pokémon Showdown data." : "No ability assigned.");
+  return getDescription("ability", name) ?? (name.trim() ? "No ability description is available from the live Pokémon Showdown data." : "No ability assigned.");
 }
 
 export function getItemDescription(name: string): string {
-  return getDescription("item", name) ?? (name.trim() ? "No item description is available in the bundled Pokémon Showdown data." : "No item assigned.");
+  return getDescription("item", name) ?? (name.trim() ? "No item description is available from the live Pokémon Showdown data." : "No item assigned.");
 }
 
 export function formatAbilityTooltip(name: string): string {

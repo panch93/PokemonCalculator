@@ -1,6 +1,6 @@
 # Pokémon Team Lab — v1.0.0
 
-A browser-based Pokémon team matchup lab built with Next.js, React, TypeScript, `@smogon/calc`, and Pokémon Showdown's data and validation logic from `@pkmn/sim`.
+A browser-based Pokémon team matchup lab built with Next.js, React, TypeScript, `@smogon/calc`, live Pokémon Showdown data, and format validation via `@pkmn/sim`.
 
 ## Features
 
@@ -11,6 +11,13 @@ A browser-based Pokémon team matchup lab built with Next.js, React, TypeScript,
 - Move coverage and support-category panels, sprites, speed/priority helpers, weather and terrain modifiers, and entry-hazard estimates.
 - Format legality report powered by the bundled Pokémon Showdown `TeamValidator` from `@pkmn/sim` for formats explicitly listed in `src/lib/format-validation.ts`.
 - A separate species-learnset lookup used for move discovery. This data is **not** treated as format legality.
+
+
+## Live Pokémon Showdown data
+
+Species, moves, learnsets, items, and abilities are loaded directly at runtime from the published Pokémon Showdown data service (`https://play.pokemonshowdown.com/data/`). The 25-nature table is fetched from the official upstream source at `https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/natures.ts` and parsed through a small, validated adapter. Requests bypass browser caching on app startup, so changes published upstream are reflected without rebuilding this static site. The app does not bundle a local `@pkmn/dex` snapshot.
+
+The data adapter is intentionally split into ID/table normalization, resource lookup, learnset inheritance, nature parsing, and remote loading modules under `src/lib/showdown-data/`. Unit tests cover ID normalization, nested source wrappers, alternate-form learnset merging, unknown species, and nature parsing. Runtime data loading requires an internet connection to Pokémon Showdown and GitHub; if either source is unavailable, the app displays a retry state rather than silently switching to stale bundled data.
 
 ## Development
 
@@ -45,7 +52,7 @@ The selected format is resolved to a canonical Pokémon Showdown format ID, and 
 
 The built-in list currently covers selected standard OU tiers and popular Gen 9 formats from the installed `@pkmn/sim` package. These bundled rules are not a live connection to the current Pokémon Showdown server, so tiering changes require a dependency update and test run. It is intentionally explicit because format data availability depends on the bundled Pokémon Showdown data. To add another format, add its canonical format ID to `SUPPORTED_FORMATS` and test that the installed `Dex` contains it. National Dex and custom draft formats require their corresponding format/ruleset data. **Champions NatDex Draft is not an official built-in Pokémon Showdown format and is not validated unless its custom rules are implemented.**
 
-The separate learnset panel is still useful for discovering species moves, but it is not a substitute for the format legality report. Species learnsets are loaded from the public Pokémon Showdown data file, with bundled Pokédex data as a fallback if the network request fails.
+The separate learnset panel is still useful for discovering species moves, but it is not a substitute for the format legality report. Species learnsets are loaded from the live public Pokémon Showdown data file; if the network request fails, the app asks the user to retry instead of falling back to a bundled snapshot.
 
 ## Known limitations
 
@@ -65,8 +72,3 @@ The separate learnset panel is still useful for discovering species moves, but i
 ## Data and licensing
 
 Pokémon names and battle data are sourced from Pokémon Showdown / `@pkmn` projects. Damage calculations use `@smogon/calc`. Consult each upstream project's license and terms when redistributing or deploying this application.
-
-
-## Live format data and legality limits
-
-The format picker fetches the current format catalog from Pokémon Showdown's upstream `config/formats.ts` and ruleset source from `data/rulesets.ts`, including formats with `searchShow: false`. Species learnsets are fetched from Pokémon Showdown's public learnset data. The default **Everything!** mode is for unrestricted analysis and does not claim format legality. A remote format is validated only when the installed `@pkmn/sim` package contains executable rules for that exact format; otherwise it is explicitly reported as not validated. Fetching configuration source alone cannot execute new simulator mods or custom validation callbacks, so this avoids pretending an unsupported format was checked.

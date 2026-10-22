@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAvailableShowdownFormats, resolveShowdownFormat, setRemoteShowdownFormats, validateTeamForFormat } from "../src/lib/format-validation";
+import { getAvailableShowdownFormats, resolveShowdownFormat, validateTeamForFormat } from "../src/lib/format-validation";
 import type { PokemonSet } from "../src/lib/types";
 
 function set(overrides: Partial<PokemonSet> = {}): PokemonSet {
@@ -13,7 +13,7 @@ function set(overrides: Partial<PokemonSet> = {}): PokemonSet {
 }
 
 describe("Pokémon Showdown format resolution", () => {
-  it("exposes bundled formats as a fallback", () => {
+  it("exposes Gen 9 OU when it exists in the bundled Showdown data", () => {
     expect(getAvailableShowdownFormats().some(format => format.id === "gen9ou")).toBe(true);
   });
 
@@ -22,12 +22,7 @@ describe("Pokémon Showdown format resolution", () => {
     expect(resolveShowdownFormat("gen9ou")).toMatchObject({ supported: true, id: "gen9ou" });
   });
 
-  it("provides an explicit Everything! analysis mode without claiming legality", () => {
-    expect(resolveShowdownFormat("Everything!")).toMatchObject({ supported: false, label: "Everything!" });
-    expect(validateTeamForFormat([set()], "everything")).toMatchObject({ supported: false, valid: null, issues: [] });
-  });
-
-  it("does not silently validate formats missing from the installed simulator", () => {
+  it("does not silently treat custom draft formats as standard formats", () => {
     const result = resolveShowdownFormat("Champions NatDex Draft");
     expect(result.supported).toBe(false);
     expect(validateTeamForFormat([set()], "Champions NatDex Draft")).toMatchObject({ supported: false, valid: null, issues: [] });
@@ -41,14 +36,5 @@ describe("Pokémon Showdown format resolution", () => {
     expect(illegal.supported).toBe(true);
     expect(illegal.valid).toBe(false);
     expect(illegal.issues.length).toBeGreaterThan(0);
-  });
-});
-
-
-describe("live formats versus executable validator rules", () => {
-  it("keeps remote-only formats searchable without pretending the installed simulator can validate them", () => {
-    setRemoteShowdownFormats([{ label: "Example Community Draft", id: "gen9examplecommunitydraft", section: "Draft", source: "remote" }]);
-    expect(getAvailableShowdownFormats().some(format => format.id === "gen9examplecommunitydraft")).toBe(true);
-    expect(resolveShowdownFormat("gen9examplecommunitydraft")).toMatchObject({ supported: false, id: null });
   });
 });

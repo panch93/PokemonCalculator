@@ -5,7 +5,7 @@ import { calculateMove, getMoveDetails } from "../lib/calc";
 import { getMoveLibrary } from "../lib/moves";
 import { FieldState, PokemonSet, StatStages } from "../lib/types";
 
-export default function MoveExplorer({ attacker, defender, field, attackerStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 }, defenderStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 }, doubles = false }: { attacker: PokemonSet; defender: PokemonSet; field: FieldState; attackerStages?: StatStages; defenderStages?: StatStages; doubles?: boolean }) {
+export default function MoveExplorer({ attacker, defender, field, attackerStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 }, defenderStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 } }: { attacker: PokemonSet; defender: PokemonSet; field: FieldState; attackerStages?: StatStages; defenderStages?: StatStages }) {
   const [query, setQuery] = useState("");
   const [move, setMove] = useState("");
   const [result, setResult] = useState<ReturnType<typeof calculateMove>>(null);
@@ -18,8 +18,8 @@ export default function MoveExplorer({ attacker, defender, field, attackerStages
       setResult(null);
       return;
     }
-    setResult(calculateMove(attacker, defender, move, field, attackerStages, defenderStages, false, 9, doubles));
-  }, [attacker, defender, move, field, attackerStages, defenderStages, doubles]);
+    setResult(calculateMove(attacker, defender, move, field, attackerStages, defenderStages));
+  }, [attacker, defender, move, field, attackerStages, defenderStages]);
 
   return (
     <section className="panel explorer-panel">
@@ -36,7 +36,7 @@ export default function MoveExplorer({ attacker, defender, field, attackerStages
           <option value="">Choose a move</option>
           {filtered.map(name => <option key={name}>{name}</option>)}
         </select>
-        <button className="primary" onClick={() => setResult(move ? calculateMove(attacker, defender, move, field, attackerStages, defenderStages, false, 9, doubles) : null)}>Recalculate</button>
+        <button className="primary" onClick={() => setResult(move ? calculateMove(attacker, defender, move, field, attackerStages, defenderStages) : null)}>Recalculate</button>
       </div>
       {result && (() => {
         const details = getMoveDetails(result.move);

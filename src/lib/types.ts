@@ -57,9 +57,6 @@ export type DamageSummary = {
   rolls?: number[];
   minPct: number;
   maxPct: number;
-  /** Critical damage range computed by @smogon/calc for the same battle state. */
-  critMinPct?: number;
-  critMaxPct?: number;
   rawMinPct: number;
   rawMaxPct: number;
   effectiveHp: number;

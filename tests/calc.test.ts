@@ -22,16 +22,6 @@ describe("damage calculator wrappers", () => {
     expect(result!.max).toBeGreaterThanOrEqual(result!.min);
   });
 
-  it("passes Doubles game type to the calculator for spread-move damage", () => {
-    const attacker = makeSet("Garchomp", "Rough Skin", ["Earthquake"]);
-    const defender = makeSet("Bulbasaur", "Overgrow", ["Tackle"]);
-    const singles = calculateMove(attacker, defender, "Earthquake", field, undefined, undefined, false, 9, false);
-    const doubles = calculateMove(attacker, defender, "Earthquake", field, undefined, undefined, false, 9, true);
-    expect(singles).not.toBeNull();
-    expect(doubles).not.toBeNull();
-    expect(doubles!.max).toBeLessThan(singles!.max);
-  });
-
   it("returns move metadata and a description for common moves", () => {
     expect(getMoveDetails("Earthquake", 9)).toMatchObject({ name: "Earthquake", type: "Ground", category: "Physical", power: 100 });
   });
