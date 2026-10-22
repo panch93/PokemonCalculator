@@ -1,4 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// battle-order helpers are synchronous; tests provide a deterministic Showdown
+// data fixture instead of depending on the app startup network loader.
+vi.mock("../src/lib/showdown-data", () => ({
+  getSpecies: (name: string) => name === "Pikachu" ? { name: "Pikachu", baseStats: { spe: 90 } } : undefined,
+  getNature: (name: string) => name === "Jolly" ? { name: "Jolly", plus: "spe", minus: "spa" } : { name },
+  getMove: (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, "") === "grassyglide"
+    ? { name: "Grassy Glide", priority: 0, category: "Physical", type: "Grass", flags: {} }
+    : undefined,
+}));
 import { getEffectiveMovePriority, getEffectiveSpeed } from "../src/lib/battle-order";
 import type { FieldState, PokemonSet } from "../src/lib/types";
 

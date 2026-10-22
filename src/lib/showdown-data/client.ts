@@ -21,7 +21,7 @@ async function fetchFreshText(url: string): Promise<string> {
 }
 
 /** Load an official Showdown browser data file and read its exported table. */
-function loadPublishedScriptTable(exportName: "BattleItems" | "BattleAbilities"): Promise<Record<string, ShowdownDescribedEntry>> {
+function loadPublishedScriptTable(exportName: "BattleItems" | "BattleAbilities" | "BattleMovedex"): Promise<Record<string, ShowdownDescribedEntry>> {
   if (typeof window === "undefined" || typeof document === "undefined") {
     return Promise.reject(new Error("Pokémon Showdown browser data can only be loaded in a browser"));
   }
@@ -46,7 +46,8 @@ function loadPublishedScriptTable(exportName: "BattleItems" | "BattleAbilities")
     };
     target.exports = isolatedExports;
     script.async = true;
-    script.src = `${DATA_ROOT}/${exportName === "BattleItems" ? "items" : "abilities"}.js?ptl_refresh=${Date.now()}`;
+    const filename = exportName === "BattleItems" ? "items" : exportName === "BattleAbilities" ? "abilities" : "moves";
+    script.src = `${DATA_ROOT}/${filename}.js?ptl_refresh=${Date.now()}`;
     script.onload = () => {
       if (settled) return;
       settled = true;
@@ -96,8 +97,20 @@ export async function loadShowdownData(forceRefresh = false): Promise<ShowdownDa
     // them serially to avoid one script observing the other's temporary export.
     const items = await loadPublishedScriptTable("BattleItems");
     const abilities = await loadPublishedScriptTable("BattleAbilities");
+    const moveDescriptions = await loadPublishedScriptTable("BattleMovedex");
     const species = unwrapTable<ShowdownSpecies>(speciesRaw, ["pokedex", "Pokedex", "species", "data"]);
     const moves = unwrapTable<ShowdownMove>(movesRaw, ["moves", "Moves", "data"]);
+    // The JSON endpoint contains move mechanics, while the published browser
+    // table carries canonical descriptions. Merge both keyed by Showdown ID.
+    for (const [id, description] of Object.entries(moveDescriptions)) {
+      const move = moves[id];
+      if (move) {
+        if (typeof description.desc === "string" && description.desc.trim()) move.desc = description.desc;
+        if (typeof description.shortDesc === "string" && description.shortDesc.trim()) move.shortDesc = description.shortDesc;
+      } else {
+        moves[id] = { ...description } as ShowdownMove;
+      }
+    }
     const learnsets = unwrapLearnsets(learnsetsRaw);
     const natures = parseOfficialNatureSource(naturesSource);
     if (!Object.keys(species).length || !Object.keys(moves).length || !Object.keys(learnsets).length) {
