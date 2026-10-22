@@ -161,8 +161,18 @@ export function parseShowdownFormatConfig(source: string): ShowdownFormatOption[
   return formats;
 }
 
-export async function fetchLiveShowdownFormats(): Promise<ShowdownFormatOption[]> {
-  const response = await fetch("https://raw.githubusercontent.com/smogon/pokemon-showdown/master/config/formats.ts", { cache: "no-store" });
-  if (!response.ok) throw new Error(`Could not fetch official Pokémon Showdown format config (${response.status})`);
-  return parseShowdownFormatConfig(await response.text());
+let liveFormatsPromise: Promise<ShowdownFormatOption[]> | null = null;
+
+export function fetchLiveShowdownFormats(): Promise<ShowdownFormatOption[]> {
+  if (!liveFormatsPromise) {
+    liveFormatsPromise = (async () => {
+      const response = await fetch("https://raw.githubusercontent.com/smogon/pokemon-showdown/master/config/formats.ts", { cache: "no-store" });
+      if (!response.ok) throw new Error(`Could not fetch official Pokémon Showdown format config (${response.status})`);
+      return parseShowdownFormatConfig(await response.text());
+    })().catch(error => {
+      liveFormatsPromise = null;
+      throw error;
+    });
+  }
+  return liveFormatsPromise;
 }

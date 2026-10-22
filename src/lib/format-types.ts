@@ -27,6 +27,7 @@ export type TeamFormatValidation = {
   formatLabel: string;
   valid: boolean | null;
   issues: string[];
+  warnings?: string[];
   message?: string;
 };
 

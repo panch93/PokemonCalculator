@@ -23,7 +23,7 @@ function charizard(overrides: Partial<PokemonSet> = {}): PokemonSet {
     level: 100,
     evs: { hp: 0, atk: 0, def: 4, spa: 252, spd: 0, spe: 252 },
     ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
-    moves: ["Flamethrower", "Air Slash", "Roost", "Focus Blast"],
+    moves: ["Flamethrower", "Air Slash", "Protect", "Focus Blast"],
     ...overrides,
   };
 }
@@ -82,7 +82,7 @@ describe("format validation contract during browser-validator migration", () => 
     });
   });
 
-  it("keeps live rule metadata informational until an executable browser validator exists", () => {
+  it("uses executable bundled upstream rules rather than treating live metadata as executable code", () => {
     setRemoteShowdownFormats([{
       id: "gen9ou",
       label: "[Gen 9] OU",
@@ -93,16 +93,19 @@ describe("format validation contract during browser-validator migration", () => 
     const resolution = resolveShowdownFormat("gen9ou");
     expect(resolution).toMatchObject({ supported: true, id: "gen9ou" });
     const validation = validateTeamForFormat([charizard()], "gen9ou");
-    expect(validation).toMatchObject({ supported: false, valid: null, issues: [] });
+    expect(validation).toMatchObject({ supported: true, valid: true, issues: [] });
+    expect(validation.message).toMatch(/bundled upstream data snapshot/i);
   });
 
-  it("never claims a team is legal until the browser-compatible official validator is ready", () => {
+  it("uses official TeamValidator to distinguish legal and illegal teams", () => {
     const legal = validateTeamForFormat([charizard()], "gen9ou");
-    expect(legal).toMatchObject({ supported: false, valid: null, issues: [] });
-    expect(legal.message).toMatch(/browser execution|browser-compatible|temporarily unavailable/i);
+    expect(legal).toMatchObject({ supported: true, valid: true, issues: [] });
+    expect(legal.message).toMatch(/official Pokémon Showdown TeamValidator/i);
 
     const illegal = validateTeamForFormat([charizard({ moves: ["V-create"] })], "gen9ou");
-    expect(illegal).toMatchObject({ supported: false, valid: null, issues: [] });
+    expect(illegal.supported).toBe(true);
+    expect(illegal.valid).toBe(false);
+    expect(illegal.issues.length).toBeGreaterThan(0);
   });
 
   it("does not mutate the caller's team while validating", () => {

@@ -1,20 +1,17 @@
 import type { Team } from "./types";
-import type { TeamFormatValidation } from "./format-types";
 import type { SupportedFormatResolution, TeamValidationProvider } from "./team-validation-provider";
+import { validateWithOfficialTeamValidator } from "./showdown-official/browser-validator";
 
-/**
- * Deliberately conservative migration placeholder. A live rules catalogue is
- * metadata, not a substitute for Showdown's executable TeamValidator. Never
- * claim a team is legal until the browser port and differential tests exist.
- */
+/** Synchronous compatibility adapter. The app UI uses the same engine in a Web Worker. */
 export const browserValidationProvider: TeamValidationProvider = {
-  validateTeam(_team: Team, format: SupportedFormatResolution): TeamFormatValidation {
+  validateTeam(team: Team, format: SupportedFormatResolution) {
+    const result = validateWithOfficialTeamValidator(team, format.id);
     return {
-      supported: false,
-      formatLabel: format.label,
-      valid: null,
-      issues: [],
-      message: "The live format list is available, but legality validation is temporarily unavailable while the official Pokémon Showdown validator is being adapted for browser execution. No legality result is being inferred.",
+      supported: result.supported,
+      formatLabel: result.formatLabel || format.label,
+      valid: result.valid,
+      issues: result.issues,
+      message: result.message,
     };
   },
 };

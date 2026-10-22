@@ -4,7 +4,7 @@ import type { FormatResolution } from "./format-types";
 
 export { isEverythingFormat } from "./format-normalization";
 
-/** Resolves a format from the live or fallback display catalog. */
+/** Resolves only formats that the bundled browser validator can potentially execute. */
 export function resolveShowdownFormat(input: string): FormatResolution {
   if (isEverythingFormat(input)) {
     return {
@@ -24,8 +24,17 @@ export function resolveShowdownFormat(input: string): FormatResolution {
       reason: "This format is not present in the fetched or bundled Pokémon Showdown format catalog.",
     };
   }
-  if (selected.source === "remote") {
-    return { supported: false, id: null, label: selected.label, reason: `The format “${selected.label}” is listed in live upstream metadata, but its legality cannot be checked until a compatible browser validator is available.` };
+
+  const mod = selected.remoteMod ?? selected.mod;
+  const generatedTeam = selected.remoteTeam ?? selected.team;
+  if (generatedTeam) {
+    return { supported: false, id: null, label: selected.label, reason: "This format uses a generated team and cannot validate an imported team." };
+  }
+  if (selected.source === "remote" && !/^gen[1-9]$/.test(mod || "")) {
+    return { supported: false, id: null, label: selected.label, reason: `The format “${selected.label}” uses mod “${mod || "unknown"}”, which is not included in this browser validator build.` };
+  }
+  if (selected.source !== "remote" && !/^gen[1-9]/.test(selected.id)) {
+    return { supported: false, id: null, label: selected.label, reason: "This browser validator build bundles official base-generation data for Gen 1–9 only; custom mods remain unverified." };
   }
 
   return { supported: true, id: selected.id, label: selected.label };
