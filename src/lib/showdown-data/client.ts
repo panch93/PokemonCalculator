@@ -1,6 +1,7 @@
 import { unwrapTable } from "./ids";
 import { collectSpeciesLearnsetMoves } from "./learnsets";
 import { parseOfficialNatureSource } from "./natures";
+import { mergeDescriptions, parseDescriptionTable } from "./descriptions";
 import type { ShowdownData, ShowdownDescribedEntry, ShowdownLearnsetEntry, ShowdownMove, ShowdownSpecies } from "./types";
 
 const DATA_ROOT = "https://play.pokemonshowdown.com/data";
@@ -87,29 +88,33 @@ export async function loadShowdownData(forceRefresh = false): Promise<ShowdownDa
   if (resolved) return resolved;
   if (pending) return pending;
   pending = (async () => {
-    const [speciesRaw, movesRaw, learnsetsRaw, naturesSource] = await Promise.all([
+    const [speciesRaw, movesRaw, learnsetsRaw, naturesSource, movesTextSource, itemsTextSource, abilitiesTextSource] = await Promise.all([
       fetchFreshJson(`${DATA_ROOT}/pokedex.json`),
       fetchFreshJson(`${DATA_ROOT}/moves.json`),
       fetchFreshJson(`${DATA_ROOT}/learnsets.json`),
       fetchFreshText("https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/natures.ts"),
+      fetchFreshText("https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/text/moves.ts"),
+      fetchFreshText("https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/text/items.ts"),
+      fetchFreshText("https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/text/abilities.ts"),
     ]);
     // These legacy browser data scripts export through window.exports, so load
     // them serially to avoid one script observing the other's temporary export.
-    const items = await loadPublishedScriptTable("BattleItems");
-    const abilities = await loadPublishedScriptTable("BattleAbilities");
     const moveDescriptions = await loadPublishedScriptTable("BattleMovedex");
     const species = unwrapTable<ShowdownSpecies>(speciesRaw, ["pokedex", "Pokedex", "species", "data"]);
-    const moves = unwrapTable<ShowdownMove>(movesRaw, ["moves", "Moves", "data"]);
-    // The JSON endpoint contains move mechanics, while the published browser
-    // table carries canonical descriptions. Merge both keyed by Showdown ID.
-    for (const [id, description] of Object.entries(moveDescriptions)) {
-      const move = moves[id];
-      if (move) {
-        if (typeof description.desc === "string" && description.desc.trim()) move.desc = description.desc;
-        if (typeof description.shortDesc === "string" && description.shortDesc.trim()) move.shortDesc = description.shortDesc;
-      } else {
-        moves[id] = { ...description } as ShowdownMove;
-      }
+    let moves = unwrapTable<ShowdownMove>(movesRaw, ["moves", "Moves", "data"]);
+    const itemMechanics = await loadPublishedScriptTable("BattleItems");
+    const abilityMechanics = await loadPublishedScriptTable("BattleAbilities");
+    // Battle data and text descriptions are maintained separately upstream.
+    // Use the official text tables as the authoritative description source;
+    // the client data scripts supplement any entries they contain.
+    moves = mergeDescriptions(moves, parseDescriptionTable(movesTextSource));
+    moves = mergeDescriptions(moves, moveDescriptions);
+    const itemDescriptions = parseDescriptionTable(itemsTextSource);
+    const abilityDescriptions = parseDescriptionTable(abilitiesTextSource);
+    const items = mergeDescriptions(itemMechanics, itemDescriptions);
+    const abilities = mergeDescriptions(abilityMechanics, abilityDescriptions);
+    if (Object.keys(parseDescriptionTable(movesTextSource)).length < 500 || Object.keys(itemDescriptions).length < 100 || Object.keys(abilityDescriptions).length < 100) {
+      throw new Error("Official Pokémon Showdown description tables were incomplete; refusing to load without move, item, and ability descriptions");
     }
     const learnsets = unwrapLearnsets(learnsetsRaw);
     const natures = parseOfficialNatureSource(naturesSource);

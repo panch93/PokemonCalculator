@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveByName, toShowdownId, unwrapTable } from "./ids";
+import { mergeDescriptions, parseDescriptionTable } from "./descriptions";
+import { getAbilityNamesForSpecies } from "./index";
 import { collectSpeciesLearnsetMoves } from "./learnsets";
 import { getNature, getNatureEffectsByDisplayStat, getNatureList, parseOfficialNatureSource } from "./natures";
 import type { ShowdownLearnsetEntry, ShowdownSpecies } from "./types";
@@ -71,5 +73,53 @@ describe("nature data", () => {
     const parsed = parseOfficialNatureSource(source);
     expect(Object.keys(parsed)).toHaveLength(25);
     expect(parsed.jolly).toEqual({ name: "Jolly", plus: "spe", minus: "spa" });
+  });
+});
+
+describe("official upstream description tables", () => {
+  it("extracts only canonical top-level description fields", () => {
+    const source = [
+      "export const MovesText = {",
+      "\ttackle: {",
+      '\t\tname: "Tackle",',
+      '\t\tdesc: "A basic attack.",',
+      '\t\tshortDesc: "A basic move.",',
+      "\t\tgen1: {",
+      '\t\t\tdesc: "Older generation text.",',
+      "\t\t},",
+      "\t},",
+      "\tearthquake: {",
+      '\t\tname: "Earthquake",',
+      '\t\tshortDesc: "Hits adjacent Pokémon.",',
+      "\t},",
+      "};",
+    ].join("\n");
+    const parsed = parseDescriptionTable(source);
+    expect(parsed.tackle).toEqual({ name: "Tackle", desc: "A basic attack.", shortDesc: "A basic move." });
+    expect(parsed.earthquake).toEqual({ name: "Earthquake", shortDesc: "Hits adjacent Pokémon." });
+    expect(parsed.tackle.desc).not.toBe("Older generation text.");
+  });
+
+  it("merges text descriptions onto mechanics by normalized ID", () => {
+    const merged = mergeDescriptions(
+      { leftovers: { name: "Leftovers", flingPower: 10 } },
+      { leftovers: { name: "Leftovers", shortDesc: "Restores a little HP every turn." } },
+    );
+    expect(merged.leftovers.flingPower).toBe(10);
+    expect(merged.leftovers.shortDesc).toBe("Restores a little HP every turn.");
+  });
+});
+
+
+describe("species ability options", () => {
+  it("returns only the abilities assigned to the selected species", () => {
+    expect(getAbilityNamesForSpecies({
+      name: "Pikachu",
+      abilities: { "0": "Static", H: "Lightning Rod" },
+    })).toEqual(["Lightning Rod", "Static"]);
+  });
+
+  it("does not leak the global ability list when species data is absent", () => {
+    expect(getAbilityNamesForSpecies(undefined)).toEqual([]);
   });
 });

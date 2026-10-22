@@ -22,6 +22,22 @@ describe("damage calculator wrappers", () => {
     expect(result!.max).toBeGreaterThanOrEqual(result!.min);
   });
 
+  it("calculates critical marker range with a separate @smogon/calc run", () => {
+    const attacker = makeSet("Charizard", "Blaze", ["Flamethrower"]);
+    const defender = makeSet("Bulbasaur", "Overgrow", ["Tackle"]);
+    const fieldWithScreen = { ...field, defenderLightScreen: true };
+    const attackerStages = { atk: -2, spa: -2, def: 0, spd: 0, spe: 0 };
+    const defenderStages = { atk: 0, spa: 0, def: 2, spd: 0, spe: 0 };
+
+    const ordinary = calculateMove(attacker, defender, "Flamethrower", fieldWithScreen, attackerStages, defenderStages, false, 9);
+    const explicitlyCritical = calculateMove(attacker, defender, "Flamethrower", fieldWithScreen, attackerStages, defenderStages, true, 9);
+
+    expect(ordinary).not.toBeNull();
+    expect(explicitlyCritical).not.toBeNull();
+    expect(ordinary!.critMinPct).toBeCloseTo(explicitlyCritical!.minPct, 8);
+    expect(ordinary!.critMaxPct).toBeCloseTo(explicitlyCritical!.maxPct, 8);
+  });
+
   it("returns move metadata and a description for common moves", () => {
     expect(getMoveDetails("Earthquake", 9)).toMatchObject({ name: "Earthquake", type: "Ground", category: "Physical", power: 100 });
   });

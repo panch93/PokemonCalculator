@@ -52,8 +52,11 @@ export function getSpeciesList(): string[] { return names(current()?.species); }
 export function getMoveList(): string[] { return names(current()?.moves); }
 export function getItemList(): string[] { return names(current()?.items); }
 export function getAbilityList(): string[] { return names(current()?.abilities); }
+export function getAbilityNamesForSpecies(species: ShowdownSpecies | undefined): string[] {
+  return [...new Set(Object.values(species?.abilities ?? {}).filter((ability): ability is string => typeof ability === "string" && Boolean(ability.trim())))].sort((a, b) => a.localeCompare(b));
+}
 export function getSpeciesAbilities(name: string): string[] {
-  return [...new Set(Object.values(getSpecies(name)?.abilities ?? {}).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  return getAbilityNamesForSpecies(getSpecies(name));
 }
 export async function getSpeciesLearnset(name: string): Promise<Set<string> | null> {
   await loadShowdownData();

@@ -266,6 +266,26 @@ export function calculateMove(
       ? [...new Set(rawDamage as number[])].sort((a, b) => a - b)
       : undefined;
     const maxHp = defenderPokemon.maxHP();
+
+    // Critical damage is a second, explicit @smogon/calc run using the same
+    // battle state. Do not derive it from the ordinary result with a multiplier:
+    // critical hits can ignore stat stages and screens, and other mechanics may
+    // alter the result. When the main calculation is already critical, its range
+    // is the critical range, so no duplicate run is needed.
+    let criticalRange: { min: number; max: number } | null = null;
+    if (!critical) {
+      const criticalMove = new Move(gen, moveName);
+      (criticalMove as unknown as { isCrit: boolean }).isCrit = true;
+      const criticalResult = calculate(
+        gen,
+        makePokemon(attacker, generation, { atk: attackerStages.atk, spa: attackerStages.spa }, fieldState),
+        makePokemon(defender, generation, { def: defenderStages.def, spd: defenderStages.spd }, fieldState),
+        criticalMove,
+        makeField(fieldState),
+      );
+      criticalRange = damageRange((criticalResult as unknown as { damage?: unknown }).damage);
+    }
+
     const entryHazardDamage = defender.currentHp === undefined ? getEntryHazardDamage(defender, defenderPokemon, fieldState) : 0;
     const currentHp = Math.max(1, Math.min(maxHp, Math.floor(defender.currentHp ?? maxHp)));
     const effectiveHp = Math.max(1, currentHp - entryHazardDamage);
@@ -330,6 +350,10 @@ export function calculateMove(
       rolls,
       minPct,
       maxPct,
+      ...(criticalRange ? {
+        critMinPct: (criticalRange.min / maxHp) * 100,
+        critMaxPct: (criticalRange.max / maxHp) * 100,
+      } : {}),
       rawMinPct,
       rawMaxPct,
       effectiveHp,

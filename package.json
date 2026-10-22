@@ -12,7 +12,8 @@
     "check:field-effects": "node scripts/check-field-effects.cjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:release": "npm run typecheck && npm test && npm run check:move-data && npm run check:field-effects && npm run build"
+    "check:release": "npm run typecheck && npm test && npm run check:no-pkmn-dex && npm run check:move-data && npm run check:field-effects && npm run build",
+    "check:no-pkmn-dex": "node scripts/check-no-pkmn-dex.mjs"
   },
   "dependencies": {
     "@pkmn/sim": "0.10.11",
