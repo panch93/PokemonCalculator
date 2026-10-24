@@ -84,9 +84,17 @@ describe("browser-adapted official Pokémon Showdown TeamValidator", () => {
     expect(result.issues).toEqual([]);
   });
 
-  it("does not claim support for custom mods whose data is not bundled", () => {
-    const result = validateWithOfficialTeamValidator([charizard], "gen9championsnatdexdraft");
+  it("does not claim support when a format requests custom mod data that is not bundled", () => {
+    // Pass the custom mod as live metadata for a known bundled format ID. This
+    // exercises the real safety boundary: a custom mod must never be silently
+    // validated using the base Gen 9 data just because its ID starts with gen9.
+    const result = validateWithOfficialTeamValidator([charizard], "gen9ou", {
+      mod: "championsnatdexdraft",
+      ruleset: ["Standard", "Sleep Clause Mod", "Species Clause"],
+      banlist: [],
+    });
     expect(result).toMatchObject({ supported: false, valid: null, issues: [] });
+    expect(result.message).toMatch(/metadata differs from the bundled validator snapshot/i);
   });
 
   it("fails closed when live format metadata differs from the bundled rule snapshot", () => {
