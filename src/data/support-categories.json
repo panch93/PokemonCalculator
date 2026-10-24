@@ -427,42 +427,5 @@
       "Cloud Nine",
       "Air Lock"
     ]
-  },
-  {
-    "id": "doubles-support",
-    "label": "Doubles Support",
-    "doubles": true,
-    "moves": [
-      "Follow Me",
-      "Rage Powder",
-      "Helping Hand",
-      "Ally Switch",
-      "Wide Guard",
-      "Quick Guard",
-      "Coaching",
-      "Pollen Puff",
-      "Heal Pulse",
-      "After You",
-      "Quash",
-      "Decorate",
-      "Life Dew",
-      "Tailwind",
-      "Trick Room"
-    ],
-    "abilities": [
-      "Friend Guard",
-      "Telepathy",
-      "Intimidate",
-      "Competitive",
-      "Defiant",
-      "Pressure",
-      "Healer",
-      "Symbiosis",
-      "Battery",
-      "Power Spot",
-      "Steely Spirit",
-      "Victory Star",
-      "Commander"
-    ]
   }
 ]

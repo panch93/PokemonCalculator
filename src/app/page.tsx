@@ -1,5 +1,6 @@
 import TeamLab from "../components/TeamLab";
+import ShowdownDataGate from "../components/ShowdownDataGate";
 
 export default function Page() {
-  return <TeamLab />;
+  return <ShowdownDataGate><TeamLab /></ShowdownDataGate>;
 }

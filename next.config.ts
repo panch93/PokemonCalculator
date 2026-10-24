@@ -7,6 +7,9 @@ const nextConfig: NextConfig = {
   trailingSlash: true,
   basePath,
   assetPrefix: basePath ? `${basePath}/` : undefined,
+  experimental: {
+    agentUpgrade: "security",
+  },
 };
 
 export default nextConfig;

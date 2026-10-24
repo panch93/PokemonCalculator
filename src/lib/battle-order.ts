@@ -1,4 +1,4 @@
-import { Dex } from "@pkmn/dex";
+import { getMove, getNature, getSpecies } from "./showdown-data";
 import { FieldState, PokemonSet } from "./types";
 
 type DexEntry = {
@@ -10,16 +10,16 @@ const clean = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]/g
 const ability = (p: PokemonSet, name: string) => clean(p.ability) === clean(name);
 const item = (p: PokemonSet, name: string) => clean(p.item) === clean(name);
 
-/** Gen 9 estimated effective Speed using bundled Pokémon Showdown dex data. */
+/** Gen 9 estimated effective Speed using the live Pokémon Showdown data adapter. */
 export function getEffectiveSpeed(p: PokemonSet, field: FieldState, side: "attacker" | "defender" = "attacker", speedStage = 0): number {
-  const species = Dex.species.get(p.species || p.name) as unknown as DexEntry;
+  const species = getSpecies(p.species || p.name) as DexEntry;
   const base = Number(species?.baseStats?.spe);
   if (!Number.isFinite(base)) return 0;
   const level = Math.max(1, Math.min(100, p.level || 100));
   const iv = Math.max(0, Math.min(31, p.ivs?.spe ?? 31));
   const ev = Math.max(0, Math.min(252, p.evs?.spe ?? 0));
   let speed = Math.floor((Math.floor((2 * base + iv + Math.floor(ev / 4)) * level / 100) + 5));
-  const nature = Dex.natures.get(p.nature || "Serious") as unknown as DexEntry;
+  const nature = getNature(p.nature || "Serious") as DexEntry;
   if (nature?.plus === "spe") speed = Math.floor(speed * 1.1);
   if (nature?.minus === "spe") speed = Math.floor(speed * 0.9);
 
@@ -46,14 +46,14 @@ export function getEffectiveSpeed(p: PokemonSet, field: FieldState, side: "attac
 
 /** Speed stat from level, IVs, EVs and nature only; excludes battle stages, status, items, weather abilities and field effects. */
 export function getBaseSpeed(p: PokemonSet): number {
-  const species = Dex.species.get(p.species || p.name) as unknown as DexEntry;
+  const species = getSpecies(p.species || p.name) as DexEntry;
   const base = Number(species?.baseStats?.spe);
   if (!Number.isFinite(base)) return 0;
   const level = Math.max(1, Math.min(100, p.level || 100));
   const iv = Math.max(0, Math.min(31, p.ivs?.spe ?? 31));
   const ev = Math.max(0, Math.min(252, p.evs?.spe ?? 0));
   let speed = Math.floor(Math.floor((2 * base + iv + Math.floor(ev / 4)) * level / 100) + 5);
-  const nature = Dex.natures.get(p.nature || "Serious") as unknown as DexEntry;
+  const nature = getNature(p.nature || "Serious") as DexEntry;
   if (nature?.plus === "spe") speed = Math.floor(speed * 1.1);
   if (nature?.minus === "spe") speed = Math.floor(speed * 0.9);
   return Math.max(1, speed);
@@ -61,8 +61,8 @@ export function getBaseSpeed(p: PokemonSet): number {
 
 /** Move priority after common Gen 9 ability/terrain modifiers. */
 export function getEffectiveMovePriority(p: PokemonSet, moveName: string, field: FieldState): number {
-  const move = Dex.moves.get(moveName) as unknown as DexEntry;
-  if (move?.exists === false) return 0;
+  const move = getMove(moveName) as DexEntry;
+  if (!move) return 0;
   let priority = Number(move?.priority ?? 0);
   const category = String(move?.category ?? "");
   const type = String(move?.type ?? "");
@@ -77,13 +77,13 @@ export function getEffectiveMovePriority(p: PokemonSet, moveName: string, field:
 
 export function getMovePriorityLabel(p: PokemonSet, moveName: string, field: FieldState): string {
   const priority = getEffectiveMovePriority(p, moveName, field);
-  const move = Dex.moves.get(moveName) as unknown as DexEntry;
+  const move = getMove(moveName) as DexEntry;
   const galeWingsConditional = ability(p, "Gale Wings") && String(move?.type ?? "") === "Flying";
   return `[${priority > 0 ? "+" : ""}${priority}${galeWingsConditional ? "*" : ""}]`;
 }
 
 export function getMovePriorityNote(p: PokemonSet, moveName: string, field: FieldState): string {
-  const move = Dex.moves.get(moveName) as unknown as DexEntry;
+  const move = getMove(moveName) as DexEntry;
   const base = Number(move?.priority ?? 0);
   const actual = getEffectiveMovePriority(p, moveName, field);
   const conditional = ability(p, "Gale Wings") && String(move?.type ?? "") === "Flying";
@@ -93,14 +93,14 @@ export function getMovePriorityNote(p: PokemonSet, moveName: string, field: Fiel
 
 /** Ratio of effective battle Speed to the Pokémon's unmodified calculated Speed. */
 export function getSpeedMultiplier(p: PokemonSet, field: FieldState, side: "attacker" | "defender" = "attacker", speedStage = 0): number {
-  const species = Dex.species.get(p.species || p.name) as unknown as DexEntry;
+  const species = getSpecies(p.species || p.name) as DexEntry;
   const base = Number(species?.baseStats?.spe);
   if (!Number.isFinite(base)) return 1;
   const level = Math.max(1, Math.min(100, p.level || 100));
   const iv = Math.max(0, Math.min(31, p.ivs?.spe ?? 31));
   const ev = Math.max(0, Math.min(252, p.evs?.spe ?? 0));
   let raw = Math.floor((Math.floor((2 * base + iv + Math.floor(ev / 4)) * level / 100) + 5));
-  const nature = Dex.natures.get(p.nature || "Serious") as unknown as DexEntry;
+  const nature = getNature(p.nature || "Serious") as DexEntry;
   if (nature?.plus === "spe") raw = Math.floor(raw * 1.1);
   if (nature?.minus === "spe") raw = Math.floor(raw * 0.9);
   return raw > 0 ? getEffectiveSpeed(p, field, side, speedStage) / raw : 1;

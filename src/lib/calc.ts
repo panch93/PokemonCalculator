@@ -1,12 +1,12 @@
 import { calculate, Generations, Move, Pokemon, Field, TYPE_CHART } from "@smogon/calc";
-import { Dex } from "@pkmn/dex";
+import { getMove } from "./showdown-data";
 import { DamageSummary, FieldState, MoveDetails, PokemonSet, StatStages } from "./types";
 
-/** Read canonical English move descriptions from the bundled pkmn/ps dex data. */
-function getPkmnMoveDescription(name: string): string | undefined {
+/** Read canonical English move descriptions from the live official Pokémon Showdown data. */
+function getShowdownMoveDescription(name: string): string | undefined {
   try {
-    const psMove = Dex.moves.get(name) as unknown as { desc?: unknown; shortDesc?: unknown; exists?: boolean };
-    if (psMove?.exists === false) return undefined;
+    const psMove = getMove(name);
+    if (!psMove) return undefined;
     if (typeof psMove?.desc === "string" && psMove.desc.trim()) return psMove.desc.trim();
     if (typeof psMove?.shortDesc === "string" && psMove.shortDesc.trim()) return psMove.shortDesc.trim();
   } catch {
@@ -15,7 +15,7 @@ function getPkmnMoveDescription(name: string): string | undefined {
   return undefined;
 }
 
-/** Defensive fallback for custom/unknown moves absent from the bundled dex. */
+/** Defensive fallback for custom/unknown moves absent from the current live Showdown data. */
 function getMoveDescription(
   name: string,
   metadata?: { type?: string; category?: string; power?: number | null; accuracy?: number | null; priority?: number },
@@ -25,7 +25,7 @@ function getMoveDescription(
   const power = metadata?.power == null ? "variable or no direct" : `${metadata.power}-power`;
   const accuracy = metadata?.accuracy == null ? "variable" : `${metadata.accuracy}%`;
   const priority = metadata?.priority ? ` Its priority is ${metadata.priority > 0 ? "+" : ""}${metadata.priority}.` : "";
-  return `${name} is a${category ? ` ${category.trim()}` : ""} ${type} move with ${power} base power and ${accuracy} accuracy.${priority} A full description is not available in the bundled Pokémon Showdown data.`;
+  return `${name} is a${category ? ` ${category.trim()}` : ""} ${type} move with ${power} base power and ${accuracy} accuracy.${priority} A full description is not available in the live Pokémon Showdown data.`;
 }
 
 const DEFAULT_GEN = 9;
@@ -96,9 +96,9 @@ function makePokemon(set: PokemonSet, generation = DEFAULT_GEN, boosts: Partial<
  * of which team is attacking. Never reuse a Field instance: the calc engine
  * clones and can mutate side conditions for abilities such as Infiltrator.
  */
-function makeField(state: FieldState, doubles = false) {
+function makeField(state: FieldState) {
   return new Field({
-    gameType: doubles ? "Doubles" : "Singles",
+    gameType: "Singles",
     weather: state.weather || undefined,
     terrain: state.terrain || undefined,
     defenderSide: {
@@ -191,9 +191,8 @@ function cacheKey(
   attackerStages: StatStages,
   defenderStages: StatStages,
   critical: boolean,
-  doubles: boolean,
 ) {
-  return JSON.stringify([attacker, defender, moveName, fieldState, attackerStages, defenderStages, critical, doubles]);
+  return JSON.stringify([attacker, defender, moveName, fieldState, attackerStages, defenderStages, critical]);
 }
 
 const CACHE_LIMIT = 1500;
@@ -226,11 +225,10 @@ export function calculateMove(
   defenderStages: StatStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 },
   critical = false,
   generation = DEFAULT_GEN,
-  doubles = false,
 ): DamageSummary | null {
   if (!moveName.trim()) return null;
 
-  const key = `${generation}|${cacheKey(attacker, defender, moveName, fieldState, attackerStages, defenderStages, critical, doubles)}`;
+  const key = `${generation}|${cacheKey(attacker, defender, moveName, fieldState, attackerStages, defenderStages, critical)}`;
   const cached = getCached(key);
   if (cached !== undefined) return cached;
 
@@ -240,7 +238,7 @@ export function calculateMove(
     const defenderPokemon = makePokemon(defender, generation, { def: defenderStages.def, spd: defenderStages.spd }, fieldState);
     const move = new Move(gen, moveName);
     if (critical) (move as unknown as { isCrit: boolean }).isCrit = true;
-    const field = makeField(fieldState, doubles);
+    const field = makeField(fieldState);
     const result = calculate(gen, attackerPokemon, defenderPokemon, move, field);
 
     const range = damageRange((result as unknown as { damage?: unknown }).damage);
@@ -268,6 +266,26 @@ export function calculateMove(
       ? [...new Set(rawDamage as number[])].sort((a, b) => a - b)
       : undefined;
     const maxHp = defenderPokemon.maxHP();
+
+    // Critical damage is a second, explicit @smogon/calc run using the same
+    // battle state. Do not derive it from the ordinary result with a multiplier:
+    // critical hits can ignore stat stages and screens, and other mechanics may
+    // alter the result. When the main calculation is already critical, its range
+    // is the critical range, so no duplicate run is needed.
+    let criticalRange: { min: number; max: number } | null = null;
+    if (!critical) {
+      const criticalMove = new Move(gen, moveName);
+      (criticalMove as unknown as { isCrit: boolean }).isCrit = true;
+      const criticalResult = calculate(
+        gen,
+        makePokemon(attacker, generation, { atk: attackerStages.atk, spa: attackerStages.spa }, fieldState),
+        makePokemon(defender, generation, { def: defenderStages.def, spd: defenderStages.spd }, fieldState),
+        criticalMove,
+        makeField(fieldState),
+      );
+      criticalRange = damageRange((criticalResult as unknown as { damage?: unknown }).damage);
+    }
+
     const entryHazardDamage = defender.currentHp === undefined ? getEntryHazardDamage(defender, defenderPokemon, fieldState) : 0;
     const currentHp = Math.max(1, Math.min(maxHp, Math.floor(defender.currentHp ?? maxHp)));
     const effectiveHp = Math.max(1, currentHp - entryHazardDamage);
@@ -332,6 +350,10 @@ export function calculateMove(
       rolls,
       minPct,
       maxPct,
+      ...(criticalRange ? {
+        critMinPct: (criticalRange.min / maxHp) * 100,
+        critMaxPct: (criticalRange.max / maxHp) * 100,
+      } : {}),
       rawMinPct,
       rawMaxPct,
       effectiveHp,
@@ -384,7 +406,7 @@ export function getMoveDetails(moveName: string, generation = DEFAULT_GEN): Move
       accuracy: numeric(move.accuracy) ?? numeric(raw.accuracy),
       pp: numeric(move.pp) ?? numeric(raw.pp),
       priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0),
-      description: getPkmnMoveDescription(moveName) || text(raw.desc) || text(raw.shortDesc) || text(move.desc) || getMoveDescription(moveName, { type: text(move.type) || text(raw.type), category: text(move.category) || text(raw.category), power: numeric(move.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp), accuracy: numeric(move.accuracy) ?? numeric(raw.accuracy), priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0) }),
+      description: getShowdownMoveDescription(moveName) || text(raw.desc) || text(raw.shortDesc) || text(move.desc) || getMoveDescription(moveName, { type: text(move.type) || text(raw.type), category: text(move.category) || text(raw.category), power: numeric(move.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp), accuracy: numeric(move.accuracy) ?? numeric(raw.accuracy), priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0) }),
     };
   } catch {
     return null;

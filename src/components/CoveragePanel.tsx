@@ -1,15 +1,14 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { Dex } from "@pkmn/dex";
 import { Team, PokemonSet } from "../lib/types";
 import { getSpeciesLearnset } from "../lib/learnsets";
 import { getMoveDetails } from "../lib/calc";
 import PokemonSprite from "./PokemonSprite";
+import { getMoveNameMap } from "../lib/showdown-data";
 
 type Props = { left: Team; right: Team; format: string; generation: number; onClose: () => void };
 const id = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 const TYPES = ["Normal", "Fire", "Water", "Electric", "Grass", "Ice", "Fighting", "Poison", "Ground", "Flying", "Psychic", "Bug", "Rock", "Ghost", "Dragon", "Dark", "Steel", "Fairy"];
-const MOVE_NAMES = (() => { try { return new Map((Dex.moves as unknown as { all: () => Array<{name:string; exists?:boolean}> }).all().filter(move => move.exists !== false).map(move => [id(move.name), move.name] as const)); } catch { return new Map<string, string>(); } })();
 type Entry = { species: string; move: string; side: "Team A" | "Team B"; fainted: boolean };
 export default function CoveragePanel({ left, right, format, generation, onClose }: Props) {
   const [type, setType] = useState("Ice");
@@ -17,6 +16,7 @@ export default function CoveragePanel({ left, right, format, generation, onClose
   const [includeFainted, setIncludeFainted] = useState(false);
   const [learnsets, setLearnsets] = useState<Record<string, Set<string> | null>>({});
   const [revision, setRevision] = useState(0);
+  const moveNames = useMemo(() => getMoveNameMap(), [revision]);
   useEffect(() => {
     const refresh = () => setRevision(value => value + 1);
     window.addEventListener("ptl-learnsets-refreshed", refresh);
@@ -35,11 +35,11 @@ export default function CoveragePanel({ left, right, format, generation, onClose
     .flatMap(group => group.team.flatMap((pokemon: PokemonSet) => {
       if (!pokemon.species || /^Empty Slot/.test(pokemon.name) || (!includeFainted && pokemon.dead)) return [];
       const moves = [...(learnsets[id(pokemon.species)] || new Set<string>())];
-      return moves.map(moveId => MOVE_NAMES.get(moveId)).filter((move): move is string => Boolean(move)).filter(move => {
+      return moves.map(moveId => moveNames.get(moveId)).filter((move): move is string => Boolean(move)).filter(move => {
         const details = getMoveDetails(move, generation);
-        return details?.type === type && ["Physical", "Special"].includes(details.category);
+        return Boolean(details && details.type === type && ["Physical", "Special"].includes(details.category));
       }).map(move => ({ species: pokemon.species, move, side: group.side, fainted: Boolean(pokemon.dead) } as Entry));
-    })), [left, right, teamFilter, includeFainted, learnsets, type, generation]);
+    })), [left, right, teamFilter, includeFainted, learnsets, type, generation, moveNames]);
   const physical = entries.filter(entry => getMoveDetails(entry.move, generation)?.category === "Physical");
   const special = entries.filter(entry => getMoveDetails(entry.move, generation)?.category === "Special");
   const renderEntries = (rows: Entry[]) => rows.length ? rows.map((entry, i) => <div className={`coverage-entry${entry.fainted ? " is-fainted" : ""}`} key={`${entry.side}-${entry.species}-${entry.move}-${i}`} title={`${entry.species} · ${entry.side}${entry.fainted ? " · Fainted" : ""}`}><PokemonSprite species={entry.species} className="coverage-sprite" /><span>{entry.move}</span><small className={entry.side === "Team A" ? "team-a" : "team-b"}>{entry.side === "Team A" ? "A" : "B"}</small></div>) : <p className="support-empty">No moves found</p>;

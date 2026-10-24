@@ -22,14 +22,20 @@ describe("damage calculator wrappers", () => {
     expect(result!.max).toBeGreaterThanOrEqual(result!.min);
   });
 
-  it("passes Doubles game type to the calculator for spread-move damage", () => {
-    const attacker = makeSet("Garchomp", "Rough Skin", ["Earthquake"]);
+  it("calculates critical marker range with a separate @smogon/calc run", () => {
+    const attacker = makeSet("Charizard", "Blaze", ["Flamethrower"]);
     const defender = makeSet("Bulbasaur", "Overgrow", ["Tackle"]);
-    const singles = calculateMove(attacker, defender, "Earthquake", field, undefined, undefined, false, 9, false);
-    const doubles = calculateMove(attacker, defender, "Earthquake", field, undefined, undefined, false, 9, true);
-    expect(singles).not.toBeNull();
-    expect(doubles).not.toBeNull();
-    expect(doubles!.max).toBeLessThan(singles!.max);
+    const fieldWithScreen = { ...field, defenderLightScreen: true };
+    const attackerStages = { atk: -2, spa: -2, def: 0, spd: 0, spe: 0 };
+    const defenderStages = { atk: 0, spa: 0, def: 2, spd: 0, spe: 0 };
+
+    const ordinary = calculateMove(attacker, defender, "Flamethrower", fieldWithScreen, attackerStages, defenderStages, false, 9);
+    const explicitlyCritical = calculateMove(attacker, defender, "Flamethrower", fieldWithScreen, attackerStages, defenderStages, true, 9);
+
+    expect(ordinary).not.toBeNull();
+    expect(explicitlyCritical).not.toBeNull();
+    expect(ordinary!.critMinPct).toBeCloseTo(explicitlyCritical!.minPct, 8);
+    expect(ordinary!.critMaxPct).toBeCloseTo(explicitlyCritical!.maxPct, 8);
   });
 
   it("returns move metadata and a description for common moves", () => {
