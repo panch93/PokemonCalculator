@@ -18,6 +18,8 @@ New sections will be added to the bottom of the specified column.
 The column value will be ignored for repeat sections.
 */
 
+import { TeamValidator } from '../sim/team-validator';
+
 export const Formats: import('../sim/dex-formats').FormatList = [
 
 	// S/V Singles
@@ -568,9 +570,8 @@ export const Formats: import('../sim/dex-formats').FormatList = [
 		ruleset: ['Standard Draft', 'NatDex Mod'],
 		checkCanLearn(move, species, setSources, set) {
 			if (!this.ruleTable.has('natdexmod')) return this.checkCanLearn(move, species, setSources, set);
-			const TeamValidator: typeof import('../sim/team-validator').TeamValidator =
-				require('../sim/team-validator').TeamValidator;
-			const natDex = TeamValidator.get(`gen${this.gen}nationaldexag`)
+			const Validator = TeamValidator;
+			const natDex = Validator.get(`gen${this.gen}nationaldexag`)
 				.checkCanLearn(move, species, this.allSources(species), set);
 			if (typeof natDex === 'string') return this.checkCanLearn(move, species, setSources, set);
 			return natDex;
@@ -1456,9 +1457,8 @@ export const Formats: import('../sim/dex-formats').FormatList = [
 				const newMoveSlots = [];
 				for (const moveSlot of pokemon.baseMoveSlots) {
 					if (moveSlot.id === 'metronome') {
-						const TeamValidator: typeof import('../sim/team-validator').TeamValidator =
-							require('../sim/team-validator').TeamValidator;
-						const cantMetronome = TeamValidator.get(this.format).checkCanLearn(this.dex.moves.get('metronome'), pokemon.species);
+						const Validator = TeamValidator;
+						const cantMetronome = Validator.get(this.format).checkCanLearn(this.dex.moves.get('metronome'), pokemon.species);
 						if (!cantMetronome) {
 							newMoveSlots.push(moveSlot);
 						} else {
@@ -3331,10 +3331,9 @@ export const Formats: import('../sim/dex-formats').FormatList = [
 			if (!customRules.includes('!obtainableabilities')) customRules.push('!obtainableabilities');
 			if (!customRules.includes('+noability')) customRules.push('+noability');
 
-			const TeamValidator: typeof import('../sim/team-validator').TeamValidator =
-				require('../sim/team-validator').TeamValidator;
+			const Validator = TeamValidator;
 
-			const validator = new TeamValidator(dex.formats.get(`${this.format.id}@@@${customRules.join(',')}`));
+			const validator = new Validator(dex.formats.get(`${this.format.id}@@@${customRules.join(',')}`));
 			const moves = set.moves;
 			set.moves = [ability.id];
 			set.ability = 'No Ability';

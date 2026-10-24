@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { exportTeam, parseTeamPaste } from "../lib/team-parser";
+import { exportTeam, getPokepasteTextUrl, parseTeamPaste } from "../lib/team-parser";
 import { PokemonSet, Stats, Team } from "../lib/types";
 import AutocompleteInput from "./AutocompleteInput";
 import { getSpeciesLearnset } from "../lib/learnsets";
@@ -41,7 +41,7 @@ function parsePresetStats(value: unknown, defaults: Stats): Stats {
   return output;
 }
 function blankTeamSlot(index: number): PokemonSet {
-  return { name: `Empty Slot ${index + 1}`, species: "Pikachu", item: "", ability: "", nature: "Hardy", level: 100, teraType: "", importedTeraType: "", evs: { ...DEFAULT_STATS }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: ["", "", "", ""] };
+  return { name: "Pikachu", species: "Pikachu", item: "", ability: "", nature: "Hardy", level: 100, teraType: "", importedTeraType: "", evs: { ...DEFAULT_STATS }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: ["", "", "", ""] };
 }
 function paddedTeam(team: Team): Team {
   const output = team.slice(0, 6).map(p => ({ ...p, evs: { ...DEFAULT_STATS, ...p.evs }, ivs: { ...p.ivs, hp: p.ivs?.hp ?? 31, atk: p.ivs?.atk ?? 31, def: p.ivs?.def ?? 31, spa: p.ivs?.spa ?? 31, spd: p.ivs?.spd ?? 31, spe: p.ivs?.spe ?? 31 }, moves: [...p.moves, "", "", "", ""].slice(0, 4) }));
@@ -166,7 +166,7 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
     const old = current[index];
     const nextName = species.trim() || old.species;
     setSelectedPresets(previous => { const next = { ...previous }; delete next[`${side}-${index}`]; return next; });
-    updateBuilderPokemon(side, index, { species: nextName, name: old.name.startsWith("Empty Slot") ? nextName : old.name, ability: "", item: "", moves: ["", "", "", ""], nature: "Hardy", evs: { ...DEFAULT_STATS }, teraType: "", importedTeraType: "" });
+    updateBuilderPokemon(side, index, { species: nextName, name: nextName, ability: "", item: "", moves: ["", "", "", ""], nature: "Hardy", evs: { ...DEFAULT_STATS }, teraType: "", importedTeraType: "" });
   };
   const updateStat = (side: Side, index: number, stat: keyof Stats, value: string, kind: "evs" | "ivs") => {
     const team = side === "left" ? builderA : builderB;
@@ -180,9 +180,31 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a"); anchor.href = url; anchor.download = side === "left" ? "team-a.txt" : "team-b.txt"; anchor.click(); URL.revokeObjectURL(url);
   };
-  const importNow = (side: Side) => {
-    const parsed = parseTeamPaste(side === "left" ? textA : textB);
+  const [pasteError, setPasteError] = useState("");
+  const [pasteLoading, setPasteLoading] = useState(false);
+  const importNow = async (side: Side) => {
+    const current = (side === "left" ? textA : textB).trim();
+    setPasteError("");
+    let text = current;
+    const pasteUrl = getPokepasteTextUrl(current);
+    if (pasteUrl) {
+      setPasteLoading(true);
+      try {
+        const response = await fetch(pasteUrl);
+        if (!response.ok) throw new Error(`Poképaste returned HTTP ${response.status}`);
+        text = await response.text();
+        if (!text.trim() || /^\s*<!doctype html/i.test(text)) throw new Error("The link did not return a Showdown team paste.");
+        if (side === "left") setTextA(text); else setTextB(text);
+      } catch (error) {
+        setPasteError(`Could not load Poképaste: ${error instanceof Error ? error.message : String(error)}`);
+        setPasteLoading(false);
+        return;
+      }
+      setPasteLoading(false);
+    }
+    const parsed = parseTeamPaste(text);
     if (parsed.length) onImport(side, parsed);
+    else setPasteError("No Pokémon were found in that paste.");
   };
   if (!open) return null;
 
@@ -192,13 +214,12 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
       const presets = getPresets(pokemon);
       const presetKey = `${side}-${index}`;
       return <article className="builder-pokemon" key={`${side}-${index}`}>
-        <div className="builder-pokemon-heading"><strong>{index + 1}. {pokemon.name || pokemon.species}</strong><select aria-label={`${pokemon.species} meta set`} value={selectedPresets[presetKey] || ""} disabled={!presets.length} onChange={event => {
+        <div className="builder-pokemon-heading"><strong>{index + 1}. {pokemon.species}</strong><select aria-label={`${pokemon.species} meta set`} value={selectedPresets[presetKey] || ""} disabled={!presets.length} onChange={event => {
           const key = event.target.value; setSelectedPresets(previous => ({ ...previous, [presetKey]: key }));
           const chosen = presets.find(([name]) => name === key)?.[1]; if (chosen) updateBuilderPokemon(side, index, applyPreset(pokemon, chosen));
         }}><option value="">{setStatus === "loading" ? "Loading meta sets…" : presets.length ? "Choose meta set…" : "No preset available"}</option>{presets.map(([name]) => <option key={name} value={name}>{name}</option>)}</select></div>
         <div className="builder-fields">
           <label>Species<AutocompleteInput ariaLabel={`${pokemon.name} species`} options={speciesOptions} value={pokemon.species} onChange={value => changeSpecies(side, index, value)} /></label>
-          <label>Nickname<input value={pokemon.name} onChange={event => updateBuilderPokemon(side, index, { name: event.target.value })} /></label>
           <label>Item<AutocompleteInput ariaLabel={`${pokemon.species} item`} options={dexOptions.items} value={pokemon.item} onChange={value => updateBuilderPokemon(side, index, { item: value })} /></label>
           <label>Ability<AutocompleteInput ariaLabel={`${pokemon.species} ability`} options={abilitiesForSpecies(pokemon.species)} value={pokemon.ability} onChange={value => updateBuilderPokemon(side, index, { ability: value })} /></label>
           <label>Nature<select value={pokemon.nature} onChange={event => updateBuilderPokemon(side, index, { nature: event.target.value })}>{NATURES.map(n => { const effect = NATURE_EFFECTS[n]; return <option key={n} value={n}>{n}{effect.plus && effect.minus ? ` (+${effect.plus}, −${effect.minus})` : " (neutral)"}</option>; })}</select></label>
@@ -217,9 +238,10 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
     <section className="teams-modal panel" role="dialog" aria-modal="true" aria-labelledby="teams-modal-title">
       <div className="panel-title-row"><div><h2 id="teams-modal-title">Teams · Teambuilder / Paste</h2><p>Format: {format}. Moves are checked against the species learnset; custom-format bans may require additional rules data.</p></div><button onClick={onClose} aria-label="Close teams">Close ×</button></div>
       <div className="builder-toolbar"><div className="mode-toggle" role="group" aria-label="Team editing mode"><button className={mode === "builder" ? "active" : ""} onClick={() => setMode("builder")}>Teambuilder</button><button className={mode === "paste" ? "active" : ""} onClick={() => setMode("paste")}>Paste</button></div><small className="preset-status">{mode === "builder" ? setStatus === "loading" ? "Loading Smogon sets…" : setStatus === "error" ? "Smogon set data unavailable; manual editing still works." : "Presets from Smogon usage sets" : "Standard Showdown team paste format"}</small></div>
+      {pasteError && <p role="alert" className="paste-error">{pasteError}</p>}
       {mode === "builder" ? <><div className="teams-two-column">{renderBuilderTeam("left", builderA)}{renderBuilderTeam("right", builderB)}</div></> : <div className="teams-two-column">
-        <section className="team-editor"><div className="team-editor-heading"><h3>Team A</h3><span>{left.length}/6 Pokémon</span></div><textarea aria-label="Team A Showdown text" value={textA} onChange={e => setTextA(e.target.value)} spellCheck={false}/><div className="button-row"><button className="primary" onClick={() => importNow("left")}>Import Team A</button><button onClick={() => download("left")}>Export Team A</button><button onClick={() => navigator.clipboard?.writeText(exportTeam(left))}>Copy current</button></div></section>
-        <section className="team-editor"><div className="team-editor-heading"><h3>Team B</h3><span>{right.length}/6 Pokémon</span></div><textarea aria-label="Team B Showdown text" value={textB} onChange={e => setTextB(e.target.value)} spellCheck={false}/><div className="button-row"><button className="primary" onClick={() => importNow("right")}>Import Team B</button><button onClick={() => download("right")}>Export Team B</button><button onClick={() => navigator.clipboard?.writeText(exportTeam(right))}>Copy current</button></div></section>
+        <section className="team-editor"><div className="team-editor-heading"><h3>Team A</h3><span>{left.length}/6 Pokémon</span></div><textarea aria-label="Team A Showdown text" value={textA} onChange={e => setTextA(e.target.value)} spellCheck={false}/><div className="button-row"><button className="primary" disabled={pasteLoading} onClick={() => void importNow("left")}>{pasteLoading ? "Loading paste…" : "Import Team A"}</button><button onClick={() => download("left")}>Export Team A</button><button onClick={() => navigator.clipboard?.writeText(exportTeam(left))}>Copy current</button></div></section>
+        <section className="team-editor"><div className="team-editor-heading"><h3>Team B</h3><span>{right.length}/6 Pokémon</span></div><textarea aria-label="Team B Showdown text" value={textB} onChange={e => setTextB(e.target.value)} spellCheck={false}/><div className="button-row"><button className="primary" disabled={pasteLoading} onClick={() => void importNow("right")}>{pasteLoading ? "Loading paste…" : "Import Team B"}</button><button onClick={() => download("right")}>Export Team B</button><button onClick={() => navigator.clipboard?.writeText(exportTeam(right))}>Copy current</button></div></section>
       </div>}
     </section>
   </div>;
