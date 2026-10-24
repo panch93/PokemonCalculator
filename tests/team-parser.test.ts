@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { exportTeam, parseTeamPaste } from "../src/lib/team-parser";
+import { exportTeam, getPokepasteTextUrl, parseTeamPaste } from "../src/lib/team-parser";
 
 describe("team paste parser and exporter", () => {
   it("parses species, item, ability, EVs, nature, Tera type, and moves", () => {
@@ -22,6 +22,21 @@ describe("team paste parser and exporter", () => {
     expect(normalized).toContain("Jolly Nature");
     expect(normalized).toContain("- Volt Tackle");
     expect(normalized).toContain("- Fake Out");
+  });
+
+  it("ignores Showdown nicknames and exports species names only", () => {
+    const team = parseTeamPaste(`Sparky (Pikachu) @ Light Ball\nAbility: Static\n- Thunderbolt`);
+    expect(team[0].species).toBe("Pikachu");
+    expect(team[0].name).toBe("Pikachu");
+    expect(exportTeam(team)).toContain("Pikachu @ Light Ball");
+    expect(exportTeam(team)).not.toContain("Sparky");
+  });
+
+  it("recognizes only a single Poképaste link and builds its text endpoint", () => {
+    expect(getPokepasteTextUrl("https://pokepast.es/abc123")).toBe("https://pokepast.es/abc123.txt");
+    expect(getPokepasteTextUrl("  https://www.pokepast.es/abc123/  ")).toBe("https://pokepast.es/abc123.txt");
+    expect(getPokepasteTextUrl("https://example.com/abc123")).toBeNull();
+    expect(getPokepasteTextUrl("team text\nhttps://pokepast.es/abc123")).toBeNull();
   });
 
   it("caps imported teams at six Pokémon", () => {

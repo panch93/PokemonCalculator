@@ -12,6 +12,13 @@ const STAT_MAP: Record<string, keyof Stats> = {
 const emptyStats = (): Stats => ({ hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 });
 const defaultIVs = (): Stats => ({ hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 });
 
+
+/** Returns the public plain-text endpoint for a single Poképaste URL. */
+export function getPokepasteTextUrl(input: string): string | null {
+  const match = input.trim().match(/^https?:\/\/(?:www\.)?pokepast\.es\/([a-zA-Z0-9]+)\/?(?:\?.*)?$/i);
+  return match ? `https://pokepast.es/${match[1]}.txt` : null;
+}
+
 export function parseTeamPaste(input: string): Team {
   const blocks = input.replace(/\r/g, "").split(/\n\s*\n/);
   const team: Team = [];
@@ -26,7 +33,7 @@ export function parseTeamPaste(input: string): Team {
     const nicknameMatch = genderless.match(/^(.*?)\s+\((.*?)\)$/);
 
     const set: PokemonSet = {
-      name: nicknameMatch?.[1]?.trim() || genderless.trim(),
+      name: nicknameMatch?.[2]?.trim() || genderless.trim(),
       species: nicknameMatch?.[2]?.trim() || genderless.trim(),
       item: itemPart?.trim() || "",
       ability: "",
@@ -69,9 +76,7 @@ function parseStats(value: string): Stats {
 
 export function exportTeam(team: Team): string {
   return team.map(set => {
-    const header = set.name && set.name !== set.species
-      ? `${set.name} (${set.species})`
-      : set.species;
+    const header = set.species;
 
     const lines = [`${header}${set.item ? ` @ ${set.item}` : ""}`];
     if (set.ability) lines.push(`Ability: ${set.ability}`);

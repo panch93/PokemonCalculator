@@ -27,6 +27,12 @@ const championsTeam: Team = [
 ];
 
 describe("browser-adapted official Pokémon Showdown TeamValidator", () => {
+  it("exposes a callable TeamValidator constructor in the production module graph", async () => {
+    const module = await import("../src/lib/showdown-official/sim/team-validator");
+    expect(typeof module.TeamValidator).toBe("function");
+    expect(typeof module.TeamValidator.get).toBe("function");
+  });
+
   it("accepts a legal Gen 9 OU team using bundled upstream rules", () => {
     const result = validateWithOfficialTeamValidator([charizard], "gen9ou");
     expect(result).toMatchObject({ supported: true, valid: true, issues: [] });
