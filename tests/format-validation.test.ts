@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { getAvailableShowdownFormats, resolveShowdownFormat, validateTeamForFormat } from "../src/lib/format-validation";
+import { afterEach, describe, expect, it } from "vitest";
+import { getAvailableShowdownFormats, resolveShowdownFormat, setRemoteShowdownFormats, validateTeamForFormat } from "../src/lib/format-validation";
+import { createFormatValidationFacade } from "../src/lib/format-validation-facade";
+import type { TeamValidationProvider } from "../src/lib/team-validation-provider";
 import type { PokemonSet } from "../src/lib/types";
 
 function set(overrides: Partial<PokemonSet> = {}): PokemonSet {
@@ -12,14 +14,26 @@ function set(overrides: Partial<PokemonSet> = {}): PokemonSet {
   };
 }
 
+afterEach(() => setRemoteShowdownFormats([]));
+
 describe("Pokémon Showdown format resolution", () => {
   it("exposes Gen 9 OU in the fallback format list", () => {
     expect(getAvailableShowdownFormats().some(format => format.id === "gen9ou")).toBe(true);
   });
 
-  it("resolves display names and canonical IDs", () => {
-    expect(resolveShowdownFormat("Gen 9 OU")).toMatchObject({ supported: true, id: "gen9ou" });
-    expect(resolveShowdownFormat("gen9ou")).toMatchObject({ supported: true, id: "gen9ou" });
+  it.each([
+    ["Gen 9 OU", "gen9ou"], ["gen9ou", "gen9ou"],
+    ["Gen 8 OU", "gen8ou"], ["gen1ou", "gen1ou"],
+    ["gen9championsou", "gen9championsou"], ["gen9championsbssregmb", "gen9championsbssregmb"],
+  ])("resolves bundled format %s to canonical ID %s", (input, id) => {
+    expect(resolveShowdownFormat(input)).toMatchObject({ supported: true, id });
+  });
+
+  it("does not infer a missing mod for remote metadata", () => {
+    setRemoteShowdownFormats([{
+      id: "gen9futureformat", label: "Future Format", source: "remote",
+    }]);
+    expect(resolveShowdownFormat("gen9futureformat")).toMatchObject({ supported: false, id: null });
   });
 
   it("does not silently treat custom draft formats as standard formats", () => {
@@ -29,9 +43,19 @@ describe("Pokémon Showdown format resolution", () => {
   });
 
   it("does not infer legality while the official browser validator is unavailable", () => {
-    const legal = validateTeamForFormat([set()], "Gen 9 OU");
+    const unavailableProvider: TeamValidationProvider = {
+      validateTeam: (_team, format) => ({
+        supported: false,
+        formatLabel: format.label,
+        valid: null,
+        issues: [],
+        message: "Official browser validator unavailable.",
+      }),
+    };
+    const facade = createFormatValidationFacade(unavailableProvider);
+    const legal = facade.validateTeamForFormat([set()], "Gen 9 OU");
     expect(legal).toMatchObject({ supported: false, valid: null, issues: [] });
-    const illegal = validateTeamForFormat([set({ moves: ["V-create"] })], "Gen 9 OU");
+    const illegal = facade.validateTeamForFormat([set({ moves: ["V-create"] })], "Gen 9 OU");
     expect(illegal).toMatchObject({ supported: false, valid: null, issues: [] });
   });
 });

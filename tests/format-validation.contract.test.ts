@@ -52,6 +52,13 @@ describe("format validation contract during browser-validator migration", () => 
     expect(resolveShowdownFormat("Gen 9 OU")).toMatchObject({ supported: true, id: "gen9ou", label: "[Gen 9] OU" });
   });
 
+  it.each(["gen1ou", "gen8ou", "gen9ou", "gen9championsou", "gen9championsbssregmb"])(
+    "keeps bundled validator format %s supported at the facade boundary",
+    formatId => {
+      expect(resolveShowdownFormat(formatId).supported).toBe(true);
+    },
+  );
+
   it("does not claim an unknown or remote-only format is validated", () => {
     expect(resolveShowdownFormat("not-a-real-format")).toMatchObject({ supported: false, id: null });
 

@@ -1,6 +1,7 @@
 import { findShowdownFormat } from "./format-catalog";
 import { isEverythingFormat } from "./format-normalization";
 import type { FormatResolution } from "./format-types";
+import { inferBundledFormatMod, isBundledValidatorMod } from "./showdown-validator-mods";
 
 export { isEverythingFormat } from "./format-normalization";
 
@@ -25,13 +26,12 @@ export function resolveShowdownFormat(input: string): FormatResolution {
     };
   }
 
-  const mod = selected.remoteMod ?? selected.mod;
+  const mod = selected.remoteMod ?? selected.mod ?? inferBundledFormatMod(selected.id, selected.source);
   const generatedTeam = selected.remoteTeam ?? selected.team;
   if (generatedTeam) {
     return { supported: false, id: null, label: selected.label, reason: "This format uses a generated team and cannot validate an imported team." };
   }
-  const bundledMods = new Set(["gen1", "gen2", "gen3", "gen4", "gen5", "gen6", "gen7", "gen8", "gen9", "champions", "championsregmb"]);
-  if (!bundledMods.has(mod || "")) {
+  if (!isBundledValidatorMod(mod)) {
     return { supported: false, id: null, label: selected.label, reason: `The format “${selected.label}” uses mod “${mod || "unknown"}”, which is not included in this browser validator build.` };
   }
   if (selected.source !== "remote" && !/^gen[1-9]/.test(selected.id) && !selected.id.includes("champions")) {

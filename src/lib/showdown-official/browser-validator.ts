@@ -1,6 +1,7 @@
 import { Dex, toID } from "./sim/dex";
 import { TeamValidator } from "./sim/team-validator";
 import type { Team } from "../types";
+import { isBundledValidatorMod } from "../showdown-validator-mods";
 
 export const SHOWDOWN_VALIDATOR_REVISION = "showdown-team-validator-browser-port-v1";
 
@@ -36,8 +37,7 @@ export function validateWithOfficialTeamValidator(team: Team, formatId: string, 
         message: "This format is not present in the bundled official Pokémon Showdown format snapshot; legality was not checked.",
       };
     }
-    const supportedMods = new Set(["gen1", "gen2", "gen3", "gen4", "gen5", "gen6", "gen7", "gen8", "gen9", "champions", "championsregmb"]);
-    if (!supportedMods.has(format.mod)) {
+    if (!isBundledValidatorMod(format.mod)) {
       return {
         supported: false, valid: null, issues: [], formatLabel,
         message: `This browser build does not bundle the official data for mod “${format.mod}”; no legality result was inferred.`,

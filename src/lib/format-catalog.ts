@@ -7,6 +7,10 @@ const CURATED_FORMATS = [
   { label: "[Gen 9] UU", id: "gen9uu" }, { label: "[Gen 9] RU", id: "gen9ru" },
   { label: "[Gen 9] NU", id: "gen9nu" }, { label: "[Gen 9] PU", id: "gen9pu" },
   { label: "[Gen 9] Monotype", id: "gen9monotype" }, { label: "[Gen 9] Doubles OU", id: "gen9doublesou" },
+  // Champions formats are explicit bundled entries because the offline picker
+  // cannot rely on the live format endpoint being reachable.
+  { label: "[Gen 9] Pokémon Champions OU", id: "gen9championsou", section: "Pokémon Champions" },
+  { label: "[Gen 9] Pokémon Champions BSS Reg M-B", id: "gen9championsbssregmb", section: "Pokémon Champions" },
   { label: "[Gen 8] OU", id: "gen8ou" }, { label: "[Gen 7] OU", id: "gen7ou" },
   { label: "[Gen 6] OU", id: "gen6ou" }, { label: "[Gen 5] OU", id: "gen5ou" },
   { label: "[Gen 4] OU", id: "gen4ou" }, { label: "[Gen 3] OU", id: "gen3ou" },

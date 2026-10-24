@@ -14,6 +14,18 @@ const charizard: Team[number] = {
   moves: ["Flamethrower", "Air Slash", "Protect", "Focus Blast"],
 };
 
+// Champions is a six-Pokémon format and uses Stat Points (0–32 per stat,
+// 66 total), not the conventional 510-EV configuration. Keep fixtures legal
+// for that format rather than weakening the official validator.
+const championsTeam: Team = [
+  { ...charizard, item: "", nature: "Hardy", evs: { hp: 11, atk: 11, def: 11, spa: 11, spd: 11, spe: 11 } },
+  { ...charizard, name: "Venusaur", species: "Venusaur", ability: "Overgrow", moves: ["Giga Drain", "Sludge Bomb", "Earth Power", "Protect"], item: "", nature: "Hardy", evs: { hp: 11, atk: 11, def: 11, spa: 11, spd: 11, spe: 11 } },
+  { ...charizard, name: "Blastoise", species: "Blastoise", ability: "Torrent", moves: ["Surf", "Ice Beam", "Aura Sphere", "Protect"], item: "", nature: "Hardy", evs: { hp: 11, atk: 11, def: 11, spa: 11, spd: 11, spe: 11 } },
+  { ...charizard, name: "Pikachu", species: "Pikachu", ability: "Static", moves: ["Thunderbolt", "Volt Switch", "Quick Attack", "Protect"], item: "", nature: "Hardy", evs: { hp: 11, atk: 11, def: 11, spa: 11, spd: 11, spe: 11 } },
+  { ...charizard, name: "Gengar", species: "Gengar", ability: "Cursed Body", moves: ["Shadow Ball", "Sludge Bomb", "Focus Blast", "Protect"], item: "", nature: "Hardy", evs: { hp: 11, atk: 11, def: 11, spa: 11, spd: 11, spe: 11 } },
+  { ...charizard, name: "Dragonite", species: "Dragonite", ability: "Inner Focus", moves: ["Dragon Claw", "Earthquake", "Extreme Speed", "Protect"], item: "", nature: "Hardy", evs: { hp: 11, atk: 11, def: 11, spa: 11, spd: 11, spe: 11 } },
+];
+
 describe("browser-adapted official Pokémon Showdown TeamValidator", () => {
   it("accepts a legal Gen 9 OU team using bundled upstream rules", () => {
     const result = validateWithOfficialTeamValidator([charizard], "gen9ou");
@@ -53,14 +65,14 @@ describe("browser-adapted official Pokémon Showdown TeamValidator", () => {
   });
 
   it("validates the official Pokémon Champions OU format using Champions-specific data", () => {
-    const result = validateWithOfficialTeamValidator([charizard], "gen9championsou");
+    const result = validateWithOfficialTeamValidator(championsTeam, "gen9championsou");
     expect(result.supported).toBe(true);
     expect(result.valid).toBe(true);
     expect(result.issues).toEqual([]);
   });
 
   it("supports the Champions Regulation M-B mod data", () => {
-    const result = validateWithOfficialTeamValidator([charizard], "gen9championsbssregmb");
+    const result = validateWithOfficialTeamValidator(championsTeam, "gen9championsbssregmb");
     expect(result.supported).toBe(true);
     expect(result.valid).toBe(true);
     expect(result.issues).toEqual([]);
