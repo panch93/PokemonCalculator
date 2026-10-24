@@ -88,12 +88,42 @@ import * as Gen8Pokedex from "./data/mods/gen8/pokedex";
 import * as Gen8Rulesets from "./data/mods/gen8/rulesets";
 import * as Gen8Scripts from "./data/mods/gen8/scripts";
 import * as Gen8TypeChart from "./data/mods/gen8/typechart";
+import * as ChampionsAbilities from "./data/mods/champions/abilities";
+import * as ChampionsConditions from "./data/mods/champions/conditions";
+import * as ChampionsFormatsData from "./data/mods/champions/formats-data";
+import * as ChampionsItems from "./data/mods/champions/items";
+import * as ChampionsLearnsets from "./data/mods/champions/learnsets";
+import * as ChampionsMoves from "./data/mods/champions/moves";
+import * as ChampionsRulesets from "./data/mods/champions/rulesets";
+import * as ChampionsScripts from "./data/mods/champions/scripts";
+import * as ChampionsRegMBFormatsData from "./data/mods/championsregmb/formats-data";
+import * as ChampionsRegMBItems from "./data/mods/championsregmb/items";
+import * as ChampionsRegMBLearnsets from "./data/mods/championsregmb/learnsets";
+import * as ChampionsRegMBMoves from "./data/mods/championsregmb/moves";
+import * as ChampionsRegMBScripts from "./data/mods/championsregmb/scripts";
 
 export const BrowserDataModules: Record<string, Record<string, unknown>> = {
   Abilities, Aliases, Conditions, FormatsData, Items, Learnsets, Moves, Natures,
   Pokedex, PokemonGoData, Rulesets, Scripts, TypeChart,
 };
 export const BrowserModDataModules: Record<string, Record<string, Record<string, unknown>>> = {
+  champions: {
+    Abilities: ChampionsAbilities,
+    Conditions: ChampionsConditions,
+    FormatsData: ChampionsFormatsData,
+    Items: ChampionsItems,
+    Learnsets: ChampionsLearnsets,
+    Moves: ChampionsMoves,
+    Rulesets: ChampionsRulesets,
+    Scripts: ChampionsScripts,
+  },
+  championsregmb: {
+    FormatsData: ChampionsRegMBFormatsData,
+    Items: ChampionsRegMBItems,
+    Learnsets: ChampionsRegMBLearnsets,
+    Moves: ChampionsRegMBMoves,
+    Scripts: ChampionsRegMBScripts,
+  },
   gen1: {
     Conditions: Gen1Conditions,
     FormatsData: Gen1FormatsData,

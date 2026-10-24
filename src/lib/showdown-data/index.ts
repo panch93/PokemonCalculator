@@ -1,4 +1,5 @@
 import { resolveByName, toShowdownId } from "./ids";
+import historicalLearnsets from "./historical-learnsets.json";
 import { getLoadedShowdownData, loadShowdownData, getSpeciesLearnsetMoves, clearShowdownDataCache } from "./client";
 import { getNature as getFallbackNature, getNatureList as getFallbackNatureList, getNatureEffectsByDisplayStat as getFallbackNatureEffects } from "./natures";
 import type { ShowdownDescribedEntry, ShowdownMove, ShowdownSpecies } from "./types";
@@ -58,6 +59,38 @@ export function getAbilityNamesForSpecies(species: ShowdownSpecies | undefined):
 export function getSpeciesAbilities(name: string): string[] {
   return getAbilityNamesForSpecies(getSpecies(name));
 }
+/**
+ * Historical Everything! move pool assembled from official Showdown learnset tables
+ * across supported generations and the Champions mod. Includes a species' forms
+ * and named base/change-from species when Showdown records those relationships.
+ */
+export function getHistoricalSpeciesLearnset(name: string): Set<string> | null {
+  const data = current();
+  const species = data ? resolveByName(data.species, name) : undefined;
+  const candidates = new Set<string>([toShowdownId(name)]);
+  if (species) {
+    for (const related of [species.name, species.baseSpecies, species.changesFrom]) {
+      if (typeof related === "string" && related.trim()) candidates.add(toShowdownId(related));
+    }
+  }
+  const moves = new Set<string>();
+  let found = false;
+  for (const candidate of candidates) {
+    const table = (historicalLearnsets as Record<string, string[]>)[candidate];
+    if (!table) continue;
+    found = true;
+    for (const move of table) moves.add(move);
+  }
+  // Keep the current upstream table as a supplement, so newly published moves
+  // can be present even before the generated historical bundle is refreshed.
+  const currentMoves = getSpeciesLearnsetMoves(name);
+  if (currentMoves) {
+    found = true;
+    for (const move of currentMoves) moves.add(move);
+  }
+  return found ? moves : null;
+}
+
 export async function getSpeciesLearnset(name: string): Promise<Set<string> | null> {
   await loadShowdownData();
   return getSpeciesLearnsetMoves(name);

@@ -52,6 +52,20 @@ describe("browser-adapted official Pokémon Showdown TeamValidator", () => {
     expect(gen1).toMatchObject({ supported: true, valid: true, issues: [] });
   });
 
+  it("validates the official Pokémon Champions OU format using Champions-specific data", () => {
+    const result = validateWithOfficialTeamValidator([charizard], "gen9championsou");
+    expect(result.supported).toBe(true);
+    expect(result.valid).toBe(true);
+    expect(result.issues).toEqual([]);
+  });
+
+  it("supports the Champions Regulation M-B mod data", () => {
+    const result = validateWithOfficialTeamValidator([charizard], "gen9championsbssregmb");
+    expect(result.supported).toBe(true);
+    expect(result.valid).toBe(true);
+    expect(result.issues).toEqual([]);
+  });
+
   it("does not claim support for custom mods whose data is not bundled", () => {
     const result = validateWithOfficialTeamValidator([charizard], "gen9championsnatdexdraft");
     expect(result).toMatchObject({ supported: false, valid: null, issues: [] });

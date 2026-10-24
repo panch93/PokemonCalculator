@@ -21,8 +21,8 @@ export type OfficialBrowserValidation = {
 };
 
 /**
- * Runs the upstream TeamValidator against bundled official base-generation data for Gen 1–9.
- * The static-export build supports official base-generation mods Gen 1–9.
+ * Runs the upstream TeamValidator against bundled official base-generation and Pokémon Champions data.
+ * Supported mods include Gen 1–9, Champions, and Champions Regulation M-B.
  * Other custom mods and generated-team formats fail closed.
  */
 export function validateWithOfficialTeamValidator(team: Team, formatId: string, liveMetadata?: LiveFormatMetadata): OfficialBrowserValidation {
@@ -36,10 +36,11 @@ export function validateWithOfficialTeamValidator(team: Team, formatId: string, 
         message: "This format is not present in the bundled official Pokémon Showdown format snapshot; legality was not checked.",
       };
     }
-    if (!/^gen[1-9]$/.test(format.mod)) {
+    const supportedMods = new Set(["gen1", "gen2", "gen3", "gen4", "gen5", "gen6", "gen7", "gen8", "gen9", "champions", "championsregmb"]);
+    if (!supportedMods.has(format.mod)) {
       return {
         supported: false, valid: null, issues: [], formatLabel,
-        message: `This browser build bundles official base-generation data for Gen 1–9 only; format mod “${format.mod}” is not supported and no legality result was inferred.`,
+        message: `This browser build does not bundle the official data for mod “${format.mod}”; no legality result was inferred.`,
       };
     }
     if (format.team) {

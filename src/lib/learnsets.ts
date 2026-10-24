@@ -1,4 +1,5 @@
-import { getSpeciesLearnset as getLiveSpeciesLearnset, loadShowdownData } from "./showdown-data";
+import { getSpeciesLearnset as getLiveSpeciesLearnset, getHistoricalSpeciesLearnset, loadShowdownData } from "./showdown-data";
+import { isEverythingFormat } from "./format-normalization";
 
 export type LearnsetMap = Record<string, Record<string, unknown>>;
 
@@ -16,12 +17,15 @@ export async function loadFormatLearnsets(_format: string, forceRefresh = false)
   return loadLearnsets(forceRefresh);
 }
 
-export function getLearnsetModeLabel(_format: string): string {
-  return "Live species learnset loaded · format legality checked separately";
+export function getLearnsetModeLabel(format: string): string {
+  return isEverythingFormat(format)
+    ? "Historical all-generation + Champions move pool · format legality separate"
+    : "Live current-generation species learnset · format legality checked separately";
 }
 
-export async function getSpeciesLearnset(species: string, _format = "gen9ou"): Promise<Set<string> | null> {
-  return getLiveSpeciesLearnset(species);
+export async function getSpeciesLearnset(species: string, format = "gen9ou"): Promise<Set<string> | null> {
+  await loadShowdownData();
+  return isEverythingFormat(format) ? getHistoricalSpeciesLearnset(species) : getLiveSpeciesLearnset(species);
 }
 
 export function isMoveInLearnset(learnset: Set<string> | null | undefined, move: string): boolean | null {

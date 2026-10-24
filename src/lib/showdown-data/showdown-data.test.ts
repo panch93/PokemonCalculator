@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveByName, toShowdownId, unwrapTable } from "./ids";
 import { mergeDescriptions, parseDescriptionTable } from "./descriptions";
-import { getAbilityNamesForSpecies } from "./index";
+import { getAbilityNamesForSpecies, getHistoricalSpeciesLearnset } from "./index";
 import { collectSpeciesLearnsetMoves } from "./learnsets";
 import { getNature, getNatureEffectsByDisplayStat, getNatureList, parseOfficialNatureSource } from "./natures";
 import type { ShowdownLearnsetEntry, ShowdownSpecies } from "./types";
@@ -121,5 +121,21 @@ describe("species ability options", () => {
 
   it("does not leak the global ability list when species data is absent", () => {
     expect(getAbilityNamesForSpecies(undefined)).toEqual([]);
+  });
+});
+
+describe("historical Everything! learnset pool", () => {
+  it("includes historical moves that are missing from current-generation learnsets", () => {
+    expect(getHistoricalSpeciesLearnset("Corviknight")?.has("roost")).toBe(true);
+    expect(getHistoricalSpeciesLearnset("Kingambit")?.has("suckerpunch")).toBe(true);
+  });
+
+  it("includes Champions-only learnset entries in the shared pool", () => {
+    // Pollen Puff is present for Beedrill in the bundled Champions learnset.
+    expect(getHistoricalSpeciesLearnset("Beedrill")?.has("pollenpuff")).toBe(true);
+  });
+
+  it("returns null for an unknown species", () => {
+    expect(getHistoricalSpeciesLearnset("Definitely Not A Pokémon")).toBeNull();
   });
 });
