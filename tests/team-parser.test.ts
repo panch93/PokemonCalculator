@@ -32,7 +32,8 @@ describe("team paste parser and exporter", () => {
     expect(exportTeam(team)).not.toContain("Sparky");
   });
 
-  it("recognizes only a single Poképaste link and builds its text endpoint", () => {
+  it("recognizes the provided Poképaste example and builds its text endpoint", () => {
+    expect(getPokepasteTextUrl("https://pokepast.es/aaf560b77c9674bc")).toBe("https://pokepast.es/aaf560b77c9674bc.txt");
     expect(getPokepasteTextUrl("https://pokepast.es/abc123")).toBe("https://pokepast.es/abc123.txt");
     expect(getPokepasteTextUrl("  https://www.pokepast.es/abc123/  ")).toBe("https://pokepast.es/abc123.txt");
     expect(getPokepasteTextUrl("https://example.com/abc123")).toBeNull();

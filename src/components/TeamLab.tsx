@@ -35,7 +35,7 @@ export default function TeamLab() {
   const [stagesB, setStagesB] = useState<StatStages[]>(ZERO_STAGES);
   const [storageReady, setStorageReady] = useState(false);
   const [teamsOpen, setTeamsOpen] = useState(false);
-  const [format, setFormat] = useState("Gen 9 OU");
+  const [format, setFormat] = useState("Everything!");
   const [mechanics, setMechanics] = useState({ tera: true });
   const [generation, setGeneration] = useState(9);
   const [learnsetStatus, setLearnsetStatus] = useState<"loading" | "ready" | "error">("loading");

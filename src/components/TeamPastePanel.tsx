@@ -190,8 +190,17 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
     if (pasteUrl) {
       setPasteLoading(true);
       try {
-        const response = await fetch(pasteUrl);
-        if (!response.ok) throw new Error(`Poképaste returned HTTP ${response.status}`);
+        // pokepast.es may not allow direct browser-origin fetches on static hosts.
+        // Try the official text endpoint first, then a CORS-enabled raw relay.
+        let response: Response;
+        try {
+          response = await fetch(pasteUrl);
+          if (!response.ok) throw new Error(`Poképaste returned HTTP ${response.status}`);
+        } catch {
+          const relay = `https://api.allorigins.win/raw?url=${encodeURIComponent(pasteUrl)}`;
+          response = await fetch(relay);
+          if (!response.ok) throw new Error(`Poképaste fetch failed (HTTP ${response.status})`);
+        }
         text = await response.text();
         if (!text.trim() || /^\s*<!doctype html/i.test(text)) throw new Error("The link did not return a Showdown team paste.");
         if (side === "left") setTextA(text); else setTextB(text);
