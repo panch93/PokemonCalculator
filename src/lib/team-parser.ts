@@ -13,10 +13,39 @@ const emptyStats = (): Stats => ({ hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0
 const defaultIVs = (): Stats => ({ hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 });
 
 
-/** Returns the public plain-text endpoint for a single Poképaste URL. */
-export function getPokepasteTextUrl(input: string): string | null {
+/** Returns the public HTML page for a single Poképaste URL. */
+export function getPokepasteHtmlUrl(input: string): string | null {
   const match = input.trim().match(/^https?:\/\/(?:www\.)?pokepast\.es\/([a-zA-Z0-9]+)\/?(?:\?.*)?$/i);
-  return match ? `https://pokepast.es/${match[1]}.txt` : null;
+  return match ? `https://pokepast.es/${match[1]}` : null;
+}
+
+/**
+ * Extract the team text embedded in a Poképaste HTML page. Poképaste's rendered
+ * page exposes the copyable paste in a pre/code-style region; strip markup and
+ * decode HTML entities before passing it to the regular Showdown paste parser.
+ */
+export function extractPokepasteHtmlText(html: string): string {
+  const candidates: string[] = [];
+  const blockPattern = /<(pre|code|textarea)\b[^>]*>([\s\S]*?)<\/\1\s*>/gi;
+  for (const match of html.matchAll(blockPattern)) candidates.push(match[2]);
+
+  // Some page revisions place the paste in a div rather than a pre/code block.
+  if (!candidates.length) candidates.push(html);
+  const decode = (value: string) => value
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<\/(?:div|p|li)\s*>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
+    .trim();
+  const teamLike = candidates.map(decode).find(text => /(?:^|\n)\s*(?:[^\n]+\s+@\s+[^\n]+|Ability:|[-•]\s+[^\n]+)\s*(?:\n|$)/i.test(text));
+  return teamLike || "";
 }
 
 export function parseTeamPaste(input: string): Team {

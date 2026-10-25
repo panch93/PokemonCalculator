@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { exportTeam, getPokepasteTextUrl, parseTeamPaste } from "../src/lib/team-parser";
+import { exportTeam, extractPokepasteHtmlText, getPokepasteHtmlUrl, parseTeamPaste } from "../src/lib/team-parser";
 
 describe("team paste parser and exporter", () => {
   it("parses species, item, ability, EVs, nature, Tera type, and moves", () => {
@@ -32,12 +32,18 @@ describe("team paste parser and exporter", () => {
     expect(exportTeam(team)).not.toContain("Sparky");
   });
 
-  it("recognizes the provided Poképaste example and builds its text endpoint", () => {
-    expect(getPokepasteTextUrl("https://pokepast.es/aaf560b77c9674bc")).toBe("https://pokepast.es/aaf560b77c9674bc.txt");
-    expect(getPokepasteTextUrl("https://pokepast.es/abc123")).toBe("https://pokepast.es/abc123.txt");
-    expect(getPokepasteTextUrl("  https://www.pokepast.es/abc123/  ")).toBe("https://pokepast.es/abc123.txt");
-    expect(getPokepasteTextUrl("https://example.com/abc123")).toBeNull();
-    expect(getPokepasteTextUrl("team text\nhttps://pokepast.es/abc123")).toBeNull();
+  it("recognizes the supplied Poképaste URL and resolves its HTML page", () => {
+    expect(getPokepasteHtmlUrl("https://pokepast.es/aaf560b77c9674bc")).toBe("https://pokepast.es/aaf560b77c9674bc");
+    expect(getPokepasteHtmlUrl("https://pokepast.es/abc123")).toBe("https://pokepast.es/abc123");
+    expect(getPokepasteHtmlUrl("  https://www.pokepast.es/abc123/  ")).toBe("https://pokepast.es/abc123");
+    expect(getPokepasteHtmlUrl("https://example.com/abc123")).toBeNull();
+    expect(getPokepasteHtmlUrl("team text\nhttps://pokepast.es/abc123")).toBeNull();
+  });
+
+  it("extracts a Showdown team from the HTML paste body and decodes entities", () => {
+    const html = `<html><body><pre>Tornadus-Therian @ Assault Vest&amp;#10;Ability: Regenerator<br> - U-turn<br> - Knock Off</pre></body></html>`;
+    expect(extractPokepasteHtmlText(html)).toContain("Tornadus-Therian @ Assault Vest");
+    expect(parseTeamPaste(extractPokepasteHtmlText(html))).toHaveLength(1);
   });
 
   it("caps imported teams at six Pokémon", () => {

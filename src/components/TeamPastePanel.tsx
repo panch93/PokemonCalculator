@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { exportTeam, getPokepasteTextUrl, parseTeamPaste } from "../lib/team-parser";
+import { exportTeam, extractPokepasteHtmlText, getPokepasteHtmlUrl, parseTeamPaste } from "../lib/team-parser";
 import { PokemonSet, Stats, Team } from "../lib/types";
 import AutocompleteInput from "./AutocompleteInput";
 import { getSpeciesLearnset } from "../lib/learnsets";
@@ -186,23 +186,39 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
     const current = (side === "left" ? textA : textB).trim();
     setPasteError("");
     let text = current;
-    const pasteUrl = getPokepasteTextUrl(current);
+    const pasteUrl = getPokepasteHtmlUrl(current);
     if (pasteUrl) {
       setPasteLoading(true);
       try {
-        // pokepast.es may not allow direct browser-origin fetches on static hosts.
-        // Try the official text endpoint first, then a CORS-enabled raw relay.
-        let response: Response;
-        try {
-          response = await fetch(pasteUrl);
-          if (!response.ok) throw new Error(`Poképaste returned HTTP ${response.status}`);
-        } catch {
-          const relay = `https://api.allorigins.win/raw?url=${encodeURIComponent(pasteUrl)}`;
-          response = await fetch(relay);
-          if (!response.ok) throw new Error(`Poképaste fetch failed (HTTP ${response.status})`);
+        // Fetch the actual Poképaste HTML page through public CORS relays, then
+        // extract the embedded copyable team. Direct cross-origin fetches often
+        // fail in static-hosted browser apps due to Poképaste's CORS policy.
+        const endpoints = [
+          `https://api.allorigins.win/raw?url=${encodeURIComponent(pasteUrl)}`,
+          `https://corsproxy.io/?url=${encodeURIComponent(pasteUrl)}`,
+          `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(pasteUrl)}`,
+        ];
+        const failures: string[] = [];
+        let loadedText = "";
+        for (const endpoint of endpoints) {
+          try {
+            const response = await fetch(endpoint);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const html = await response.text();
+            const extracted = extractPokepasteHtmlText(html);
+            if (!extracted || !parseTeamPaste(extracted).length) {
+              throw new Error("HTML response did not contain a readable Pokémon team");
+            }
+            loadedText = extracted;
+            break;
+          } catch (error) {
+            failures.push(error instanceof Error ? error.message : String(error));
+          }
         }
-        text = await response.text();
-        if (!text.trim() || /^\s*<!doctype html/i.test(text)) throw new Error("The link did not return a Showdown team paste.");
+        if (!loadedText) {
+          throw new Error(`Could not read the paste page HTML (${failures.join("; ")}). CORS relays may be blocked or unavailable; paste the Showdown text directly instead.`);
+        }
+        text = loadedText;
         if (side === "left") setTextA(text); else setTextB(text);
       } catch (error) {
         setPasteError(`Could not load Poképaste: ${error instanceof Error ? error.message : String(error)}`);
