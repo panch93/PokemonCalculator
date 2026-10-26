@@ -22,6 +22,25 @@ describe("damage calculator wrappers", () => {
     expect(result!.max).toBeGreaterThanOrEqual(result!.min);
   });
 
+  it("shows Psychic Terrain blocking priority moves against grounded defenders", () => {
+    const terrain: FieldState = { ...field, terrain: "Psychic" };
+    const attacker = makeSet("Chien-Pao", "Sword of Ruin", ["Sucker Punch"]);
+    const groundedDefender = makeSet("Bulbasaur", "Overgrow", ["Tackle"]);
+    const result = calculateMove(attacker, groundedDefender, "Sucker Punch", terrain, undefined, undefined, false, 9);
+    expect(result).toMatchObject({ min: 0, max: 0, minPct: 0, maxPct: 0, ko: "No damage" });
+    expect(result?.description).toContain("blocked by Psychic Terrain");
+  });
+
+  it("does not block priority moves against airborne defenders in Psychic Terrain", () => {
+    const terrain: FieldState = { ...field, terrain: "Psychic" };
+    const attacker = makeSet("Chien-Pao", "Sword of Ruin", ["Sucker Punch"]);
+    const airborneDefender = makeSet("Tornadus-Therian", "Regenerator", ["Hurricane"]);
+    const result = calculateMove(attacker, airborneDefender, "Sucker Punch", terrain, undefined, undefined, false, 9);
+    expect(result).not.toBeNull();
+    expect(result!.max).toBeGreaterThan(0);
+    expect(result!.description).not.toContain("blocked by Psychic Terrain");
+  });
+
   it("calculates critical marker range with a separate @smogon/calc run", () => {
     const attacker = makeSet("Charizard", "Blaze", ["Flamethrower"]);
     const defender = makeSet("Bulbasaur", "Overgrow", ["Tackle"]);

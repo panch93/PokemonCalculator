@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { exportTeam, getPokepasteTextUrl, parseTeamPaste } from "../lib/team-parser";
+import { exportTeam, extractPokepasteHtmlText, getPokepasteHtmlUrl, parseTeamPaste } from "../lib/team-parser";
 import { PokemonSet, Stats, Team } from "../lib/types";
 import AutocompleteInput from "./AutocompleteInput";
 import { getSpeciesLearnset } from "../lib/learnsets";
@@ -186,14 +186,39 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
     const current = (side === "left" ? textA : textB).trim();
     setPasteError("");
     let text = current;
-    const pasteUrl = getPokepasteTextUrl(current);
+    const pasteUrl = getPokepasteHtmlUrl(current);
     if (pasteUrl) {
       setPasteLoading(true);
       try {
-        const response = await fetch(pasteUrl);
-        if (!response.ok) throw new Error(`Poképaste returned HTTP ${response.status}`);
-        text = await response.text();
-        if (!text.trim() || /^\s*<!doctype html/i.test(text)) throw new Error("The link did not return a Showdown team paste.");
+        // Fetch the actual Poképaste HTML page through public CORS relays, then
+        // extract the embedded copyable team. Direct cross-origin fetches often
+        // fail in static-hosted browser apps due to Poképaste's CORS policy.
+        const endpoints = [
+          `https://api.allorigins.win/raw?url=${encodeURIComponent(pasteUrl)}`,
+          `https://corsproxy.io/?url=${encodeURIComponent(pasteUrl)}`,
+          `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(pasteUrl)}`,
+        ];
+        const failures: string[] = [];
+        let loadedText = "";
+        for (const endpoint of endpoints) {
+          try {
+            const response = await fetch(endpoint);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const html = await response.text();
+            const extracted = extractPokepasteHtmlText(html);
+            if (!extracted || !parseTeamPaste(extracted).length) {
+              throw new Error("HTML response did not contain a readable Pokémon team");
+            }
+            loadedText = extracted;
+            break;
+          } catch (error) {
+            failures.push(error instanceof Error ? error.message : String(error));
+          }
+        }
+        if (!loadedText) {
+          throw new Error(`Could not read the paste page HTML (${failures.join("; ")}). CORS relays may be blocked or unavailable; paste the Showdown text directly instead.`);
+        }
+        text = loadedText;
         if (side === "left") setTextA(text); else setTextB(text);
       } catch (error) {
         setPasteError(`Could not load Poképaste: ${error instanceof Error ? error.message : String(error)}`);
@@ -224,7 +249,7 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
           <label>Ability<AutocompleteInput ariaLabel={`${pokemon.species} ability`} options={abilitiesForSpecies(pokemon.species)} value={pokemon.ability} onChange={value => updateBuilderPokemon(side, index, { ability: value })} /></label>
           <label>Nature<select value={pokemon.nature} onChange={event => updateBuilderPokemon(side, index, { nature: event.target.value })}>{NATURES.map(n => { const effect = NATURE_EFFECTS[n]; return <option key={n} value={n}>{n}{effect.plus && effect.minus ? ` (+${effect.plus}, −${effect.minus})` : " (neutral)"}</option>; })}</select></label>
           <label>Level<input type="number" min="1" max="100" value={pokemon.level} onChange={event => updateBuilderPokemon(side, index, { level: Math.max(1, Math.min(100, Number(event.target.value) || 100)) })} /></label>
-          <label>Tera Type<select aria-label={`${pokemon.species} Tera type`} value={pokemon.teraType || ""} onChange={event => updateBuilderPokemon(side, index, { teraType: event.target.value })}><option value="">None</option>{["Normal","Fire","Water","Electric","Grass","Ice","Fighting","Poison","Ground","Flying","Psychic","Bug","Rock","Ghost","Dragon","Dark","Steel","Fairy","Stellar"].map(type => <option key={type} value={type}>{type}</option>)}</select></label>
+          <label>Tera Type<select aria-label={`${pokemon.species} Tera type`} value={pokemon.importedTeraType || ""} onChange={event => updateBuilderPokemon(side, index, { importedTeraType: event.target.value, teraType: "" })}><option value="">None</option>{["Normal","Fire","Water","Electric","Grass","Ice","Fighting","Poison","Ground","Flying","Psychic","Bug","Rock","Ghost","Dragon","Dark","Steel","Fairy","Stellar"].map(type => <option key={type} value={type}>{type}</option>)}</select></label>
         </div>
         <div className="builder-moves">{[0,1,2,3].map(moveIndex => <label key={moveIndex}>Move {moveIndex + 1}<AutocompleteInput ariaLabel={`${pokemon.species} move ${moveIndex + 1}`} options={legalMovesFor(pokemon.species)} value={pokemon.moves[moveIndex] || ""} onChange={value => { const moves = [...pokemon.moves]; moves[moveIndex] = value; updateBuilderPokemon(side, index, { moves }); }} />{pokemon.moves[moveIndex] && !isEverythingFormat(format) && !moveIsLegal(pokemon.species, pokemon.moves[moveIndex]) && <span className="move-illegal-indicator" title={`Move is not in ${pokemon.species} species learnset; check the Format legality report for format rules`}>Learnset?</span>}</label>)}</div>
         <div className="builder-evs-heading"><strong>{isChampionsFormat ? "Stat Points" : "EVs"}</strong>{(() => { const limit = isChampionsFormat ? 66 : 510; const remaining = limit - Object.values(pokemon.evs).reduce((sum, value) => sum + value, 0); return <span className={remaining < 0 ? "evs-remaining-over" : ""}>Remaining: {remaining}</span>; })()}</div>

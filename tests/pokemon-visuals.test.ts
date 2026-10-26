@@ -3,8 +3,8 @@ import { getSpriteCandidates, speciesSpriteSlug, typeMatchupSummary } from "../s
 
 describe("Pokémon visual helpers", () => {
   it("normalizes gendered and punctuation-bearing species names", () => {
-    expect(speciesSpriteSlug("Nidoran♀")).toBe("nidoran-f");
-    expect(speciesSpriteSlug("Mr. Mime")).toBe("mr-mime");
+    expect(speciesSpriteSlug("Nidoran♀")).toBe("nidoranf");
+    expect(speciesSpriteSlug("Mr. Mime")).toBe("mrmime");
     expect(speciesSpriteSlug("Farfetch’d")).toBe("farfetchd");
   });
 
@@ -13,6 +13,7 @@ describe("Pokémon visual helpers", () => {
     expect(candidates).toHaveLength(4);
     expect(candidates[0]).toContain("/sprites/gen9/pikachu.png");
     expect(candidates[3]).toContain("/sprites/dex/pikachu.png");
+    expect(getSpriteCandidates("Iron Valiant")[0]).toContain("/sprites/gen9/ironvaliant.png");
   });
 
   it("reports expected type weaknesses and immunities", () => {

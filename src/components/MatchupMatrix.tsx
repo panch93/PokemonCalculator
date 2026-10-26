@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { calculateMove, getMoveDetails, getPokemonHp, getPokemonTypes, getAutoBoostedStat } from "../lib/calc";
 import { FieldState, Matchup, PokemonSet, StatStages } from "../lib/types";
 import { formatAbilityTooltip, formatItemTooltip } from "../lib/item-ability-descriptions";
-import { getBaseSpeed, getEffectiveSpeed, getMovePriorityLabel, getMovePriorityNote } from "../lib/battle-order";
+import { getBaseSpeed, getEffectiveSpeed, getEffectiveMovePriority, getMovePriorityLabel, getMovePriorityNote } from "../lib/battle-order";
 import { getItemList, getMoveList, getSpeciesAbilities } from "../lib/showdown-data";
 import AutocompleteInput from "./AutocompleteInput";
 import { getSpeciesLearnset } from "../lib/learnsets";
@@ -57,14 +57,16 @@ function updateHpPercent(pokemon: PokemonSet, value: string, onChange: (patch: P
   const hp = getPokemonHp(pokemon);
   if (hp.max > 0) onChange({ currentHp: Math.round(hp.max * Math.max(0, Math.min(100, pct)) / 100) });
 }
-function defenderFieldIndicators(defender: PokemonSet, move: string, field: FieldState, generation = 9) {
+function defenderFieldIndicators(defender: PokemonSet, move: string, field: FieldState, generation = 9, attacker?: PokemonSet) {
   const details = getMoveDetails(move, generation);
   if (!details || !["Physical", "Special"].includes(details.category)) return [] as string[];
   const tags: string[] = [];
   const types = getPokemonTypes(defender);
   const ability = defender.ability.trim().toLowerCase();
   const item = defender.item.trim().toLowerCase();
-  const grounded = !types.includes("Flying") && ability !== "levitate" && item !== "air balloon";
+  const effectiveTypes = defender.teraType ? [defender.teraType] : types;
+  const grounded = !effectiveTypes.includes("Flying") && ability !== "levitate" && item !== "air balloon";
+  if (field.terrain === "Psychic" && grounded && Math.max(details.priority, getEffectiveMovePriority(attacker || defender, move, field)) > 0) tags.push("Psychic Terrain ×0 (priority blocked)");
   if (field.weather === "Sand" && types.includes("Rock") && details.category === "Special") tags.push("Sand: Rock SpD ×1.5");
   if (field.weather === "Snow" && types.includes("Ice") && details.category === "Physical") tags.push("Snow: Ice Def ×1.5");
   if (field.terrain === "Misty" && grounded && details.type === "Dragon") tags.push("Misty Terrain ×0.5 Dragon");
@@ -234,8 +236,8 @@ export default function MatchupMatrix(props: Props) {
   const [quickBoostedStat, setQuickBoostedStat] = useState<PokemonSet["boostedStat"]>("");
   const [quickMoves, setQuickMoves] = useState<string[]>(["", "", "", ""]);
   const allMoves = useMemo(() => getMoveList(), [learnsetRevision]);
-  const openQuickEditor = (side: "left" | "right", index: number) => { const p = (side === "left" ? left : right)[index]; setQuickItem(p.item || ""); setQuickAbility(p.ability || ""); setQuickTera(p.teraType || ""); setQuickBoostedStat(p.boostedStat || ""); setQuickMoves([...p.moves, "", "", "", ""].slice(0,4)); setQuickEditor({ side, index }); };
-  const saveQuickEditor = () => { if (!quickEditor) return; const change = quickEditor.side === "left" ? props.onRowPokemonChange : props.onColPokemonChange; change(quickEditor.index, { item: quickItem, ability: quickAbility, moves: quickMoves, teraType: quickTera, boostedStat: quickBoostedStat }); setQuickEditor(null); };
+  const openQuickEditor = (side: "left" | "right", index: number) => { const p = (side === "left" ? left : right)[index]; setQuickItem(p.item || ""); setQuickAbility(p.ability || ""); setQuickTera(p.importedTeraType || ""); setQuickBoostedStat(p.boostedStat || ""); setQuickMoves([...p.moves, "", "", "", ""].slice(0,4)); setQuickEditor({ side, index }); };
+  const saveQuickEditor = () => { if (!quickEditor) return; const change = quickEditor.side === "left" ? props.onRowPokemonChange : props.onColPokemonChange; change(quickEditor.index, { item: quickItem, ability: quickAbility, moves: quickMoves, importedTeraType: quickTera, teraType: (quickEditor.side === "left" ? left : right)[quickEditor.index].teraType || "", boostedStat: quickBoostedStat }); setQuickEditor(null); };
   const [moveAtkEvs, setMoveAtkEvs] = useState(0);
   const [moveDefEvs, setMoveDefEvs] = useState(0);
   const [moveHpEvs, setMoveHpEvs] = useState(0);
@@ -288,7 +290,7 @@ export default function MatchupMatrix(props: Props) {
   const rowEntries = speedSorted(left);
   const colEntries = speedSorted(right);
   return <><section className="panel matrix-panel">
-    <div className="panel-title-row"><div><h2>6 × 6 matchup matrix</h2></div><div className="button-row"><button type="button" onClick={() => setSupportOpen(true)}>Move Support</button><button type="button" onClick={() => setCoverageOpen(true)}>Coverage</button><button className="reset-stages-button reset-all-stages-button" title="Reset all Pokémon stat stages to zero" aria-label="Reset all Pokémon stat stages to zero" onClick={props.onResetStages}><span aria-hidden="true">↺</span></button><label className={`crit-toggle ${props.critical ? "active" : ""}`}><input type="checkbox" checked={props.critical} onChange={e => props.onCriticalChange(e.target.checked)} /> Critical hits</label><button onClick={props.onToggleSwap} title="Swap attacking and defending teams">⇄ {swapped ? "Team B attacks" : "Team A attacks"}</button></div></div>
+    <div className="panel-title-row"><div><h2>6 × 6 matchup matrix</h2></div><div className="button-row"><button type="button" onClick={() => setSupportOpen(true)}>Move Support</button><button type="button" onClick={() => setCoverageOpen(true)}>Coverage</button><button className="reset-stages-button reset-all-stages-button" title="Reset all stat stages and current HP to 100%" aria-label="Reset all stat stages and current HP to 100%" onClick={props.onResetStages}><span aria-hidden="true">↺</span></button><label className={`crit-toggle ${props.critical ? "active" : ""}`}><input type="checkbox" checked={props.critical} onChange={e => props.onCriticalChange(e.target.checked)} /> Critical hits</label><button onClick={props.onToggleSwap} title="Swap attacking and defending teams">⇄ {swapped ? "Team B attacks" : "Team A attacks"}</button></div></div>
     <div className="ko-legend"><span className="ko-1">1HKO</span><span className="ko-2">2HKO</span><span className="ko-3">3HKO</span><span className="ko-4">4HKO</span><span className="ko-5">4HKO+</span><span className="turn-order attacker">←</span><small>attacker first</small><span className="turn-order defender">↑</span><small>defender first</small><span className="turn-order tie">↔</span><small>tie</small><small>* conditional priority (Gale Wings assumes full HP)</small></div>
     <div className="matrix-scroll"><table className="matrix">
       <thead><tr><th className="corner" colSpan={2}>Attacker / move ↓</th>{colEntries.map(({ pokemon: poke, index: col }) => <th key={`${poke.name}-${col}`} className={`defender-header ${poke.dead ? "fainted-cell" : ""} ${poke.teraType ? "tera-active" : ""}`}>
@@ -335,7 +337,7 @@ ${result.ko}
 ${result.description}` : move ? `${formatMoveTooltip(move, poke, fieldState)}
 
 No direct damage result for this move.` : "No move assigned";
-              return <td key={col} className={`${right[col]?.dead ? "fainted-cell" : ""} ${right[col]?.teraType ? "tera-defender-cell" : ""}`}><div className="matchup-cell-layout"><button title={title} disabled={!move} className={`matrix-cell compact-cell ${result ? koClass(result.ko) : "ko-none"} ${active ? "active" : ""} ${poke.dead || right[col]?.dead ? "fainted-cell" : ""}`} onClick={() => { props.onSelect(row, col); if (move && details && ["Physical", "Special"].includes(details.category)) openMoveEditor(row, col, move); }}>{result ? <DamageRangeBar result={result} /> : <span>—</span>}</button>{move && defenderFieldIndicators(right[col], move, fieldState, props.generation).map(tag => <span className="move-field-indicator cell-field-indicator" key={tag} title={`Defender-side damage modifier: ${tag}`}>{tag}</span>)}{move && <button type="button" className={`turn-order speed-arrow ${order}`} title={`Edit matchup Speed. ${orderLabel}. Effective Speed: ${attackerSpeed} vs ${defenderSpeed}.`} aria-label={`Edit Speed matchup: ${poke.name} versus ${right[col].name}`} onClick={() => openSpeedEditor(row, col)}>{order === "attacker" ? "←" : order === "defender" ? "↑" : "↔"}</button>}</div></td>;
+              return <td key={col} className={`${right[col]?.dead ? "fainted-cell" : ""} ${right[col]?.teraType ? "tera-defender-cell" : ""}`}><div className="matchup-cell-layout">{move && defenderFieldIndicators(right[col], move, fieldState, props.generation, poke).length > 0 && <div className="cell-field-indicators">{defenderFieldIndicators(right[col], move, fieldState, props.generation, poke).map(tag => <span className="move-field-indicator cell-field-indicator" key={tag} title={`Defender-side damage modifier: ${tag}`}>{tag}</span>)}</div>}<button title={title} disabled={!move} className={`matrix-cell compact-cell ${result ? koClass(result.ko) : "ko-none"} ${active ? "active" : ""} ${poke.dead || right[col]?.dead ? "fainted-cell" : ""}`} onClick={() => { props.onSelect(row, col); if (move && details && ["Physical", "Special"].includes(details.category)) openMoveEditor(row, col, move); }}>{result ? <DamageRangeBar result={result} /> : <span>—</span>}</button>{move && <button type="button" className={`turn-order speed-arrow ${order}`} title={`Edit matchup Speed. ${orderLabel}. Effective Speed: ${attackerSpeed} vs ${defenderSpeed}.`} aria-label={`Edit Speed matchup: ${poke.name} versus ${right[col].name}`} onClick={() => openSpeedEditor(row, col)}>{order === "attacker" ? "←" : order === "defender" ? "↑" : "↔"}</button>}</div></td>;
             })}
           </tr>;
         });

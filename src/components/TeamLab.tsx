@@ -35,7 +35,7 @@ export default function TeamLab() {
   const [stagesB, setStagesB] = useState<StatStages[]>(ZERO_STAGES);
   const [storageReady, setStorageReady] = useState(false);
   const [teamsOpen, setTeamsOpen] = useState(false);
-  const [format, setFormat] = useState("Gen 9 OU");
+  const [format, setFormat] = useState("Everything!");
   const [mechanics, setMechanics] = useState({ tera: true });
   const [generation, setGeneration] = useState(9);
   const [learnsetStatus, setLearnsetStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -156,13 +156,13 @@ export default function TeamLab() {
   return (
     <main>
       <header className="hero">
-        <div><span className="eyebrow">BATTLE LAB / {generation === 10 ? "CHAMPIONS" : `GEN ${generation}`}</span><h1>Pokemon Team Lab</h1><p>6v6 matchup analysis powered by the Smogon damage calculator.</p>
+        <div><h1>Pokemon Team Lab</h1><p>6v6 matchup analysis powered by the Smogon damage calculator.</p>
           <div className="top-rule-controls"><label>Mechanics Gen <select aria-label="Battle mechanics generation" value={generation} onChange={e => { const next = Number(e.target.value); setGeneration(next); if (next !== 9) setMechanics({ tera: false }); }}>{Array.from({ length: 9 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Gen {g}{g === 1 ? " · RBY" : g === 2 ? " · GSC" : g === 3 ? " · ADV" : g === 4 ? " · DPP" : g === 5 ? " · BW" : g === 6 ? " · XY" : g === 7 ? " · SM" : g === 8 ? " · SS" : " · SV"}</option>)}<option value={10}>Pokémon Champions</option></select></label><label>Format <input list="team-lab-formats" value={format} onChange={e => setFormat(e.target.value)} aria-label="Battle format" /><datalist id="team-lab-formats">{getAvailableShowdownFormats().map(x => <option key={x.id} value={x.label} />)}<option value="Champions NatDex Draft" /></datalist></label>
           <details className="mechanics-menu"><summary>Battle mechanics</summary><div className="mechanics-options"><label><input type="checkbox" checked={mechanics.tera && generation === 9} disabled={generation !== 9} onChange={e => setMechanics({ tera: e.target.checked })} />Terastallization</label><small>Generations 1–9 use their Smogon Calc generation. Champions is listed as a selectable mode, but the installed @smogon/calc 0.12.0 does not include its dedicated engine, so damage currently falls back to Gen 9 mechanics. Terastallization is available only in Gen 9.</small></div></details></div>
         </div>
         <div className="hero-actions"><button type="button" onClick={refreshTeamLearnsets} disabled={learnsetStatus === "loading"}>{learnsetStatus === "loading" ? "Loading learnsets…" : "Refresh team learnsets"}</button><span className={`learnset-status ${learnsetStatus}`} role="status">{learnsetStatus === "loading" ? "Learnsets loading" : learnsetStatus === "ready" ? getLearnsetModeLabel(format) : "Learnsets unavailable"}</span><button onClick={() => setTeamsOpen(true)}>Teams · Import / Export</button></div>
       </header>
-      <FormatLegalityPanel teamA={left} teamB={right} format={format} />
+      {!format.trim().toLowerCase().replace(/[^a-z0-9]/g, "").includes("everything") && <FormatLegalityPanel teamA={left} teamB={right} format={format} />}
       <div className="workspace workspace-full">
         <FieldPanel value={field} onChange={setField} />
         <MatchupMatrix
@@ -173,7 +173,7 @@ export default function TeamLab() {
           onMoveChange={updateRowMove}
           onRowStageChange={(index, stat, value) => updateStage(index, stat, value, swapped ? "right" : "left")}
           onColStageChange={(index, stat, value) => updateStage(index, stat, value, swapped ? "left" : "right")}
-          onResetStages={() => { setStagesA(ZERO_STAGES()); setStagesB(ZERO_STAGES()); }}
+          onResetStages={() => { setStagesA(ZERO_STAGES()); setStagesB(ZERO_STAGES()); setLeft(previous => previous.map(p => ({ ...p, currentHp: undefined }))); setRight(previous => previous.map(p => ({ ...p, currentHp: undefined }))); }}
           onResetRowStages={index => (swapped ? setStagesB : setStagesA)(prev => prev.map((stage, i) => i === index ? { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 } : stage))}
           onResetColStages={index => (swapped ? setStagesA : setStagesB)(prev => prev.map((stage, i) => i === index ? { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 } : stage))}
           onRowPokemonChange={(index, patch) => updatePokemon(swapped ? "right" : "left", index, patch)}
