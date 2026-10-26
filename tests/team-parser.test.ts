@@ -46,6 +46,21 @@ describe("team paste parser and exporter", () => {
     expect(parseTeamPaste(extractPokepasteHtmlText(html))).toHaveLength(1);
   });
 
+
+  it("extracts all Pokémon when the HTML renders separate copy blocks", () => {
+    const html = `<html><pre>Charizard @ Boots\nAbility: Blaze\n- Flamethrower</pre><pre>Iron Valiant @ Booster Energy\nAbility: Quark Drive\n- Moonblast</pre></html>`;
+    const extracted = extractPokepasteHtmlText(html);
+    expect(parseTeamPaste(extracted).map(p => p.species)).toEqual(["Charizard", "Iron Valiant"]);
+  });
+
+  it("exports the imported Tera type without activating Terastallization", () => {
+    const team = parseTeamPaste(`Iron Valiant\nTera Type: Fairy\n- Moonblast`);
+    team[0].teraType = "";
+    expect(team[0].importedTeraType).toBe("Fairy");
+    expect(exportTeam(team)).toContain("Tera Type: Fairy");
+    expect(team[0].teraType).toBe("");
+  });
+
   it("caps imported teams at six Pokémon", () => {
     const source = Array.from({ length: 8 }, (_, i) => `Pikachu${i + 1}\n- Thunderbolt`).join("\n\n");
     expect(parseTeamPaste(source)).toHaveLength(6);

@@ -29,10 +29,19 @@ export function extractPokepasteHtmlText(html: string): string {
   const blockPattern = /<(pre|code|textarea)\b[^>]*>([\s\S]*?)<\/\1\s*>/gi;
   for (const match of html.matchAll(blockPattern)) candidates.push(match[2]);
 
+  // Some page revisions embed copyable team text in an attribute or escaped
+  // script payload instead of a single pre/code node. Include those candidates
+  // and aggregate distinct team blocks so the importer does not stop at set 1.
+  const attributePattern = /(?:data-clipboard-text|data-paste|content)=(["'])([\s\S]*?)\1/gi;
+  for (const match of html.matchAll(attributePattern)) candidates.push(match[2]);
+  const jsonTextPattern = /(?:paste|team|clipboard)[^:]{0,40}:\s*["']((?:\\.|[^"']){30,})["']/gi;
+  for (const match of html.matchAll(jsonTextPattern)) candidates.push(match[1]);
+
   // Some page revisions place the paste in a div rather than a pre/code block.
   if (!candidates.length) candidates.push(html);
-  const decode = (value: string) => value
-    .replace(/<br\s*\/?\s*>/gi, "\n")
+  const decode = (value: string) => {
+    let decoded = value
+      .replace(/<br\s*\/?\s*>/gi, "\n")
     .replace(/<\/(?:div|p|li)\s*>/gi, "\n")
     .replace(/<[^>]*>/g, "")
     .replace(/&nbsp;/gi, " ")
@@ -42,10 +51,25 @@ export function extractPokepasteHtmlText(html: string): string {
     .replace(/&quot;/gi, '"')
     .replace(/&#39;|&apos;/gi, "'")
     .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
-    .trim();
-  const teamLike = candidates.map(decode).find(text => /(?:^|\n)\s*(?:[^\n]+\s+@\s+[^\n]+|Ability:|[-•]\s+[^\n]+)\s*(?:\n|$)/i.test(text));
-  return teamLike || "";
+      .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
+      .trim();
+    for (let i = 0; i < 2; i++) decoded = decoded
+      .replace(/&amp;/gi, "&")
+      .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+      .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)));
+    return decoded;
+  };
+  const decoded = candidates.map(decode).filter(Boolean);
+  const teamCandidates = decoded.filter(text => /(?:^|\n)\s*(?:[^\n]+\s+@\s+[^\n]+|Ability:|[-•]\s+[^\n]+)\s*(?:\n|$)/i.test(text));
+  // Pick the fullest text source if the HTML includes nested duplicate regions;
+  // otherwise concatenate separately rendered set blocks, preserving boundaries.
+  const unique = [...new Set(teamCandidates)];
+  if (!unique.length) return "";
+  const longest = unique.sort((a, b) => b.length - a.length)[0];
+  const longestSetCount = parseTeamPaste(longest).length;
+  const aggregate = unique.join("\n\n");
+  const aggregateSetCount = parseTeamPaste(aggregate).length;
+  return aggregateSetCount > longestSetCount ? aggregate : longest;
 }
 
 export function parseTeamPaste(input: string): Team {
@@ -115,7 +139,8 @@ export function exportTeam(team: Team): string {
 
     if (set.level !== 100) lines.push(`Level: ${set.level}`);
 
-    if (set.teraType) lines.push(`Tera Type: ${set.teraType}`);
+    const pasteTeraType = set.importedTeraType || set.teraType;
+    if (pasteTeraType) lines.push(`Tera Type: ${pasteTeraType}`);
 
     const ivs = formatIVs(set.ivs);
     if (ivs) lines.push(`IVs: ${ivs}`);
