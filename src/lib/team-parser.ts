@@ -65,7 +65,7 @@ export function extractPokepasteHtmlText(html: string): string {
   // otherwise concatenate separately rendered set blocks, preserving boundaries.
   const unique = [...new Set(teamCandidates)];
   if (!unique.length) return "";
-  const longest = unique.sort((a, b) => b.length - a.length)[0];
+  const longest = [...unique].sort((a, b) => b.length - a.length)[0];
   const longestSetCount = parseTeamPaste(longest).length;
   const aggregate = unique.join("\n\n");
   const aggregateSetCount = parseTeamPaste(aggregate).length;
