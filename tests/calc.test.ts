@@ -23,7 +23,7 @@ describe("damage calculator wrappers", () => {
   });
 
   it("shows Psychic Terrain blocking priority moves against grounded defenders", () => {
-    const terrain = { ...field, terrain: "Psychic" };
+    const terrain: FieldState = { ...field, terrain: "Psychic" };
     const attacker = makeSet("Chien-Pao", "Sword of Ruin", ["Sucker Punch"]);
     const groundedDefender = makeSet("Bulbasaur", "Overgrow", ["Tackle"]);
     const result = calculateMove(attacker, groundedDefender, "Sucker Punch", terrain, undefined, undefined, false, 9);
@@ -32,7 +32,7 @@ describe("damage calculator wrappers", () => {
   });
 
   it("does not block priority moves against airborne defenders in Psychic Terrain", () => {
-    const terrain = { ...field, terrain: "Psychic" };
+    const terrain: FieldState = { ...field, terrain: "Psychic" };
     const attacker = makeSet("Chien-Pao", "Sword of Ruin", ["Sucker Punch"]);
     const airborneDefender = makeSet("Tornadus-Therian", "Regenerator", ["Hurricane"]);
     const result = calculateMove(attacker, airborneDefender, "Sucker Punch", terrain, undefined, undefined, false, 9);
