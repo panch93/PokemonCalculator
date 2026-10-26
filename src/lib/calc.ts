@@ -1,5 +1,6 @@
 import { calculate, Generations, Move, Pokemon, Field, TYPE_CHART } from "@smogon/calc";
 import { getMove } from "./showdown-data";
+import { getEffectiveMovePriority } from "./battle-order";
 import { DamageSummary, FieldState, MoveDetails, PokemonSet, StatStages } from "./types";
 
 /** Read canonical English move descriptions from the live official Pokémon Showdown data. */
@@ -239,6 +240,29 @@ export function calculateMove(
     const move = new Move(gen, moveName);
     if (critical) (move as unknown as { isCrit: boolean }).isCrit = true;
     const field = makeField(fieldState);
+
+    // Psychic Terrain blocks opposing positive-priority moves against grounded
+    // targets. Airborne targets (e.g. Tornadus-Therian) remain hittable.
+    const movePriority = Math.max(Number(move.priority ?? 0), getEffectiveMovePriority(attacker, moveName, fieldState));
+    if (generation >= 7 && fieldState.terrain === "Psychic" && movePriority > 0 && isGroundedForHazards(defender, defenderPokemon)) {
+      const maxHp = defenderPokemon.maxHP();
+      const blocked: DamageSummary = {
+        move: moveName,
+        min: 0,
+        max: 0,
+        minPct: 0,
+        maxPct: 0,
+        rawMinPct: 0,
+        rawMaxPct: 0,
+        effectiveHp: maxHp,
+        entryHazardDamage: 0,
+        entryHazardPct: 0,
+        ko: "No damage",
+        description: `${moveName} is blocked by Psychic Terrain because it has positive priority and the target is grounded.`,
+      };
+      return setCached(key, blocked);
+    }
+
     const result = calculate(gen, attackerPokemon, defenderPokemon, move, field);
 
     const range = damageRange((result as unknown as { damage?: unknown }).damage);

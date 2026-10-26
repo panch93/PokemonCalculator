@@ -260,8 +260,8 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 .workspace-full { width: 100%; min-width: 0; }
 .workspace-full .matrix-panel { width: 100%; min-width: 0; }
 .matrix .attacker-info-cell { width: 138px; min-width: 138px; max-width: 138px; }
-.matrix .attacker-info-cell .matrix-sprite { width: 42px; height: 38px; margin-bottom: 2px; transform: scale(2.13); transform-origin: center; }
-.matrix .defender-identity .matrix-sprite { width: 38px; height: 38px; flex-basis: 38px; transform: scale(2.13); transform-origin: center; }
+.matrix .attacker-info-cell .matrix-sprite { width: 42px; height: 38px; margin-bottom: 2px; transform: translateY(-4px) scale(2.13); transform-origin: center; }
+.matrix .defender-identity .matrix-sprite { width: 38px; height: 38px; flex-basis: 38px; transform: translateY(4px) scale(2.13); transform-origin: center; }
 .matrix .matrix-item { display: block; margin: 2px 0; color: var(--muted); font-size: .62rem; overflow-wrap: anywhere; cursor: help; }
 .matrix .matrix-ability { color: var(--text); }
 .matrix-pokemon-controls { display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap; margin: 4px 0; font-size: .62rem; }
@@ -297,9 +297,9 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 
 
 /* Keep speed arrows in a narrow side slot so they do not fill damage cells. */
-.matrix .matchup-cell-layout { display: grid; grid-template-columns: minmax(0, 1fr) 20px; gap: 3px; align-items: stretch; min-width: 0; }
-.matrix .matchup-cell-layout .matrix-cell { min-width: 0; width: 100%; }
-.matrix .speed-arrow { min-width: 0; width: 20px; height: 30px; align-self: center; padding: 0; font-size: .78rem; }
+.matrix .matchup-cell-layout { display: grid; grid-template-columns: minmax(0, 1fr) 20px; grid-template-rows: auto 30px; gap: 2px 3px; align-items: stretch; min-width: 0; }
+.matrix .matchup-cell-layout .matrix-cell { grid-row: 2; min-width: 0; width: 100%; }
+.matrix .speed-arrow { grid-row: 2; min-width: 0; width: 20px; height: 30px; align-self: center; padding: 0; font-size: .78rem; }
 .matrix .speed-multiplier { display: block; width: fit-content; max-width: 100%; margin: 3px auto; padding: 2px 4px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); font-size: .58rem; white-space: nowrap; }
 .matrix .matrix-pokemon-controls select { width: auto; max-width: 76px; }
 .field-toggle-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
@@ -500,7 +500,8 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 .matrix-current-hp { display: flex; justify-content: center; align-items: center; gap: 3px; margin: 3px 0; color: var(--muted); font-size: .58rem; }
 .matrix-current-hp label { display: inline-flex; align-items: center; gap: 3px; }
 .matrix-current-hp input { width: 48px; min-width: 0; padding: 2px 3px; font-size: .62rem; }
-.cell-field-indicator { display: block; margin: 2px auto; max-width: 112px; font-size: .52rem; overflow-wrap: anywhere; }
+.cell-field-indicators { grid-column: 1 / -1; grid-row: 1; display: flex; align-items: center; justify-content: center; gap: 3px; min-width: 0; max-width: 100%; overflow: hidden; }
+.cell-field-indicator { display: inline-block; flex: 0 1 auto; min-width: 0; margin: 0; padding: 0 2px; border: 0; border-radius: 0; font-size: .48rem; line-height: 1.15; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .move-field-indicator { max-width: 100%; overflow-wrap: anywhere; }
 
 .ability-boost-select { width: auto; max-width: 44px; padding: 1px 2px; font-size: .55rem; vertical-align: middle; }
