@@ -3,7 +3,7 @@
 import { FieldState } from "../lib/types";
 
 type Props = { value: FieldState; onChange: (next: FieldState) => void };
-type ToggleProps = { label: string; checked: boolean; onChange: (checked: boolean) => void };
+type ToggleProps = { label: string; checked: boolean; onChange: (checked: boolean) => void; description: string };
 
 function CycleControl({ label, value, options, onChange }: {
   label: string;
@@ -30,8 +30,8 @@ function SideControl({ label, value, onChange }: { label: string; value: string;
   const shown = value === "attacker" ? "ATK" : value === "defender" ? "DEF" : "OFF";
   return <button type="button" className={`field-toggle field-side-control ${value ? "active" : ""}`} onClick={() => onChange(next)} title={`${label}: ${value || "off"}. Click to cycle Off → Attacker → Defender.`} aria-label={`${label}: ${value || "off"}; click to cycle side`}><span>{label}</span><span className="field-toggle-state">{shown}</span></button>;
 }
-function Toggle({ label, checked, onChange }: ToggleProps) {
-  return <button type="button" className={`field-toggle ${checked ? "active" : ""}`} aria-pressed={checked} onClick={() => onChange(!checked)}>
+function Toggle({ label, checked, onChange, description }: ToggleProps) {
+  return <button type="button" className={`field-toggle ${checked ? "active" : ""}`} aria-pressed={checked} title={description} aria-label={`${label}. ${description}`} onClick={() => onChange(!checked)}>
     <span>{label}</span><span className="field-toggle-state">{checked ? "ON" : "OFF"}</span>
   </button>;
 }
@@ -50,17 +50,17 @@ export default function FieldPanel({ value, onChange }: Props) {
       </select></label>
     </div>
     <div className="field-toggle-grid">
-      <Toggle label="Reflect" checked={value.defenderReflect} onChange={v => set("defenderReflect", v)} />
-      <Toggle label="Light Screen" checked={value.defenderLightScreen} onChange={v => set("defenderLightScreen", v)} />
-      <Toggle label="Aurora Veil" checked={value.defenderAuroraVeil} onChange={v => set("defenderAuroraVeil", v)} />
-      <Toggle label="Stealth Rock" checked={value.defenderStealthRock} onChange={v => set("defenderStealthRock", v)} />
+      <Toggle description="Reduces physical damage dealt to the affected side for five turns (eight with Light Clay). In Doubles, the reduction is smaller." label="Reflect" checked={value.defenderReflect} onChange={v => set("defenderReflect", v)} />
+      <Toggle description="Reduces special damage dealt to the affected side for five turns (eight with Light Clay). In Doubles, the reduction is smaller." label="Light Screen" checked={value.defenderLightScreen} onChange={v => set("defenderLightScreen", v)} />
+      <Toggle description="Reduces physical and special damage to the affected side while hail/snow conditions permit; the reduction is smaller in Doubles." label="Aurora Veil" checked={value.defenderAuroraVeil} onChange={v => set("defenderAuroraVeil", v)} />
+      <Toggle description="Entry hazard that damages a Pokémon switching in based on its Rock-type effectiveness." label="Stealth Rock" checked={value.defenderStealthRock} onChange={v => set("defenderStealthRock", v)} />
       <CycleControl label="Spikes" value={String(value.defenderSpikes)} options={[
         { value: "0", label: "0 layers" }, { value: "1", label: "1 layer" },
         { value: "2", label: "2 layers" }, { value: "3", label: "3 layers" },
       ]} onChange={v => set("defenderSpikes", Number(v))} />
-      <Toggle label="Leech Seed" checked={value.defenderLeechSeed} onChange={v => set("defenderLeechSeed", v)} />
-      <Toggle label="Salt Cure" checked={value.defenderSaltCure} onChange={v => set("defenderSaltCure", v)} />
-      <Toggle label="Trick Room" checked={value.trickRoom} onChange={v => set("trickRoom", v)} />
+      <Toggle description="Drains HP from the seeded Pokémon at the end of each turn and heals the opposing side." label="Leech Seed" checked={value.defenderLeechSeed} onChange={v => set("defenderLeechSeed", v)} />
+      <Toggle description="Damages the affected Pokémon at the end of each turn; Water- and Steel-types take extra damage." label="Salt Cure" checked={value.defenderSaltCure} onChange={v => set("defenderSaltCure", v)} />
+      <Toggle description="For five turns, slower Pokémon move before faster Pokémon within the same priority bracket." label="Trick Room" checked={value.trickRoom} onChange={v => set("trickRoom", v)} />
       <CycleControl label="Tailwind" value={value.tailwindSide} options={[
         { value: "", label: "None" }, { value: "attacker", label: "Attacker" }, { value: "defender", label: "Defender" },
       ]} onChange={v => set("tailwindSide", v as FieldState["tailwindSide"])} />
