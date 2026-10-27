@@ -92,14 +92,14 @@ function makePokemon(set: PokemonSet, generation = DEFAULT_GEN, boosts: Partial<
 }
 
 /**
- * Build a fresh singles field for each attacker-vs-defender calculation.
+ * Build a fresh field for each attacker-vs-defender calculation.
  * The UI's hazards/screens always belong to the current defender, regardless
  * of which team is attacking. Never reuse a Field instance: the calc engine
  * clones and can mutate side conditions for abilities such as Infiltrator.
  */
 function makeField(state: FieldState) {
   return new Field({
-    gameType: "Singles",
+    gameType: state.gameType || "Singles",
     weather: state.weather || undefined,
     terrain: state.terrain || undefined,
     defenderSide: {
@@ -430,6 +430,7 @@ export function getMoveDetails(moveName: string, generation = DEFAULT_GEN): Move
       accuracy: numeric(move.accuracy) ?? numeric(raw.accuracy),
       pp: numeric(move.pp) ?? numeric(raw.pp),
       priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0),
+      target: text(raw.target) || text((move as unknown as Record<string, unknown>).target),
       description: getShowdownMoveDescription(moveName) || text(raw.desc) || text(raw.shortDesc) || text(move.desc) || getMoveDescription(moveName, { type: text(move.type) || text(raw.type), category: text(move.category) || text(raw.category), power: numeric(move.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp), accuracy: numeric(move.accuracy) ?? numeric(raw.accuracy), priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0) }),
     };
   } catch {

@@ -33,8 +33,9 @@ function Toggle({ label, checked, onChange }: ToggleProps) {
 export default function FieldPanel({ value, onChange }: Props) {
   const set = <K extends keyof FieldState>(key: K, next: FieldState[K]) => onChange({ ...value, [key]: next });
   return <section className="panel field-panel">
-    <div className="panel-title-row"><div><h2>Battle field</h2><p>Weather and terrain affect the field; screens and hazards apply to the defender. Trick Room reverses Speed order; Tailwind doubles Speed for the selected side.</p></div></div>
+    <div className="panel-title-row"><div><h2>Battle field</h2><p>Choose Singles or Doubles for spread-move damage. Weather and terrain affect the field; screens and hazards apply to the defender. Trick Room reverses Speed order; Tailwind doubles Speed for the selected side.</p></div></div>
     <div className="field-top-row">
+      <label className="field-select">Battle format<select aria-label="Battle format" value={value.gameType || "Singles"} onChange={e => set("gameType", e.target.value as FieldState["gameType"])}><option value="Singles">Singles</option><option value="Doubles">Doubles</option></select></label>
       <label className="field-select">Weather<select value={value.weather} onChange={e => set("weather", e.target.value as FieldState["weather"])}>
         <option value="">None</option><option>Sun</option><option>Rain</option><option>Sand</option><option>Snow</option>
       </select></label>

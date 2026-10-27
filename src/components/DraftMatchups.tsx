@@ -1,9 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+
+import { useEffect, useMemo, useState } from "react";
 import { getAbility, getSpecies, getSpeciesAbilities, getSpeciesList } from "../lib/showdown-data";
 import { POKEMON_TYPES } from "../lib/pokemon-visuals";
 import { TypeChart } from "../lib/showdown-official/data/typechart";
+import AutocompleteInput from "./AutocompleteInput";
+import SupportCategoryPanel from "./SupportCategoryPanel";
+import FormatSelector from "./FormatSelector";
+import type { Team } from "../lib/types";
 
 type Preset = { label: string; teamA: string[]; teamB: string[] };
 const PRESETS: Preset[] = [
@@ -50,6 +56,17 @@ function typeClass(type: string) { return `type-badge type-${type.toLowerCase().
 export default function DraftMatchups() {
   const species = useMemo(() => getSpeciesList(), []);
   const [presetIndex, setPresetIndex] = useState(0);
+  const [matchupName, setMatchupName] = useState(PRESETS[0].label);
+  const [typeTeam, setTypeTeam] = useState<"A" | "B" | null>(null);
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [supportSide, setSupportSide] = useState<"A" | "B">("A");
+  const [formatA, setFormatA] = useState("Everything!");
+  const [formatB, setFormatB] = useState("Everything!");
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    try { const raw = localStorage.getItem("pokemon-team-lab-draft-matchup-v1"); if (raw) { const saved = JSON.parse(raw); if (typeof saved.matchupName === "string") setMatchupName(saved.matchupName); if (Array.isArray(saved.teamA)) setTeamA(normalizeTeam(saved.teamA)); if (Array.isArray(saved.teamB)) setTeamB(normalizeTeam(saved.teamB)); if (typeof saved.formatA === "string") setFormatA(saved.formatA); if (typeof saved.formatB === "string") setFormatB(saved.formatB); if (Number.isInteger(saved.presetIndex) && saved.presetIndex >= 0 && saved.presetIndex < PRESETS.length) setPresetIndex(saved.presetIndex); } } catch {} finally { setHydrated(true); }
+  }, []);
+  useEffect(() => { if (!hydrated) return; try { localStorage.setItem("pokemon-team-lab-draft-matchup-v1", JSON.stringify({ matchupName, teamA, teamB, formatA, formatB, presetIndex })); } catch {} }, [hydrated, matchupName, teamA, teamB, formatA, formatB, presetIndex]);
   const [teamA, setTeamA] = useState<string[]>(() => normalizeTeam(PRESETS[0].teamA));
   const [teamB, setTeamB] = useState<string[]>(() => normalizeTeam(PRESETS[0].teamB));
   const [editorOpen, setEditorOpen] = useState(false);
@@ -59,6 +76,7 @@ export default function DraftMatchups() {
   const setPreset = (index: number) => {
     const selected = PRESETS[index];
     setPresetIndex(index);
+    setMatchupName(selected.label);
     setTeamA(normalizeTeam(selected.teamA));
     setTeamB(normalizeTeam(selected.teamB));
   };
@@ -74,16 +92,30 @@ export default function DraftMatchups() {
   };
   const activeA = teamA.filter(Boolean);
   const activeB = teamB.filter(Boolean);
-  const lastRow = Math.max(teamA.reduce((last, value, index) => value ? index : last, -1), teamB.reduce((last, value, index) => value ? index : last, -1));
+  const sortedA = [...activeA].sort((a, b) => (baseSpeed(b) ?? -1) - (baseSpeed(a) ?? -1));
+  const sortedB = [...activeB].sort((a, b) => (baseSpeed(b) ?? -1) - (baseSpeed(a) ?? -1));
+  const lastRow = Math.max(sortedA.length, sortedB.length) - 1;
+  const asTeam = (names: string[]): Team => names.map(species => ({ name: species, species, item: "", ability: getSpeciesAbilities(species)[0] || "", nature: "Hardy", level: 100, evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: [] }));
   const updateDraft = (side: "A" | "B", index: number, value: string) => {
     const update = side === "A" ? setDraftA : setDraftB;
     update(current => current.map((name, i) => i === index ? value : name));
+  };
+  const speedStat = (name: string, ev: number, boosted: boolean) => { const base = baseSpeed(name); if (base == null) return null; const raw = Math.floor((2 * base + 31 + Math.floor(ev / 4)) * 100 / 100) + 5; return Math.floor(raw * (boosted ? 1.1 : 1)); };
+  const speedTip = (name: string, opponents: string[]) => {
+    const checks = opponents.filter(opponent => opponent && opponent !== name).map(opponent => {
+      const targetBase = baseSpeed(opponent); if (targetBase == null) return null;
+      const target = speedStat(opponent, 252, true); if (target == null) return null;
+      const find = (boosted: boolean) => { for (let ev = 0; ev <= 252; ev += 4) if ((speedStat(name, ev, boosted) ?? 0) > target) return ev; return null; };
+      return { opponent, target, neutral: find(false), boosted: find(true) };
+    }).filter((x): x is {opponent:string;target:number;neutral:number|null;boosted:number|null} => !!x && x.neutral !== 0 && (x.neutral != null || x.boosted != null));
+    if (!checks.length) return "No opposing Pokémon requires Speed EVs to outspeed (252+ Speed nature).";
+    return checks.map(x => `${x.opponent} (${x.target} Speed): ${x.neutral == null ? "cannot with neutral nature" : `neutral ${x.neutral} EVs`}; ${x.boosted == null ? "cannot with +Speed nature" : `+Speed ${x.boosted} EVs`}`).join("\n");
   };
 
   return <main className="draft-page">
     <header className="hero draft-hero">
       <div><span className="eyebrow">Pokemon Team Lab</span><h1>Draft Matchups</h1><p>Compare up to 12 Pokémon on each side, base Speed, abilities, and defensive type matchups.</p></div>
-      <div className="hero-actions"><a className="nav-link" href="/">Back to Team Lab</a></div>
+      <div className="hero-actions"><Link className="nav-link" href="/">Back to Team Lab</Link></div>
     </header>
 
     <section className="panel draft-controls">
@@ -93,20 +125,20 @@ export default function DraftMatchups() {
     </section>
 
     <section className="panel">
-      <div className="panel-title-row"><div><h2>{PRESETS[presetIndex].label}</h2><p>Base Speed uses each Pokémon's base stat, not its trained in-battle Speed.</p></div></div>
+      <div className="panel-title-row"><div><h2>{matchupName}</h2><p>Hover over a Speed value for EV benchmarks against opposing Pokémon at 252 EVs and a boosting nature.</p></div><div className="draft-team-formats"><label>Team A format<FormatSelector value={formatA} onChange={setFormatA} /></label><label>Team B format<FormatSelector value={formatB} onChange={setFormatB} /></label></div></div>
       <div className="matrix-scroll draft-table-scroll"><table className="draft-matchup-table">
-        <thead><tr><th>Types A</th><th>Abilities A</th><th>Pokémon Team A</th><th>Speed A</th><th>Speed B</th><th>Pokémon Team B</th><th>Abilities B</th><th>Types B</th></tr></thead>
+        <thead><tr><th>Types A</th><th>Abilities A</th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("A")}>Pokémon Team A · defensive types</button></th><th>Speed A</th><th>Speed B</th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("B")}>Pokémon Team B · defensive types</button></th><th>Abilities B</th><th>Types B</th></tr></thead>
         <tbody>{Array.from({ length: Math.max(0, lastRow + 1) }, (_, index) => {
-          const a = teamA[index] || "";
-          const b = teamB[index] || "";
+          const a = sortedA[index] || "";
+          const b = sortedB[index] || "";
           const abilitiesA = a ? getSpeciesAbilities(a) : [];
           const abilitiesB = b ? getSpeciesAbilities(b) : [];
           return <tr key={index}>
             <td>{a && <div className="draft-type-pills">{speciesTypes(a).map(type => <span key={type} className={typeClass(type)}>{type}</span>)}</div>}</td>
             <td><div className="draft-abilities">{abilitiesA.map(ability => <span key={ability} className="draft-ability" title={getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}>{ability}</span>)}</div></td>
             <td className="draft-pokemon-name">{a || <span className="muted">—</span>}</td>
-            <td className="draft-speed">{a ? baseSpeed(a) ?? "—" : "—"}</td>
-            <td className="draft-speed">{b ? baseSpeed(b) ?? "—" : "—"}</td>
+            <td className="draft-speed" title={a ? speedTip(a, activeB) : undefined}>{a ? <span title={speedTip(a, activeB)}>{baseSpeed(a) ?? "—"}</span> : "—"}</td>
+            <td className="draft-speed" title={b ? speedTip(b, activeA) : undefined}>{b ? <span title={speedTip(b, activeA)}>{baseSpeed(b) ?? "—"}</span> : "—"}</td>
             <td className="draft-pokemon-name">{b || <span className="muted">—</span>}</td>
             <td><div className="draft-abilities">{abilitiesB.map(ability => <span key={ability} className="draft-ability" title={getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}>{ability}</span>)}</div></td>
             <td><div className="draft-type-pills">{b && speciesTypes(b).map(type => <span key={type} className={typeClass(type)}>{type}</span>)}</div></td>
@@ -116,33 +148,30 @@ export default function DraftMatchups() {
       {lastRow < 0 && <p className="muted">Choose Pokémon with “Edit matchup” to populate the table.</p>}
     </section>
 
-    <section className="panel">
-      <div className="panel-title-row"><div><h2>Defensive type effectiveness</h2><p>Each cell shows the multiplier for an attacking type against that Pokémon's current defensive typing.</p></div></div>
-      <div className="draft-typecharts">
-        {([{ name: "Team A", roster: teamA }, { name: "Team B", roster: teamB }] as const).map(({ name, roster }) => {
-          const occupied = roster.map((pokemon, index) => ({ pokemon, index })).filter(item => item.pokemon);
-          return <div className="draft-typechart" key={name}>
-            <h3>{name}</h3>
-            <div className="matrix-scroll"><table className="draft-typechart-table">
-              <thead><tr><th>Attack type</th>{occupied.map(({ pokemon, index }) => <th key={`${index}-${pokemon}`} title={`Slot ${index + 1}: ${pokemon}`}>{index + 1}. {pokemon}</th>)}</tr></thead>
-              <tbody>{POKEMON_TYPES.map(attackType => <tr key={attackType}><th><span className={typeClass(attackType)}>{attackType}</span></th>{occupied.map(({ pokemon, index }) => {
-                const value = multiplier(pokemon, attackType);
-                return <td key={`${index}-${pokemon}`} className={`type-multiplier ${value < 1 ? "resist" : value > 1 ? "weak" : value === 0 ? "immune" : "neutral"}`}>{multiplierLabel(value)}</td>;
-              })}</tr>)}</tbody>
-            </table></div>
-          </div>;
-        })}
-      </div>
-      <p className="muted">×0.5 and ×0.25 indicate resistances; ×2 and ×4 indicate weaknesses; ×0 indicates immunity.</p>
+    <section className="panel draft-tools-row">
+      <div><h2>Team tools</h2><p>Defensive type charts are available from each team heading.</p></div>
+      <button type="button" onClick={() => setSupportOpen(true)}>Support moves</button>
     </section>
+
+    {typeTeam && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setTypeTeam(null); }}>
+      <section className="draft-modal draft-type-modal" role="dialog" aria-modal="true" aria-labelledby="draft-type-title">
+        <div className="panel-title-row"><div><h2 id="draft-type-title">Team {typeTeam} defensive matchups</h2><p>Green indicates resistance or immunity; red indicates weakness.</p></div><button type="button" onClick={() => setTypeTeam(null)}>Close ×</button></div>
+        <div className="matrix-scroll"><table className="draft-typechart-table draft-typechart-transposed">
+          <thead><tr><th>Pokémon</th>{POKEMON_TYPES.map(type => { const roster = typeTeam === "A" ? sortedA : sortedB; const vals = roster.map(p => multiplier(p, type)); const good = vals.filter(v => v < 1).length; const bad = vals.filter(v => v > 1).length; return <th key={type} className={good > bad ? "type-head-good" : bad > good ? "type-head-bad" : ""}><span className={typeClass(type)}>{type}</span><small>{good}R · {bad}W</small></th>; })}</tr></thead>
+          <tbody>{(typeTeam === "A" ? sortedA : sortedB).map(pokemon => <tr key={pokemon}><th>{pokemon}</th>{POKEMON_TYPES.map(attackType => { const value = multiplier(pokemon, attackType); return <td key={attackType} className={`type-multiplier ${value < 1 ? "resist" : value > 1 ? "weak" : value === 0 ? "immune" : "neutral"}`}>{multiplierLabel(value)}</td>; })}</tr>)}</tbody>
+        </table></div>
+      </section>
+    </div>}
+
+    {supportOpen && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSupportOpen(false); }}><section className="draft-modal" role="dialog" aria-modal="true" aria-label="Draft support moves"><div className="panel-title-row"><h2>Support moves · Team {supportSide}</h2><button type="button" onClick={() => setSupportOpen(false)}>Close ×</button></div><div className="button-row"><button type="button" aria-pressed={supportSide === "A"} onClick={() => setSupportSide("A")}>Team A · {formatA}</button><button type="button" aria-pressed={supportSide === "B"} onClick={() => setSupportSide("B")}>Team B · {formatB}</button></div><SupportCategoryPanel left={asTeam(supportSide === "A" ? activeA : activeB)} right={[]} format={supportSide === "A" ? formatA : formatB} onClose={() => setSupportOpen(false)} /></section></div>}
 
     {editorOpen && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setEditorOpen(false); }}>
       <section className="draft-modal" role="dialog" aria-modal="true" aria-labelledby="draft-editor-title">
         <div className="panel-title-row"><div><h2 id="draft-editor-title">Edit matchup Pokémon</h2><p>Use an empty slot to reduce either roster below 12 Pokémon.</p></div><button type="button" onClick={() => setEditorOpen(false)} aria-label="Close editor">×</button></div>
-        <div className="draft-editor-teams">
+        <label className="draft-matchup-name">Matchup name<input value={matchupName} onChange={event => setMatchupName(event.target.value)} /></label><div className="draft-editor-teams">
           {[{ label: "Team A", side: "A" as const, roster: draftA }, { label: "Team B", side: "B" as const, roster: draftB }].map(({ label, side, roster }) => <div className="draft-editor-team" key={side}>
-            <h3>{label}</h3>
-            {roster.map((pokemon, index) => <label className="draft-editor-slot" key={`${side}-${index}`}><span>Slot {index + 1}</span><select value={pokemon} onChange={event => updateDraft(side, index, event.target.value)}><option value="">— Empty slot —</option>{species.map(name => <option key={name} value={name}>{name}</option>)}</select></label>)}
+            <h3>{label}</h3><label className="draft-format-label">Format<FormatSelector value={side === "A" ? formatA : formatB} onChange={side === "A" ? setFormatA : setFormatB} /></label>
+            {roster.map((pokemon, index) => <label className="draft-editor-slot" key={`${side}-${index}`}><span>Slot {index + 1}</span><AutocompleteInput ariaLabel={`${label} slot ${index + 1} Pokémon`} value={pokemon} options={["", ...species]} onChange={value => updateDraft(side, index, value)} /></label>)}
           </div>)}
         </div>
         <div className="button-row draft-editor-actions"><button type="button" onClick={() => { setDraftA(Array.from({ length: 12 }, () => "")); setDraftB(Array.from({ length: 12 }, () => "")); }}>Clear both teams</button><button type="button" onClick={() => setEditorOpen(false)}>Cancel</button><button className="primary" type="button" onClick={saveEditor}>Save matchup</button></div>

@@ -3,16 +3,22 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { loadShowdownData } from "../lib/showdown-data";
+import { getLoadedShowdownData } from "../lib/showdown-data/client";
 
 type Status = { kind: "loading" } | { kind: "ready" } | { kind: "error"; message: string };
 
 /** Ensures synchronous analysis helpers only run after live upstream data is ready. */
 export default function ShowdownDataGate({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<Status>({ kind: "loading" });
+  const [status, setStatus] = useState<Status>(() => getLoadedShowdownData() ? { kind: "ready" } : { kind: "loading" });
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    // Reuse the module-level data cache on client-side route changes.
+    if (getLoadedShowdownData() && attempt === 0) {
+      setStatus({ kind: "ready" });
+      return () => { cancelled = true; };
+    }
     setStatus({ kind: "loading" });
     loadShowdownData(attempt > 0).then(() => {
       if (!cancelled) setStatus({ kind: "ready" });

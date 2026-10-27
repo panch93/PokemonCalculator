@@ -24,6 +24,7 @@ export type PokemonSet = {
 export type Team = PokemonSet[];
 
 export type FieldState = {
+  gameType?: "Singles" | "Doubles";
   weather: "" | "Sun" | "Rain" | "Sand" | "Snow";
   terrain: "" | "Electric" | "Grassy" | "Misty" | "Psychic";
   defenderStealthRock: boolean;
@@ -47,6 +48,7 @@ export type MoveDetails = {
   accuracy: number | null;
   pp: number | null;
   priority: number;
+  target?: string;
   description: string;
 };
 

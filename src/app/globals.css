@@ -703,3 +703,27 @@ select, select:focus, select option, datalist option {
 .matrix .attacker-info-cell > .matrix-pokemon-name { margin: 0; line-height: 1.15; }
 .matrix .attacker-info-cell > .type-list { height: auto; min-height: 0; margin: 2px 0; overflow: visible; }
 .matrix .attacker-info-cell > .matrix-item { display: block; margin-top: 2px; line-height: 1.2; }
+
+
+/* Doubles and draft matchup additions */
+.move-spread-indicator { display: inline-block; margin-left: 4px; padding: 1px 4px; border-radius: 4px; font-size: 10px; line-height: 1.25; color: #a9d7ff; border: 1px solid #477da8; white-space: nowrap; }
+.draft-heading-button { color: inherit; font: inherit; font-weight: 700; border: 0; background: transparent; padding: 3px; cursor: pointer; text-align: inherit; }
+.draft-heading-button:hover { color: var(--accent, #7db8ff); text-decoration: underline; }
+.draft-tools-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.draft-type-modal { width: min(96vw, 1400px); max-height: 90vh; overflow: auto; }
+.draft-typechart-transposed { min-width: 100%; font-size: 12px; }
+.draft-typechart-transposed th, .draft-typechart-transposed td { white-space: nowrap; padding: 6px; text-align: center; }
+.draft-typechart-transposed tbody th { text-align: left; position: sticky; left: 0; background: var(--panel, #171d28); z-index: 1; }
+.draft-typechart-transposed .resist { background: rgba(38, 166, 91, .22); color: #76e5a1; }
+.draft-typechart-transposed .weak { background: rgba(220, 65, 65, .22); color: #ff9292; }
+.draft-typechart-transposed .immune { background: rgba(38, 166, 91, .3); color: #76e5a1; }
+.draft-matchup-name { display: grid; gap: 6px; margin-bottom: 16px; }
+.draft-matchup-name input { width: 100%; }
+.draft-editor-slot .builder-autocomplete { width: 100%; }
+
+.draft-team-formats { display: flex; flex-wrap: wrap; gap: 12px; align-items: start; }
+.draft-team-formats > label, .draft-format-label { display: flex; flex-direction: column; gap: 5px; min-width: 190px; font-size: .75rem; color: var(--muted); }
+.draft-format-label .format-selector { width: 100%; }
+.draft-typechart-transposed thead th.type-head-good { background: rgba(38, 166, 91, .3); color: #76e5a1; }
+.draft-typechart-transposed thead th.type-head-bad { background: rgba(220, 65, 65, .3); color: #ff9292; }
+.draft-typechart-transposed thead th small { display: block; font-size: .62rem; font-weight: 700; margin-top: 4px; }
