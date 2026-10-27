@@ -60,15 +60,14 @@ export default function DraftMatchups() {
   const [typeTeam, setTypeTeam] = useState<"A" | "B" | null>(null);
   const [supportOpen, setSupportOpen] = useState(false);
   const [supportSide, setSupportSide] = useState<"A" | "B">("A");
-  const [formatA, setFormatA] = useState("Everything!");
-  const [formatB, setFormatB] = useState("Everything!");
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    try { const raw = localStorage.getItem("pokemon-team-lab-draft-matchup-v1"); if (raw) { const saved = JSON.parse(raw); if (typeof saved.matchupName === "string") setMatchupName(saved.matchupName); if (Array.isArray(saved.teamA)) setTeamA(normalizeTeam(saved.teamA)); if (Array.isArray(saved.teamB)) setTeamB(normalizeTeam(saved.teamB)); if (typeof saved.formatA === "string") setFormatA(saved.formatA); if (typeof saved.formatB === "string") setFormatB(saved.formatB); if (Number.isInteger(saved.presetIndex) && saved.presetIndex >= 0 && saved.presetIndex < PRESETS.length) setPresetIndex(saved.presetIndex); } } catch {} finally { setHydrated(true); }
-  }, []);
-  useEffect(() => { if (!hydrated) return; try { localStorage.setItem("pokemon-team-lab-draft-matchup-v1", JSON.stringify({ matchupName, teamA, teamB, formatA, formatB, presetIndex })); } catch {} }, [hydrated, matchupName, teamA, teamB, formatA, formatB, presetIndex]);
+  const [format, setFormat] = useState("Everything!");
   const [teamA, setTeamA] = useState<string[]>(() => normalizeTeam(PRESETS[0].teamA));
   const [teamB, setTeamB] = useState<string[]>(() => normalizeTeam(PRESETS[0].teamB));
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    try { const raw = localStorage.getItem("pokemon-team-lab-draft-matchup-v1"); if (raw) { const saved = JSON.parse(raw); if (typeof saved.matchupName === "string") setMatchupName(saved.matchupName); if (Array.isArray(saved.teamA)) setTeamA(normalizeTeam(saved.teamA)); if (Array.isArray(saved.teamB)) setTeamB(normalizeTeam(saved.teamB)); if (typeof saved.format === "string") setFormat(saved.format); else if (typeof saved.formatA === "string") setFormat(saved.formatA); else if (typeof saved.formatB === "string") setFormat(saved.formatB); if (Number.isInteger(saved.presetIndex) && saved.presetIndex >= 0 && saved.presetIndex < PRESETS.length) setPresetIndex(saved.presetIndex); } } catch {} finally { setHydrated(true); }
+  }, []);
+  useEffect(() => { if (!hydrated) return; try { localStorage.setItem("pokemon-team-lab-draft-matchup-v1", JSON.stringify({ matchupName, teamA, teamB, format, presetIndex })); } catch {} }, [hydrated, matchupName, teamA, teamB, format, presetIndex]);
   const [editorOpen, setEditorOpen] = useState(false);
   const [draftA, setDraftA] = useState<string[]>(teamA);
   const [draftB, setDraftB] = useState<string[]>(teamB);
@@ -119,13 +118,13 @@ export default function DraftMatchups() {
     </header>
 
     <section className="panel draft-controls">
-      <div className="draft-preset-control"><label htmlFor="draft-preset">Matchup preset</label><select id="draft-preset" value={presetIndex} onChange={event => setPreset(Number(event.target.value))}>{PRESETS.map((preset, index) => <option key={preset.label} value={index}>{index + 1}. {preset.label}</option>)}</select></div>
+      <div className="draft-preset-control"><label htmlFor="draft-preset">Matchup preset</label><select id="draft-preset" value={presetIndex} onChange={event => setPreset(Number(event.target.value))}>{PRESETS.map((preset, index) => <option key={preset.label} value={index}>{index + 1}. {index === presetIndex ? matchupName : preset.label}</option>)}</select></div>
       <div className="draft-team-counts"><span>Team A: <strong>{activeA.length}/12</strong></span><span>Team B: <strong>{activeB.length}/12</strong></span></div>
       <button className="primary" type="button" onClick={openEditor}>Edit matchup</button>
     </section>
 
     <section className="panel">
-      <div className="panel-title-row"><div><h2>{matchupName}</h2><p>Hover over a Speed value for EV benchmarks against opposing Pokémon at 252 EVs and a boosting nature.</p></div><div className="draft-team-formats"><label>Team A format<FormatSelector value={formatA} onChange={setFormatA} /></label><label>Team B format<FormatSelector value={formatB} onChange={setFormatB} /></label></div></div>
+      <div className="panel-title-row"><div><h2>{matchupName}</h2><p>Hover over a Speed value for EV benchmarks against opposing Pokémon at 252 EVs and a boosting nature.</p></div><div className="draft-team-formats"><label>Matchup format<FormatSelector value={format} onChange={setFormat} /></label></div></div>
       <div className="matrix-scroll draft-table-scroll"><table className="draft-matchup-table">
         <thead><tr><th>Types A</th><th>Abilities A</th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("A")}>Pokémon Team A · defensive types</button></th><th>Speed A</th><th>Speed B</th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("B")}>Pokémon Team B · defensive types</button></th><th>Abilities B</th><th>Types B</th></tr></thead>
         <tbody>{Array.from({ length: Math.max(0, lastRow + 1) }, (_, index) => {
@@ -163,14 +162,14 @@ export default function DraftMatchups() {
       </section>
     </div>}
 
-    {supportOpen && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSupportOpen(false); }}><section className="draft-modal" role="dialog" aria-modal="true" aria-label="Draft support moves"><div className="panel-title-row"><h2>Support moves · Team {supportSide}</h2><button type="button" onClick={() => setSupportOpen(false)}>Close ×</button></div><div className="button-row"><button type="button" aria-pressed={supportSide === "A"} onClick={() => setSupportSide("A")}>Team A · {formatA}</button><button type="button" aria-pressed={supportSide === "B"} onClick={() => setSupportSide("B")}>Team B · {formatB}</button></div><SupportCategoryPanel left={asTeam(supportSide === "A" ? activeA : activeB)} right={[]} format={supportSide === "A" ? formatA : formatB} onClose={() => setSupportOpen(false)} /></section></div>}
+    {supportOpen && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSupportOpen(false); }}><section className="draft-modal" role="dialog" aria-modal="true" aria-label="Draft support moves"><div className="panel-title-row"><h2>Support moves · Team {supportSide}</h2><button type="button" onClick={() => setSupportOpen(false)}>Close ×</button></div><div className="button-row"><button type="button" aria-pressed={supportSide === "A"} onClick={() => setSupportSide("A")}>Team A</button><button type="button" aria-pressed={supportSide === "B"} onClick={() => setSupportSide("B")}>Team B</button></div><SupportCategoryPanel left={asTeam(supportSide === "A" ? activeA : activeB)} right={[]} format={format} onClose={() => setSupportOpen(false)} /></section></div>}
 
     {editorOpen && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setEditorOpen(false); }}>
       <section className="draft-modal" role="dialog" aria-modal="true" aria-labelledby="draft-editor-title">
         <div className="panel-title-row"><div><h2 id="draft-editor-title">Edit matchup Pokémon</h2><p>Use an empty slot to reduce either roster below 12 Pokémon.</p></div><button type="button" onClick={() => setEditorOpen(false)} aria-label="Close editor">×</button></div>
-        <label className="draft-matchup-name">Matchup name<input value={matchupName} onChange={event => setMatchupName(event.target.value)} /></label><div className="draft-editor-teams">
+        <label className="draft-matchup-name">Matchup name<input value={matchupName} onChange={event => setMatchupName(event.target.value)} /></label><label className="draft-format-label">Matchup format<FormatSelector value={format} onChange={setFormat} /></label><div className="draft-editor-teams">
           {[{ label: "Team A", side: "A" as const, roster: draftA }, { label: "Team B", side: "B" as const, roster: draftB }].map(({ label, side, roster }) => <div className="draft-editor-team" key={side}>
-            <h3>{label}</h3><label className="draft-format-label">Format<FormatSelector value={side === "A" ? formatA : formatB} onChange={side === "A" ? setFormatA : setFormatB} /></label>
+            <h3>{label}</h3>
             {roster.map((pokemon, index) => <label className="draft-editor-slot" key={`${side}-${index}`}><span>Slot {index + 1}</span><AutocompleteInput ariaLabel={`${label} slot ${index + 1} Pokémon`} value={pokemon} options={["", ...species]} onChange={value => updateDraft(side, index, value)} /></label>)}
           </div>)}
         </div>
