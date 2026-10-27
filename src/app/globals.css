@@ -912,3 +912,107 @@ select, select:focus, select option, datalist option {
 .matrix .defender-identity .defender-sprite-crop .matrix-sprite { display: block; width: 40px; height: 40px; min-width: 40px; min-height: 40px; max-width: 40px; max-height: 40px; object-fit: contain; object-position: center; transform: none; image-rendering: pixelated; }
 .matrix .attacker-info-inner > .attacker-sprite-crop { flex: 0 0 44px; min-height: 44px; height: 44px; }
 .matrix .attacker-info-inner { align-items: stretch; }
+
+/* Draft matchup: keep stat settings on three predictable lines (value, EVs, stage). */
+.draft-matchup-table-symmetric .draft-stat-adjuster {
+  display: grid;
+  grid-template-rows: minmax(10px, auto) minmax(10px, auto);
+  align-content: start;
+  justify-items: center;
+  width: 100%;
+  min-height: 22px;
+  margin: 1px 0 0;
+  padding: 0;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.draft-matchup-table-symmetric .draft-ev-line,
+.draft-matchup-table-symmetric .draft-stage-line {
+  display: block;
+  width: 100%;
+  min-height: 10px;
+  line-height: 10px;
+  text-align: center;
+  white-space: nowrap;
+}
+.draft-matchup-table-symmetric .draft-stage-line { margin-top: 1px; }
+
+/* Ability labels use the actual available cell width rather than a fixed 4-character slice. */
+.draft-matchup-table-symmetric .draft-abilities {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  gap: 2px;
+  overflow: hidden;
+}
+.draft-matchup-table-symmetric .draft-ability {
+  display: block;
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+  max-width: none;
+  padding: 1px 2px;
+  border: 1px solid var(--border, #354153);
+  border-radius: 3px;
+  background: rgba(148, 163, 184, 0.06);
+  font-size: .61rem;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+}
+.draft-matchup-table-symmetric button.draft-ability-toggle {
+  appearance: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: .61rem;
+  font-weight: inherit;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.draft-matchup-table-symmetric .draft-ability-toggle:hover { background: rgba(148, 163, 184, 0.15); }
+.draft-matchup-table-symmetric .draft-ability-toggle[aria-pressed="true"] {
+  border-color: #8bc9a4;
+  background: rgba(74, 160, 111, 0.18);
+  color: var(--text, #e6edf5);
+  box-shadow: inset 0 0 0 1px rgba(139, 201, 164, 0.18);
+}
+
+/* The central divider is drawn once, on Team A's Speed edge. */
+.draft-matchup-table-symmetric tbody td:nth-child(10),
+.draft-matchup-table-symmetric thead th:nth-child(10) {
+  border-left-width: 0 !important;
+}
+
+/* Keep the first-column portrait anchored at the top-left of the merged Pokémon cell. */
+.matrix .attacker-info-inner > .attacker-sprite-crop {
+  align-self: flex-start;
+  justify-content: flex-start;
+  flex: 0 0 84px;
+  width: 84px;
+  height: 84px;
+  min-height: 84px;
+  margin: 0 auto 2px 0;
+  overflow: visible;
+}
+.matrix .attacker-info-inner > .attacker-sprite-crop .matrix-sprite {
+  display: block;
+  width: 84px;
+  height: 84px;
+  min-height: 84px;
+  max-width: 84px;
+  object-fit: contain;
+  object-position: left top;
+}
+.draft-matchup-table-symmetric tbody td:nth-child(10),
+.draft-matchup-table-symmetric thead th:nth-child(10) {
+  border-left-width: 0 !important;
+  border-right-width: 0 !important;
+}
+.draft-matchup-table-symmetric .draft-stat-adjuster {
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-flow: row;
+}

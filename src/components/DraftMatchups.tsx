@@ -4,12 +4,13 @@ import Link from "next/link";
 
 import { useEffect, useMemo, useState } from "react";
 import { getAbility, getSpecies, getSpeciesAbilities, getSpeciesList } from "../lib/showdown-data";
-import { POKEMON_TYPES, typeMatchupSummary } from "../lib/pokemon-visuals";
+import { POKEMON_TYPES } from "../lib/pokemon-visuals";
 import { TypeChart } from "../lib/showdown-official/data/typechart";
 import AutocompleteInput from "./AutocompleteInput";
 import SupportCategoryPanel from "./SupportCategoryPanel";
 import FormatSelector from "./FormatSelector";
 import PokemonSprite from "./PokemonSprite";
+import { abilityDefenseDescription, abilityDefenseMultiplier, getAbilityDefenseEffect } from "../lib/ability-defenses";
 import type { Team } from "../lib/types";
 
 type Preset = { label: string; teamA: string[]; teamB: string[] };
@@ -54,11 +55,16 @@ function multiplier(defender: string, attackType: string): number {
   }
   return value;
 }
+function defensiveMultiplier(defender: string, attackType: string, ability: string): number {
+  const base = multiplier(defender, attackType);
+  const effect = abilityDefenseMultiplier(ability, attackType);
+  return effect === null ? base : base * effect;
+}
 function multiplierLabel(value: number) {
   return value === 0 ? "×0" : `×${Number.isInteger(value) ? value : value.toFixed(2).replace(/0$/, "")}`;
 }
 function typeClass(type: string) { return `type-badge type-${type.toLowerCase().replace(/[^a-z]/g, "")}`; }
-function shortAbilityName(ability: string) { return ability.length > 4 ? `${ability.slice(0, 4)}...` : ability; }
+function shortAbilityName(ability: string) { return ability; }
 
 export default function DraftMatchups() {
   const species = useMemo(() => getSpeciesList(), []);
@@ -72,6 +78,7 @@ export default function DraftMatchups() {
   type StatConfig = { ev: number; nature: "boost" | "neutral" | "hinder"; stage: number };
   const [speedConfigs, setSpeedConfigs] = useState<Record<string, SpeedConfig>>({});
   const [statConfigs, setStatConfigs] = useState<Record<string, StatConfig>>({});
+  const [abilityOverrides, setAbilityOverrides] = useState<Record<string, string>>({});
   const [format, setFormat] = useState("Everything!");
   // Sorting is intentionally session-only: it resets to Speed after a refresh.
   const [sortStat, setSortStat] = useState<StatKey>("spe");
@@ -84,7 +91,7 @@ export default function DraftMatchups() {
     try {
       const raw = localStorage.getItem(storageKey);
       if (raw) {
-        const saved = JSON.parse(raw) as { currentIndex?: number; matchups?: Record<string, { matchupName?: string; teamA?: string[]; teamB?: string[]; format?: string; speedConfigs?: Record<string, SpeedConfig>; statConfigs?: Record<string, StatConfig> }> };
+        const saved = JSON.parse(raw) as { currentIndex?: number; matchups?: Record<string, { matchupName?: string; teamA?: string[]; teamB?: string[]; format?: string; speedConfigs?: Record<string, SpeedConfig>; statConfigs?: Record<string, StatConfig>; abilityOverrides?: Record<string, string> }> };
         const index = Number.isInteger(saved.currentIndex) && saved.currentIndex! >= 0 && saved.currentIndex! < PRESETS.length ? saved.currentIndex! : 0;
         setPresetIndex(index);
         const active = saved.matchups?.[String(index)];
@@ -95,9 +102,10 @@ export default function DraftMatchups() {
           if (typeof active.format === "string") setFormat(active.format);
           if (active.speedConfigs && typeof active.speedConfigs === "object") setSpeedConfigs(active.speedConfigs);
           if (active.statConfigs && typeof active.statConfigs === "object") setStatConfigs(active.statConfigs);
+          if (active.abilityOverrides && typeof active.abilityOverrides === "object") setAbilityOverrides(active.abilityOverrides);
         } else {
           setTeamA(normalizeTeam(PRESETS[index].teamA)); setTeamB(normalizeTeam(PRESETS[index].teamB));
-          setMatchupName(PRESETS[index].label); setDraftMatchupName(PRESETS[index].label);
+          setMatchupName(PRESETS[index].label); setDraftMatchupName(PRESETS[index].label); setAbilityOverrides({});
         }
       } else {
         // Migrate the previous single-matchup save into its corresponding preset slot.
@@ -112,6 +120,7 @@ export default function DraftMatchups() {
           if (typeof legacy.format === "string") setFormat(legacy.format); else if (typeof legacy.formatA === "string") setFormat(legacy.formatA); else if (typeof legacy.formatB === "string") setFormat(legacy.formatB);
           if (legacy.speedConfigs && typeof legacy.speedConfigs === "object") setSpeedConfigs(legacy.speedConfigs);
           if (legacy.statConfigs && typeof legacy.statConfigs === "object") setStatConfigs(legacy.statConfigs);
+          if (legacy.abilityOverrides && typeof legacy.abilityOverrides === "object") setAbilityOverrides(legacy.abilityOverrides);
         }
       }
     } catch {} finally { setHydrated(true); }
@@ -122,10 +131,10 @@ export default function DraftMatchups() {
       const raw = localStorage.getItem(storageKey);
       const saved = raw ? JSON.parse(raw) : {};
       const matchups = saved.matchups && typeof saved.matchups === "object" ? saved.matchups : {};
-      matchups[String(presetIndex)] = { matchupName, teamA, teamB, format, speedConfigs, statConfigs };
+      matchups[String(presetIndex)] = { matchupName, teamA, teamB, format, speedConfigs, statConfigs, abilityOverrides };
       localStorage.setItem(storageKey, JSON.stringify({ currentIndex: presetIndex, matchups }));
     } catch {}
-  }, [hydrated, matchupName, teamA, teamB, format, presetIndex, speedConfigs, statConfigs]);
+  }, [hydrated, matchupName, teamA, teamB, format, presetIndex, speedConfigs, statConfigs, abilityOverrides]);
   const [editorOpen, setEditorOpen] = useState(false);
   const [draftA, setDraftA] = useState<string[]>(teamA);
   const [draftB, setDraftB] = useState<string[]>(teamB);
@@ -136,7 +145,7 @@ export default function DraftMatchups() {
       const raw = localStorage.getItem(storageKey);
       const saved = raw ? JSON.parse(raw) : {};
       const matchups = saved.matchups && typeof saved.matchups === "object" ? saved.matchups : {};
-      matchups[String(presetIndex)] = { matchupName, teamA, teamB, format, speedConfigs, statConfigs };
+      matchups[String(presetIndex)] = { matchupName, teamA, teamB, format, speedConfigs, statConfigs, abilityOverrides };
       const next = matchups[String(index)];
       localStorage.setItem(storageKey, JSON.stringify({ currentIndex: index, matchups }));
       setPresetIndex(index);
@@ -148,14 +157,15 @@ export default function DraftMatchups() {
         setFormat(typeof next.format === "string" ? next.format : "Everything!");
         setSpeedConfigs(next.speedConfigs && typeof next.speedConfigs === "object" ? next.speedConfigs : {});
         setStatConfigs(next.statConfigs && typeof next.statConfigs === "object" ? next.statConfigs : {});
+        setAbilityOverrides(next.abilityOverrides && typeof next.abilityOverrides === "object" ? next.abilityOverrides : {});
       } else {
         setMatchupName(PRESETS[index].label); setDraftMatchupName(PRESETS[index].label);
         setTeamA(normalizeTeam(PRESETS[index].teamA)); setTeamB(normalizeTeam(PRESETS[index].teamB));
-        setFormat("Everything!"); setSpeedConfigs({}); setStatConfigs({});
+        setFormat("Everything!"); setSpeedConfigs({}); setStatConfigs({}); setAbilityOverrides({});
       }
     } catch {
       setPresetIndex(index); setMatchupName(PRESETS[index].label); setDraftMatchupName(PRESETS[index].label);
-      setTeamA(normalizeTeam(PRESETS[index].teamA)); setTeamB(normalizeTeam(PRESETS[index].teamB)); setSpeedConfigs({}); setStatConfigs({});
+      setTeamA(normalizeTeam(PRESETS[index].teamA)); setTeamB(normalizeTeam(PRESETS[index].teamB)); setSpeedConfigs({}); setStatConfigs({}); setAbilityOverrides({});
     }
   };
   const openEditor = () => {
@@ -220,6 +230,25 @@ export default function DraftMatchups() {
   };
   const configFor = (side: "A" | "B", name: string): SpeedConfig => speedConfigs[`${side}:${name}`] || { ev: 252, nature: "boost", stage: 0 };
   const configForStat = (side: "A" | "B", name: string, stat: Exclude<StatKey, "bst">): StatConfig => stat === "spe" ? configFor(side, name) : statConfigs[`${side}:${name}:${stat}`] || { ev: 0, nature: "neutral", stage: 0 };
+  const enabledAbility = (side: "A" | "B", name: string) => abilityOverrides[`${side}:${name}`] || "";
+  const toggleAbility = (side: "A" | "B", name: string, ability: string) => setAbilityOverrides(current => {
+    const key = `${side}:${name}`;
+    if (current[key] === ability) { const next = { ...current }; delete next[key]; return next; }
+    return { ...current, [key]: ability };
+  });
+  const defensiveSummary = (name: string, side: "A" | "B") => {
+    const ability = enabledAbility(side, name);
+    const groups: Record<string, string[]> = { Weak: [], Resist: [], Immune: [] };
+    for (const attackType of POKEMON_TYPES) {
+      const value = defensiveMultiplier(name, attackType, ability);
+      if (value === 0) groups.Immune.push(attackType);
+      else if (value < 1) groups.Resist.push(`${attackType} ${multiplierLabel(value)}`);
+      else if (value > 1) groups.Weak.push(`${attackType} ${multiplierLabel(value)}`);
+    }
+    const lines = [groups.Weak.length ? `Weak: ${groups.Weak.join(", ")}` : "Weak: none", groups.Resist.length ? `Resist: ${groups.Resist.join(", ")}` : "Resist: none", groups.Immune.length ? `Immune: ${groups.Immune.join(", ")}` : "Immune: none"];
+    if (ability) lines.push(`Enabled ability: ${ability} — ${abilityDefenseDescription(ability)}`);
+    return lines.join("\n");
+  };
   const updateStatConfig = (side: "A" | "B", name: string, stat: Exclude<StatKey, "bst">, patch: Partial<StatConfig>) => {
     if (stat === "spe") { setSpeedConfigs(current => ({ ...current, [`${side}:${name}`]: { ...configFor(side, name), ...patch } })); return; }
     setStatConfigs(current => ({ ...current, [`${side}:${name}:${stat}`]: { ...configForStat(side, name, stat), ...patch } }));
@@ -268,10 +297,10 @@ export default function DraftMatchups() {
           const abilitiesB = b ? getSpeciesAbilities(b) : [];
           return <tr key={index}>
             <td className="draft-mon-sprite-cell"><PokemonSprite species={a} className="draft-mon-sprite" /></td>
-            <td className="draft-mon-entry"><div className="draft-mon-details"><strong className="draft-pokemon-name">{a || <span className="muted">—</span>}</strong><div className="draft-type-pills">{a && speciesTypes(a).map(type => <span key={type} className={typeClass(type)} title={`Defensive type matchups for ${a}:\n${typeMatchupSummary(speciesTypes(a))}`}>{type}</span>)}</div><div className="draft-abilities">{abilitiesA.map(ability => <span key={ability} className="draft-ability" title={`${ability}: ${getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}`}>{shortAbilityName(ability)}</span>)}</div></div></td>
+            <td className="draft-mon-entry"><div className="draft-mon-details"><strong className="draft-pokemon-name">{a || <span className="muted">—</span>}</strong><div className="draft-type-pills">{a && speciesTypes(a).map(type => <span key={type} className={typeClass(type)} title={`Defensive type matchups for ${a}:\n${defensiveSummary(a, "A")}`}>{type}</span>)}</div><div className="draft-abilities">{abilitiesA.map(ability => { const toggleable = Boolean(getAbilityDefenseEffect(ability)); const selected = enabledAbility("A", a) === ability; const title = `${ability}: ${getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}${toggleable ? `\n${abilityDefenseDescription(ability)}` : ""}`; return toggleable ? <button type="button" key={ability} className={`draft-ability draft-ability-toggle ${selected ? "is-enabled" : ""}`} title={title} aria-pressed={selected} onClick={() => toggleAbility("A", a, ability)}>{shortAbilityName(ability)}</button> : <span key={ability} className="draft-ability" title={title}>{shortAbilityName(ability)}</span>; })}</div></div></td>
             {(["bst", "spd", "spa", "def", "atk", "hp", "spe"] as StatKey[]).map(key => renderStatCell(a, "A", key))}
             {(["spe", "hp", "atk", "def", "spa", "spd", "bst"] as StatKey[]).map(key => renderStatCell(b, "B", key))}
-            <td className="draft-mon-entry"><div className="draft-mon-details"><strong className="draft-pokemon-name">{b || <span className="muted">—</span>}</strong><div className="draft-type-pills">{b && speciesTypes(b).map(type => <span key={type} className={typeClass(type)} title={`Defensive type matchups for ${b}:\n${typeMatchupSummary(speciesTypes(b))}`}>{type}</span>)}</div><div className="draft-abilities">{abilitiesB.map(ability => <span key={ability} className="draft-ability" title={`${ability}: ${getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}`}>{shortAbilityName(ability)}</span>)}</div></div></td>
+            <td className="draft-mon-entry"><div className="draft-mon-details"><strong className="draft-pokemon-name">{b || <span className="muted">—</span>}</strong><div className="draft-type-pills">{b && speciesTypes(b).map(type => <span key={type} className={typeClass(type)} title={`Defensive type matchups for ${b}:\n${defensiveSummary(b, "B")}`}>{type}</span>)}</div><div className="draft-abilities">{abilitiesB.map(ability => { const toggleable = Boolean(getAbilityDefenseEffect(ability)); const selected = enabledAbility("B", b) === ability; const title = `${ability}: ${getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}${toggleable ? `\n${abilityDefenseDescription(ability)}` : ""}`; return toggleable ? <button type="button" key={ability} className={`draft-ability draft-ability-toggle ${selected ? "is-enabled" : ""}`} title={title} aria-pressed={selected} onClick={() => toggleAbility("B", b, ability)}>{shortAbilityName(ability)}</button> : <span key={ability} className="draft-ability" title={title}>{shortAbilityName(ability)}</span>; })}</div></div></td>
             <td className="draft-mon-sprite-cell"><PokemonSprite species={b} className="draft-mon-sprite" /></td>
           </tr>;
         })}</tbody>
@@ -285,8 +314,8 @@ export default function DraftMatchups() {
       <section className="draft-modal draft-type-modal" role="dialog" aria-modal="true" aria-labelledby="draft-type-title">
         <div className="panel-title-row"><div><h2 id="draft-type-title">Team {typeTeam} defensive matchups</h2><p>Green indicates resistance or immunity; red indicates weakness.</p></div><button type="button" onClick={() => setTypeTeam(null)}>Close ×</button></div>
         <div className="matrix-scroll"><table className="draft-typechart-table draft-typechart-transposed">
-          <thead><tr><th>Pokémon</th>{POKEMON_TYPES.map(type => { const roster = typeTeam === "A" ? sortedA : sortedB; const vals = roster.map(p => multiplier(p, type)); const good = vals.filter(v => v < 1).length; const bad = vals.filter(v => v > 1).length; return <th key={type} className={good > bad ? "type-head-good" : bad > good ? "type-head-bad" : ""}><span className={typeClass(type)}>{type}</span><small>{good}R · {bad}W</small></th>; })}</tr></thead>
-          <tbody>{(typeTeam === "A" ? sortedA : sortedB).map(pokemon => <tr key={pokemon}><th>{pokemon}</th>{POKEMON_TYPES.map(attackType => { const value = multiplier(pokemon, attackType); return <td key={attackType} className={`type-multiplier ${value < 1 ? "resist" : value > 1 ? "weak" : value === 0 ? "immune" : "neutral"}`}>{multiplierLabel(value)}</td>; })}</tr>)}</tbody>
+          <thead><tr><th>Pokémon</th>{POKEMON_TYPES.map(type => { const roster = typeTeam === "A" ? sortedA : sortedB; const vals = roster.map(p => defensiveMultiplier(p, type, enabledAbility(typeTeam, p))); const good = vals.filter(v => v < 1).length; const bad = vals.filter(v => v > 1).length; return <th key={type} className={good > bad ? "type-head-good" : bad > good ? "type-head-bad" : ""}><span className={typeClass(type)}>{type}</span><small>{good}R · {bad}W</small></th>; })}</tr></thead>
+          <tbody>{(typeTeam === "A" ? sortedA : sortedB).map(pokemon => <tr key={pokemon}><th>{pokemon}</th>{POKEMON_TYPES.map(attackType => { const value = defensiveMultiplier(pokemon, attackType, enabledAbility(typeTeam, pokemon)); return <td key={attackType} className={`type-multiplier ${value === 0 ? "immune" : value < 1 ? "resist" : value > 1 ? "weak" : "neutral"}`}>{multiplierLabel(value)}</td>; })}</tr>)}</tbody>
         </table></div>
       </section>
     </div>}
