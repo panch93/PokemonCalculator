@@ -32,7 +32,7 @@ const PRESETS: Preset[] = [
 
 const normalizeTeam = (team: string[]) => Array.from({ length: 12 }, (_, i) => team[i] || "");
 const typeChart = TypeChart as unknown as Record<string, { damageTaken?: Record<string, number> }>;
-const TERA_TYPES = [...POKEMON_TYPES, "Stellar"] as const;
+const TERA_TYPES = ["None", ...POKEMON_TYPES, "Stellar"] as const;
 
 function speciesTypes(name: string): string[] {
   const types = getSpecies(name)?.types;
@@ -248,8 +248,8 @@ export default function DraftMatchups() {
   const enabledAbility = (side: "A" | "B", name: string) => abilityOverrides[`${side}:${name}`] || "";
   const matchupKey = (side: "A" | "B", name: string) => `${side}:${name}`;
   const isTeraCaptain = (side: "A" | "B", name: string) => Boolean(teraCaptains[matchupKey(side, name)]);
-  const teraTypeValue = (side: "A" | "B", name: string) => teraTypes[matchupKey(side, name)] || "Normal";
-  const selectedTeraType = (side: "A" | "B", name: string) => isTeraCaptain(side, name) && teraTypeValue(side, name) !== "Stellar" ? teraTypeValue(side, name) : undefined;
+  const teraTypeValue = (side: "A" | "B", name: string) => teraTypes[matchupKey(side, name)] || "None";
+  const selectedTeraType = (side: "A" | "B", name: string) => isTeraCaptain(side, name) && !["None", "Stellar"].includes(teraTypeValue(side, name)) ? teraTypeValue(side, name) : undefined;
   const pointsFor = (side: "A" | "B", name: string) => pokemonPoints[matchupKey(side, name)] ?? 0;
   const setPointsFor = (side: "A" | "B", name: string, value: number) => setPokemonPoints(current => ({ ...current, [matchupKey(side, name)]: Math.max(0, Math.min(999, value || 0)) }));
   const setTeraCaptain = (side: "A" | "B", name: string, enabled: boolean) => setTeraCaptains(current => ({ ...current, [matchupKey(side, name)]: enabled }));
@@ -372,9 +372,8 @@ export default function DraftMatchups() {
             {roster.map((pokemon, index) => <div className="draft-editor-slot" key={`${side}-${index}`}>
               <span className="draft-editor-slot-label">Slot {index + 1}</span>
               <AutocompleteInput ariaLabel={`${label} slot ${index + 1} Pokémon`} value={pokemon} options={["", ...species]} onChange={value => updateDraft(side, index, value)} />
-              {pokemon ? <label className="draft-points-field">Pts <input type="number" min="0" max="999" step="1" value={pointsFor(side, pokemon)} onChange={event => setPointsFor(side, pokemon, Number(event.target.value))} /></label> : <span className="draft-editor-empty-control" />}
-              {pokemon ? <label className="draft-tera-captain-field"><input type="checkbox" checked={isTeraCaptain(side, pokemon)} onChange={event => setTeraCaptain(side, pokemon, event.target.checked)} /> Tera captain</label> : <span className="draft-editor-empty-control" />}
-              {pokemon && isTeraCaptain(side, pokemon) ? <label className="draft-tera-type-field">Tera <select value={teraTypeValue(side, pokemon)} onChange={event => setTeraTypeFor(side, pokemon, event.target.value)}>{TERA_TYPES.map(type => <option key={type} value={type}>{type}</option>)}</select></label> : <span className="draft-editor-empty-control" />}
+              {pokemon ? <label className="draft-points-field">Pts <input type="text" inputMode="numeric" value={String(pointsFor(side, pokemon))} onChange={event => setPointsFor(side, pokemon, Number(event.target.value.replace(/[^0-9]/g, "")) || 0)} /></label> : <span className="draft-editor-empty-control" />}
+              {pokemon ? <label className="draft-tera-captain-field"><input type="checkbox" checked={isTeraCaptain(side, pokemon)} onChange={event => setTeraCaptain(side, pokemon, event.target.checked)} /> Captain</label> : <span className="draft-editor-empty-control" />}
             </div>)}
           </div>)}
         </div>

@@ -36,6 +36,18 @@ export type FieldState = {
   defenderSaltCure: boolean;
   trickRoom: boolean;
   tailwindSide: "" | "attacker" | "defender";
+  protectSide?: "" | "attacker" | "defender";
+  nightmareSide?: "" | "attacker" | "defender";
+  foresightSide?: "" | "attacker" | "defender";
+  chargeSide?: "" | "attacker" | "defender";
+  helpingHandSide?: "" | "attacker" | "defender";
+  flowerGiftSide?: "" | "attacker" | "defender";
+  powerTrickSide?: "" | "attacker" | "defender";
+  steelySpiritSide?: "" | "attacker" | "defender";
+  friendGuardSide?: "" | "attacker" | "defender";
+  batterySide?: "" | "attacker" | "defender";
+  powerSpotSide?: "" | "attacker" | "defender";
+  switchingOutSide?: "" | "attacker" | "defender";
 };
 
 export type StatStages = { atk: number; spa: number; def: number; spd: number; spe: number };

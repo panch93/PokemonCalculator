@@ -16,7 +16,7 @@ import FormatSelector from "./FormatSelector";
 const DEFAULT_FIELD: FieldState = {
   gameType: "Singles", weather: "", terrain: "", defenderStealthRock: false, defenderSpikes: 0, defenderReflect: false,
   defenderLightScreen: false, defenderAuroraVeil: false, defenderLeechSeed: false, defenderSaltCure: false,
-  trickRoom: false, tailwindSide: "",
+  trickRoom: false, tailwindSide: "", protectSide: "", nightmareSide: "", foresightSide: "", chargeSide: "", helpingHandSide: "", flowerGiftSide: "", powerTrickSide: "", steelySpiritSide: "", friendGuardSide: "", batterySide: "", powerSpotSide: "", switchingOutSide: "",
 };
 const ZERO_STAGES = (): StatStages[] => Array.from({ length: 6 }, () => ({ atk: 0, spa: 0, def: 0, spd: 0, spe: 0 }));
 const initialMoves = (team: Team) => team.map(p => p.moves.find(Boolean) || "");

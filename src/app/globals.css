@@ -1177,3 +1177,24 @@ select, select:focus, select option, datalist option {
   min-height: 90px !important;
   max-width: 90px !important;
 }
+
+/* Keep the battlefield compact while fitting the expanded condition set. */
+.field-toggle-grid { grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px; }
+.field-toggle, .field-cycle { min-width: 0; }
+.field-toggle { padding-left: 5px; padding-right: 5px; }
+.field-toggle > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.field-side-control .field-toggle-state { margin-left: 3px; }
+@media (max-width: 1100px) { .field-toggle-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .field-toggle-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* Draft editor keeps points and captain controls inline with each Pokémon. */
+.draft-editor-slot { grid-template-columns: 48px minmax(0, 1fr) 52px 78px; gap: 5px; }
+.draft-editor-slot-label { white-space: nowrap; }
+.draft-points-field { grid-column: 3; grid-row: 1; }
+.draft-points-field input { width: 42px; }
+.draft-tera-captain-field { grid-column: 4; grid-row: 1; }
+@media (max-width: 700px) { .draft-editor-slot { grid-template-columns: 38px minmax(0, 1fr) 42px 68px; gap: 4px; } }
+/* Slightly enlarge top-row attacker portraits while preserving a side-by-side name area. */
+.matrix .attacker-info-inner > .attacker-identity-top > .attacker-sprite-crop { flex-basis: 96px !important; width: 96px !important; height: 96px !important; min-height: 96px !important; max-width: 96px !important; align-self: flex-start; }
+.matrix .attacker-info-inner > .attacker-identity-top > .attacker-sprite-crop .matrix-sprite { width: 96px !important; height: 96px !important; min-height: 96px !important; max-width: 96px !important; object-fit: contain; }
+.matrix .attacker-info-inner > .attacker-identity-top { align-items: flex-start; justify-content: flex-start; }
+.matrix .attacker-info-inner .attacker-identity-text { flex: 1 1 0; min-width: 0; }
