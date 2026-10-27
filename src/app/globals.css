@@ -801,3 +801,33 @@ select, select:focus, select option, datalist option {
 .draft-speed-config { cursor: pointer; }
 .stage-positive { color: #42c878; font-weight: 800; }
 .stage-negative { color: #f07878; font-weight: 800; }
+
+
+/* Symmetric Draft Matchups stat line: BST ... HP, Speed | Speed, HP ... BST. */
+.draft-matchup-table-symmetric { min-width: 1660px; table-layout: auto; }
+.draft-matchup-table-symmetric thead th { text-align: center; vertical-align: middle; white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-stat-heading { min-width: 48px; padding: 5px 3px; }
+.draft-matchup-table-symmetric .draft-stat-heading button { appearance: none; border: 0; padding: 3px 2px; background: transparent; color: inherit; font: inherit; font-size: .7rem; text-transform: inherit; letter-spacing: inherit; cursor: pointer; white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-stat-heading button:hover { color: var(--foreground, #eef2ff); }
+.draft-matchup-table-symmetric .draft-sort-indicator { color: var(--accent, #93c5fd); font-size: .7rem; }
+.draft-matchup-table-symmetric .draft-base-stat { text-align: center; padding: 5px 3px; min-width: 43px; width: 43px; font-size: .78rem; font-weight: 750; color: var(--text, #e5e7eb); }
+.draft-matchup-table-symmetric .draft-base-stat span { display: inline-block; min-width: 2ch; }
+.draft-matchup-table-symmetric .draft-stat-bst { min-width: 52px; width: 52px; }
+.draft-matchup-table-symmetric .draft-speed { min-width: 68px; width: 68px; padding: 5px 3px; background: transparent; }
+.draft-matchup-table-symmetric .draft-speed:hover { background: rgba(255,255,255,.055); }
+.draft-matchup-table-symmetric .draft-pokemon-name { min-width: 122px; text-align: center; font-size: .76rem; }
+.draft-matchup-table-symmetric tbody td:nth-child(10), .draft-matchup-table-symmetric thead th:nth-child(10) { border-right-width: 2px; border-right-color: var(--accent, #93c5fd); }
+.draft-matchup-table-symmetric tbody td:nth-child(11), .draft-matchup-table-symmetric thead th:nth-child(11) { border-left-width: 2px; border-left-color: var(--accent, #93c5fd); }
+
+/* Ensure matrix sprite elements have a concrete visible box and don't inherit cropping/zero-height rules. */
+.matrix .attacker-info-inner > .attacker-sprite-crop { min-height: 84px; height: 84px; flex: 0 0 84px; overflow: visible; }
+.matrix .attacker-info-inner > .attacker-sprite-crop .matrix-sprite { display: block; width: 100%; height: 84px; min-height: 84px; max-width: 100%; object-fit: contain; visibility: visible; opacity: 1; }
+.matrix .defender-identity .defender-sprite-crop { width: 60px; height: 60px; flex: 0 0 60px; overflow: visible; }
+.matrix .defender-identity .matrix-sprite { display: block; width: 60px; height: 60px; min-width: 60px; min-height: 60px; object-fit: contain; visibility: visible; opacity: 1; }
+
+.draft-matchup-table-symmetric .draft-stat-value { display: block; font-size: .78rem; line-height: 1.15; font-weight: 800; font-variant-numeric: tabular-nums; }
+.draft-matchup-table-symmetric .draft-speed { font-size: .78rem; font-weight: 750; }
+.draft-matchup-table-symmetric .draft-stat-adjuster { display: block; width: 100%; min-height: 15px; margin: 2px 0 0; padding: 0; border: 0; background: transparent; color: var(--muted, #98a2b3); font-size: 9px; line-height: 1.25; font-weight: 500; white-space: nowrap; cursor: pointer; }
+.draft-matchup-table-symmetric .draft-stat-adjuster:hover:not(:disabled) { color: var(--accent, #93c5fd); }
+.draft-matchup-table-symmetric .draft-stat-adjuster:disabled { cursor: default; }
+.draft-matchup-table-symmetric .draft-stat-config-placeholder { display: block; height: 15px; margin-top: 2px; font-size: 9px; line-height: 1.25; }

@@ -12,6 +12,8 @@ import FormatSelector from "./FormatSelector";
 import type { Team } from "../lib/types";
 
 type Preset = { label: string; teamA: string[]; teamB: string[] };
+type StatKey = "hp" | "atk" | "def" | "spa" | "spd" | "spe" | "bst";
+const STAT_LABELS: Record<StatKey, string> = { hp: "HP", atk: "Atk", def: "Def", spa: "SpA", spd: "SpD", spe: "Speed", bst: "BST" };
 const PRESETS: Preset[] = [
   { label: "OU Balance vs Bulky Offense", teamA: "Dragapult,Great Tusk,Gholdengo,Slowking,Kingambit,Rillaboom,Gliscor,Clefable,Heatran,Zamazenta,Ogerpon-Wellspring,Iron Valiant".split(","), teamB: "Landorus-Therian,Garganacl,Volcarona,Corviknight,Kyurem,Primarina,Ting-Lu,Roaring Moon,Hatterene,Samurott-Hisui,Skeledirge,Meowscarada".split(",") },
   { label: "Sun vs Rain", teamA: "Torkoal,Koraidon,Walking Wake,Gouging Fire,Great Tusk,Venusaur,Roaring Moon,Iron Moth,Charizard,Brute Bonnet,Slither Wing,Flutter Mane".split(","), teamB: "Pelipper,Archaludon,Barraskewda,Floatzel,Kingdra,Swampert,Zapdos,Thundurus-Therian,Iron Treads,Meowscarada,Dragonite,Urshifu-Rapid-Strike".split(",") },
@@ -63,10 +65,14 @@ export default function DraftMatchups() {
   const [draftMatchupName, setDraftMatchupName] = useState(PRESETS[0].label);
   const [typeTeam, setTypeTeam] = useState<"A" | "B" | null>(null);
   const [supportOpen, setSupportOpen] = useState(false);
-  const [speedEdit, setSpeedEdit] = useState<{ side: "A" | "B"; name: string } | null>(null);
+  const [speedEdit, setSpeedEdit] = useState<{ side: "A" | "B"; name: string; stat: Exclude<StatKey, "bst"> } | null>(null);
   type SpeedConfig = { ev: number; nature: "boost" | "neutral" | "hinder"; stage: number };
+  type StatConfig = { ev: number; nature: "boost" | "neutral" | "hinder"; stage: number };
   const [speedConfigs, setSpeedConfigs] = useState<Record<string, SpeedConfig>>({});
+  const [statConfigs, setStatConfigs] = useState<Record<string, StatConfig>>({});
   const [format, setFormat] = useState("Everything!");
+  // Sorting is intentionally session-only: it resets to Speed after a refresh.
+  const [sortStat, setSortStat] = useState<StatKey>("spe");
   const [teamA, setTeamA] = useState<string[]>(() => normalizeTeam(PRESETS[0].teamA));
   const [teamB, setTeamB] = useState<string[]>(() => normalizeTeam(PRESETS[0].teamB));
   const [hydrated, setHydrated] = useState(false);
@@ -75,7 +81,7 @@ export default function DraftMatchups() {
     try {
       const raw = localStorage.getItem(storageKey);
       if (raw) {
-        const saved = JSON.parse(raw) as { currentIndex?: number; matchups?: Record<string, { matchupName?: string; teamA?: string[]; teamB?: string[]; format?: string; speedConfigs?: Record<string, SpeedConfig> }> };
+        const saved = JSON.parse(raw) as { currentIndex?: number; matchups?: Record<string, { matchupName?: string; teamA?: string[]; teamB?: string[]; format?: string; speedConfigs?: Record<string, SpeedConfig>; statConfigs?: Record<string, StatConfig> }> };
         const index = Number.isInteger(saved.currentIndex) && saved.currentIndex! >= 0 && saved.currentIndex! < PRESETS.length ? saved.currentIndex! : 0;
         setPresetIndex(index);
         const active = saved.matchups?.[String(index)];
@@ -85,6 +91,7 @@ export default function DraftMatchups() {
           if (Array.isArray(active.teamB)) setTeamB(normalizeTeam(active.teamB));
           if (typeof active.format === "string") setFormat(active.format);
           if (active.speedConfigs && typeof active.speedConfigs === "object") setSpeedConfigs(active.speedConfigs);
+          if (active.statConfigs && typeof active.statConfigs === "object") setStatConfigs(active.statConfigs);
         } else {
           setTeamA(normalizeTeam(PRESETS[index].teamA)); setTeamB(normalizeTeam(PRESETS[index].teamB));
           setMatchupName(PRESETS[index].label); setDraftMatchupName(PRESETS[index].label);
@@ -101,6 +108,7 @@ export default function DraftMatchups() {
           if (Array.isArray(legacy.teamB)) setTeamB(normalizeTeam(legacy.teamB));
           if (typeof legacy.format === "string") setFormat(legacy.format); else if (typeof legacy.formatA === "string") setFormat(legacy.formatA); else if (typeof legacy.formatB === "string") setFormat(legacy.formatB);
           if (legacy.speedConfigs && typeof legacy.speedConfigs === "object") setSpeedConfigs(legacy.speedConfigs);
+          if (legacy.statConfigs && typeof legacy.statConfigs === "object") setStatConfigs(legacy.statConfigs);
         }
       }
     } catch {} finally { setHydrated(true); }
@@ -111,10 +119,10 @@ export default function DraftMatchups() {
       const raw = localStorage.getItem(storageKey);
       const saved = raw ? JSON.parse(raw) : {};
       const matchups = saved.matchups && typeof saved.matchups === "object" ? saved.matchups : {};
-      matchups[String(presetIndex)] = { matchupName, teamA, teamB, format, speedConfigs };
+      matchups[String(presetIndex)] = { matchupName, teamA, teamB, format, speedConfigs, statConfigs };
       localStorage.setItem(storageKey, JSON.stringify({ currentIndex: presetIndex, matchups }));
     } catch {}
-  }, [hydrated, matchupName, teamA, teamB, format, presetIndex, speedConfigs]);
+  }, [hydrated, matchupName, teamA, teamB, format, presetIndex, speedConfigs, statConfigs]);
   const [editorOpen, setEditorOpen] = useState(false);
   const [draftA, setDraftA] = useState<string[]>(teamA);
   const [draftB, setDraftB] = useState<string[]>(teamB);
@@ -125,7 +133,7 @@ export default function DraftMatchups() {
       const raw = localStorage.getItem(storageKey);
       const saved = raw ? JSON.parse(raw) : {};
       const matchups = saved.matchups && typeof saved.matchups === "object" ? saved.matchups : {};
-      matchups[String(presetIndex)] = { matchupName, teamA, teamB, format, speedConfigs };
+      matchups[String(presetIndex)] = { matchupName, teamA, teamB, format, speedConfigs, statConfigs };
       const next = matchups[String(index)];
       localStorage.setItem(storageKey, JSON.stringify({ currentIndex: index, matchups }));
       setPresetIndex(index);
@@ -136,14 +144,15 @@ export default function DraftMatchups() {
         setTeamB(normalizeTeam(Array.isArray(next.teamB) ? next.teamB : PRESETS[index].teamB));
         setFormat(typeof next.format === "string" ? next.format : "Everything!");
         setSpeedConfigs(next.speedConfigs && typeof next.speedConfigs === "object" ? next.speedConfigs : {});
+        setStatConfigs(next.statConfigs && typeof next.statConfigs === "object" ? next.statConfigs : {});
       } else {
         setMatchupName(PRESETS[index].label); setDraftMatchupName(PRESETS[index].label);
         setTeamA(normalizeTeam(PRESETS[index].teamA)); setTeamB(normalizeTeam(PRESETS[index].teamB));
-        setFormat("Everything!"); setSpeedConfigs({});
+        setFormat("Everything!"); setSpeedConfigs({}); setStatConfigs({});
       }
     } catch {
       setPresetIndex(index); setMatchupName(PRESETS[index].label); setDraftMatchupName(PRESETS[index].label);
-      setTeamA(normalizeTeam(PRESETS[index].teamA)); setTeamB(normalizeTeam(PRESETS[index].teamB));
+      setTeamA(normalizeTeam(PRESETS[index].teamA)); setTeamB(normalizeTeam(PRESETS[index].teamB)); setSpeedConfigs({}); setStatConfigs({});
     }
   };
   const openEditor = () => {
@@ -160,8 +169,33 @@ export default function DraftMatchups() {
   };
   const activeA = teamA.filter(Boolean);
   const activeB = teamB.filter(Boolean);
-  const sortedA = [...activeA].sort((a, b) => (baseSpeed(b) ?? -1) - (baseSpeed(a) ?? -1));
-  const sortedB = [...activeB].sort((a, b) => (baseSpeed(b) ?? -1) - (baseSpeed(a) ?? -1));
+  const statValue = (name: string, key: StatKey) => baseStats(name)?.[key] ?? -1;
+  const sortRoster = (roster: string[]) => [...roster].sort((a, b) => statValue(b, sortStat) - statValue(a, sortStat) || (baseSpeed(b) ?? -1) - (baseSpeed(a) ?? -1));
+  const sortedA = sortRoster(activeA);
+  const sortedB = sortRoster(activeB);
+  const statColor = (value: number, key: StatKey) => {
+    const values = [...activeA, ...activeB].map(name => baseStats(name)?.[key]).filter((v): v is number => typeof v === "number");
+    if (!values.length) return undefined;
+    const min = Math.min(...values), max = Math.max(...values);
+    const ratio = max === min ? 0.5 : (value - min) / (max - min);
+    return { color: `hsl(${Math.round(2 + ratio * 122)} 78% 64%)` };
+  };
+  const renderStatCell = (name: string, side: "A" | "B", key: StatKey) => {
+    const stats = name ? baseStats(name) : null;
+    const value = stats ? stats[key] : null;
+    if (key === "bst") return <td key={`${side}-${key}`} className="draft-base-stat draft-stat-bst"><span style={value === null ? undefined : statColor(value, key)}>{value ?? "—"}</span><small className="draft-stat-config-placeholder" aria-hidden="true">&nbsp;</small></td>;
+    const cfg = name ? configForStat(side, name, key) : null;
+    const natureLabel = key === "hp" ? "" : cfg?.nature === "boost" ? "+" : cfg?.nature === "hinder" ? "−" : "";
+    const stageLabel = key === "hp" ? "" : cfg ? (cfg.stage > 0 ? `+${cfg.stage}` : String(cfg.stage)) : "";
+    const open = () => name && setSpeedEdit({ side, name, stat: key });
+    return <td key={`${side}-${key}`} className={`draft-base-stat draft-stat-${key} ${key === "spe" ? "draft-speed" : ""}`} title={name && key === "spe" ? speedTip(name, side, side === "A" ? activeB : activeA) : undefined} onClick={open}>
+      <strong className="draft-stat-value" style={value === null ? undefined : statColor(value, key)}>{value ?? "—"}</strong>
+      <button type="button" className="draft-stat-adjuster" aria-label={name ? `Adjust ${STAT_LABELS[key]} EVs and nature for ${name}` : "Adjust stat"} onClick={event => { event.stopPropagation(); open(); }} disabled={!name}>
+        {cfg ? `${cfg.ev} EV` : " "}{key !== "hp" && cfg ? <>{" · "}<span className={natureLabel === "+" ? "stage-positive" : natureLabel === "−" ? "stage-negative" : ""}>{natureLabel || "="}</span>{" · "}<span className={cfg.stage > 0 ? "stage-positive" : cfg.stage < 0 ? "stage-negative" : ""}>{stageLabel}</span></> : key === "hp" ? <span aria-hidden="true"> </span> : null}
+      </button>
+    </td>;
+  };
+  const statHeading = (key: StatKey, side: "A" | "B") => <th key={`${side}-${key}`} className={`draft-stat-heading draft-stat-${key}`}><button type="button" onClick={() => setSortStat(key)} aria-label={`Sort by ${STAT_LABELS[key]}`} title={`Sort both teams by ${STAT_LABELS[key]}`}>{STAT_LABELS[key]}{sortStat === key ? <span className="draft-sort-indicator"> ↓</span> : null}</button></th>;
   const lastRow = Math.max(sortedA.length, sortedB.length) - 1;
   const asTeam = (names: string[]): Team => names.map(species => ({ name: species, species, item: "", ability: getSpeciesAbilities(species)[0] || "", nature: "Hardy", level: 100, evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: [] }));
   const updateDraft = (side: "A" | "B", index: number, value: string) => {
@@ -171,6 +205,11 @@ export default function DraftMatchups() {
     setTeam(current => normalizeTeam(current.map((name, i) => i === index ? value : name)));
   };
   const configFor = (side: "A" | "B", name: string): SpeedConfig => speedConfigs[`${side}:${name}`] || { ev: 252, nature: "boost", stage: 0 };
+  const configForStat = (side: "A" | "B", name: string, stat: Exclude<StatKey, "bst">): StatConfig => stat === "spe" ? configFor(side, name) : statConfigs[`${side}:${name}:${stat}`] || { ev: 0, nature: "neutral", stage: 0 };
+  const updateStatConfig = (side: "A" | "B", name: string, stat: Exclude<StatKey, "bst">, patch: Partial<StatConfig>) => {
+    if (stat === "spe") { setSpeedConfigs(current => ({ ...current, [`${side}:${name}`]: { ...configFor(side, name), ...patch } })); return; }
+    setStatConfigs(current => ({ ...current, [`${side}:${name}:${stat}`]: { ...configForStat(side, name, stat), ...patch } }));
+  };
   const stageMultiplier = (stage: number) => stage >= 0 ? (2 + stage) / 2 : 2 / (2 - stage);
   const speedStat = (name: string, ev: number, nature: SpeedConfig["nature"], stage: number) => {
     const base = baseSpeed(name); if (base == null) return null;
@@ -189,7 +228,6 @@ export default function DraftMatchups() {
     if (!checks.length) return "No opposing Pokémon has a reachable Speed benchmark requiring additional EVs.";
     return checks.map(x => `${x.opponent} (${x.target} effective Speed): ${[x.neutral !== null ? `neutral ${x.neutral} EVs` : null, x.boosted !== null ? `+Speed ${x.boosted} EVs` : null].filter(Boolean).join("; ")}`).join("\n");
   };
-  const updateSpeedConfig = (side: "A" | "B", name: string, patch: Partial<SpeedConfig>) => setSpeedConfigs(current => ({ ...current, [`${side}:${name}`]: { ...configFor(side, name), ...patch } }));
 
 
   return <main className="draft-page">
@@ -207,21 +245,19 @@ export default function DraftMatchups() {
 
     <section className="panel">
       <div className="panel-title-row"><div><h2>{matchupName}</h2><p>Hover over a Speed value for EV benchmarks against opposing Pokémon at 252 EVs and a boosting nature.</p></div><div className="draft-team-formats"><label>Matchup format<FormatSelector value={format} onChange={setFormat} /></label></div></div>
-      <div className="matrix-scroll draft-table-scroll"><table className="draft-matchup-table">
-        <thead><tr><th>Types A</th><th>Abilities A</th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("A")}>Pokémon Team A · defensive types</button></th><th>Speed A</th><th>HP A</th><th>Atk A</th><th>Def A</th><th>SpA A</th><th>SpD A</th><th>BST A</th><th>Speed B</th><th>HP B</th><th>Atk B</th><th>Def B</th><th>SpA B</th><th>SpD B</th><th>BST B</th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("B")}>Pokémon Team B · defensive types</button></th><th>Abilities B</th><th>Types B</th></tr></thead>
+      <div className="matrix-scroll draft-table-scroll"><table className="draft-matchup-table draft-matchup-table-symmetric">
+        <thead><tr><th>Types A</th><th>Abilities A</th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("A")}>Pokémon Team A · defensive types</button></th>{(["bst", "spd", "spa", "def", "atk", "hp", "spe"] as StatKey[]).map(key => statHeading(key, "A"))}{(["spe", "hp", "atk", "def", "spa", "spd", "bst"] as StatKey[]).map(key => statHeading(key, "B"))}<th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("B")}>Pokémon Team B · defensive types</button></th><th>Abilities B</th><th>Types B</th></tr></thead>
         <tbody>{Array.from({ length: Math.max(0, lastRow + 1) }, (_, index) => {
           const a = sortedA[index] || "";
           const b = sortedB[index] || "";
           const abilitiesA = a ? getSpeciesAbilities(a) : [];
           const abilitiesB = b ? getSpeciesAbilities(b) : [];
           return <tr key={index}>
-            <td>{a && <div className="draft-type-pills">{speciesTypes(a).map(type => <span key={type} className={typeClass(type)}>{type}</span>)}</div>}</td>
+            <td><div className="draft-type-pills">{a && speciesTypes(a).map(type => <span key={type} className={typeClass(type)}>{type}</span>)}</div></td>
             <td><div className="draft-abilities">{abilitiesA.map(ability => <span key={ability} className="draft-ability" title={getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}>{ability}</span>)}</div></td>
             <td className="draft-pokemon-name">{a || <span className="muted">—</span>}</td>
-            <td className="draft-speed" title={a ? speedTip(a, "A", activeB) : undefined} onClick={() => a && setSpeedEdit({ side: "A", name: a })}>{a ? <><strong>{baseSpeed(a) ?? "—"}</strong><button type="button" className="draft-speed-config" onClick={event => { event.stopPropagation(); setSpeedEdit({ side: "A", name: a }); }}>{configFor("A", a).ev}{configFor("A", a).nature === "boost" ? <span className="stage-positive">+</span> : configFor("A", a).nature === "hinder" ? <span className="stage-negative">−</span> : ""} EV · <span className={configFor("A", a).stage > 0 ? "stage-positive" : configFor("A", a).stage < 0 ? "stage-negative" : ""}>{configFor("A", a).stage > 0 ? `+${configFor("A", a).stage}` : configFor("A", a).stage}</span></button></> : "—"}</td>
-            {(["hp", "atk", "def", "spa", "spd", "bst"] as const).map(key => { const st = a ? baseStats(a) : null; return <td key={`A-${key}`} className="draft-base-stat">{st ? st[key] : "—"}</td>; })}
-            <td className="draft-speed" title={b ? speedTip(b, "B", activeA) : undefined} onClick={() => b && setSpeedEdit({ side: "B", name: b })}>{b ? <><strong>{baseSpeed(b) ?? "—"}</strong><button type="button" className="draft-speed-config" onClick={event => { event.stopPropagation(); setSpeedEdit({ side: "B", name: b }); }}>{configFor("B", b).ev}{configFor("B", b).nature === "boost" ? <span className="stage-positive">+</span> : configFor("B", b).nature === "hinder" ? <span className="stage-negative">−</span> : ""} EV · <span className={configFor("B", b).stage > 0 ? "stage-positive" : configFor("B", b).stage < 0 ? "stage-negative" : ""}>{configFor("B", b).stage > 0 ? `+${configFor("B", b).stage}` : configFor("B", b).stage}</span></button></> : "—"}</td>
-            {(["hp", "atk", "def", "spa", "spd", "bst"] as const).map(key => { const st = b ? baseStats(b) : null; return <td key={`B-${key}`} className="draft-base-stat">{st ? st[key] : "—"}</td>; })}
+            {(["bst", "spd", "spa", "def", "atk", "hp", "spe"] as StatKey[]).map(key => renderStatCell(a, "A", key))}
+            {(["spe", "hp", "atk", "def", "spa", "spd", "bst"] as StatKey[]).map(key => renderStatCell(b, "B", key))}
             <td className="draft-pokemon-name">{b || <span className="muted">—</span>}</td>
             <td><div className="draft-abilities">{abilitiesB.map(ability => <span key={ability} className="draft-ability" title={getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}>{ability}</span>)}</div></td>
             <td><div className="draft-type-pills">{b && speciesTypes(b).map(type => <span key={type} className={typeClass(type)}>{type}</span>)}</div></td>
@@ -245,7 +281,7 @@ export default function DraftMatchups() {
 
     {supportOpen && <SupportCategoryPanel left={asTeam(activeA)} right={asTeam(activeB)} format={format} onClose={() => setSupportOpen(false)} draftMode />}
 
-    {speedEdit && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSpeedEdit(null); }}><section className="draft-modal draft-speed-modal" role="dialog" aria-modal="true" aria-label={`${speedEdit.name} Speed settings`}><div className="panel-title-row"><div><h2>{speedEdit.name} Speed settings</h2><p>Used for speed EV benchmarks; table order remains based on base Speed.</p></div><button type="button" onClick={() => setSpeedEdit(null)}>Close ×</button></div>{(() => { const cfg = configFor(speedEdit.side, speedEdit.name); return <div className="draft-speed-fields"><label>Speed EVs <input type="number" min="0" max="252" step="4" value={cfg.ev} onChange={e => updateSpeedConfig(speedEdit.side, speedEdit.name, { ev: Math.max(0, Math.min(252, Number(e.target.value) || 0)) })} /></label><label>Nature<select value={cfg.nature} onChange={e => updateSpeedConfig(speedEdit.side, speedEdit.name, { nature: e.target.value as SpeedConfig["nature"] })}><option value="boost">Boosting (+Speed)</option><option value="neutral">Neutral</option><option value="hinder">Hindering (−Speed)</option></select></label><label>Speed stage<select value={cfg.stage} onChange={e => updateSpeedConfig(speedEdit.side, speedEdit.name, { stage: Number(e.target.value) })}>{Array.from({length: 13}, (_, i) => i - 6).map(stage => <option key={stage} value={stage}>{stage > 0 ? `+${stage}` : stage}</option>)}</select></label></div>; })()}</section></div>}
+    {speedEdit && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSpeedEdit(null); }}><section className="draft-modal draft-speed-modal" role="dialog" aria-modal="true" aria-label={`${speedEdit.name} ${STAT_LABELS[speedEdit.stat]} settings`}><div className="panel-title-row"><div><h2>{speedEdit.name} · {STAT_LABELS[speedEdit.stat]} settings</h2><p>Base stats remain displayed in the table; these settings are saved for matchup planning and stat calculations.</p></div><button type="button" onClick={() => setSpeedEdit(null)}>Close ×</button></div>{(() => { const cfg = configForStat(speedEdit.side, speedEdit.name, speedEdit.stat); const isHp = speedEdit.stat === "hp"; return <div className="draft-speed-fields"><label>{STAT_LABELS[speedEdit.stat]} EVs <input type="number" min="0" max="252" step="4" value={cfg.ev} onChange={e => updateStatConfig(speedEdit.side, speedEdit.name, speedEdit.stat, { ev: Math.max(0, Math.min(252, Number(e.target.value) || 0)) })} /></label>{!isHp && <label>Nature<select value={cfg.nature} onChange={e => updateStatConfig(speedEdit.side, speedEdit.name, speedEdit.stat, { nature: e.target.value as StatConfig["nature"] })}><option value="boost">Boosting (+{STAT_LABELS[speedEdit.stat]})</option><option value="neutral">Neutral</option><option value="hinder">Hindering (−{STAT_LABELS[speedEdit.stat]})</option></select></label>}{!isHp && <label>{STAT_LABELS[speedEdit.stat]} stage<select value={cfg.stage} onChange={e => updateStatConfig(speedEdit.side, speedEdit.name, speedEdit.stat, { stage: Number(e.target.value) })}>{Array.from({length: 13}, (_, i) => i - 6).map(stage => <option key={stage} value={stage}>{stage > 0 ? `+${stage}` : stage}</option>)}</select></label>}</div>; })()}</section></div>}
 
     {editorOpen && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeEditor(); }}>
       <section className="draft-modal" role="dialog" aria-modal="true" aria-labelledby="draft-editor-title">
