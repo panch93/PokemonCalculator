@@ -1,9 +1,9 @@
 export const POKEMON_TYPES = ["Normal", "Fire", "Water", "Electric", "Grass", "Ice", "Fighting", "Poison", "Ground", "Flying", "Psychic", "Bug", "Rock", "Ghost", "Dragon", "Dark", "Steel", "Fairy"] as const;
 
 /** SpriteCollab portraits are stored by National Dex number, with the default emotion named Normal.png. */
-export function getSpriteUrl(dexNumber: number | undefined): string | null {
+export function getSpriteUrl(dexNumber: number | undefined, emotion: "Normal" | "Dizzy" = "Normal"): string | null {
   if (typeof dexNumber !== "number" || !Number.isInteger(dexNumber) || dexNumber <= 0) return null;
-  return `https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/portrait/${String(dexNumber).padStart(4, "0")}/Normal.png`;
+  return `https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/portrait/${String(dexNumber).padStart(4, "0")}/${emotion}.png`;
 }
 
 const WEAK_TO: Record<string, string[]> = {

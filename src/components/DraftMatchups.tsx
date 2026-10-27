@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { getAbility, getSpecies, getSpeciesAbilities, getSpeciesList } from "../lib/showdown-data";
 import { POKEMON_TYPES } from "../lib/pokemon-visuals";
 import { TypeChart } from "../lib/showdown-official/data/typechart";
@@ -15,6 +15,7 @@ import type { Team } from "../lib/types";
 
 type Preset = { label: string; teamA: string[]; teamB: string[] };
 type StatKey = "hp" | "atk" | "def" | "spa" | "spd" | "spe" | "bst";
+type SpeedBenchmark = { opponent: string; target: number; hindering: number | null; neutral: number | null; boosted: number | null };
 const STAT_LABELS: Record<StatKey, string> = { hp: "HP", atk: "Atk", def: "Def", spa: "SpA", spd: "SpD", spe: "Speed", bst: "BST" };
 const PRESETS: Preset[] = [
   { label: "OU Balance vs Bulky Offense", teamA: "Dragapult,Great Tusk,Gholdengo,Slowking,Kingambit,Rillaboom,Gliscor,Clefable,Heatran,Zamazenta,Ogerpon-Wellspring,Iron Valiant".split(","), teamB: "Landorus-Therian,Garganacl,Volcarona,Corviknight,Kyurem,Primarina,Ting-Lu,Roaring Moon,Hatterene,Samurott-Hisui,Skeledirge,Meowscarada".split(",") },
@@ -74,6 +75,7 @@ export default function DraftMatchups() {
   const [typeTeam, setTypeTeam] = useState<"A" | "B" | null>(null);
   const [supportOpen, setSupportOpen] = useState(false);
   const [speedEdit, setSpeedEdit] = useState<{ side: "A" | "B"; name: string; stat: Exclude<StatKey, "bst"> } | null>(null);
+  const [speedHover, setSpeedHover] = useState<{ side: "A" | "B"; name: string; x: number; y: number } | null>(null);
   type SpeedConfig = { ev: number; nature: "boost" | "neutral" | "hinder"; stage: number };
   type StatConfig = { ev: number; nature: "boost" | "neutral" | "hinder"; stage: number };
   const [speedConfigs, setSpeedConfigs] = useState<Record<string, SpeedConfig>>({});
@@ -211,7 +213,7 @@ export default function DraftMatchups() {
     const natureLabel = key === "hp" ? "" : cfg?.nature === "boost" ? "+" : cfg?.nature === "hinder" ? "−" : "";
     const stageLabel = key === "hp" ? "" : cfg ? (cfg.stage > 0 ? `+${cfg.stage}` : String(cfg.stage)) : "";
     const open = () => name && setSpeedEdit({ side, name, stat: key });
-    return <td key={`${side}-${key}`} className={`draft-base-stat draft-stat-${key} ${key === "spe" ? "draft-speed" : ""}`} title={name && key === "spe" ? speedTip(name, side, side === "A" ? activeB : activeA) : undefined} onClick={open}>
+    return <td key={`${side}-${key}`} className={`draft-base-stat draft-stat-${key} ${key === "spe" ? "draft-speed" : ""}`} onClick={open} onMouseEnter={key === "spe" && name ? event => showSpeedHover(event, name, side) : undefined} onMouseLeave={key === "spe" ? () => setSpeedHover(null) : undefined}>
       <strong className="draft-stat-value" style={value === null ? undefined : statColor(value, key)}>{value ?? "—"}</strong>
       <button type="button" className="draft-stat-adjuster" aria-label={name ? `Adjust ${STAT_LABELS[key]} EVs and nature for ${name}` : "Adjust stat"} onClick={event => { event.stopPropagation(); open(); }} disabled={!name}>
         <span className={`draft-ev-line ${cfg?.nature === "boost" ? "nature-boost" : cfg?.nature === "hinder" ? "nature-hinder" : ""}`}>{cfg ? `${cfg.ev}${key !== "hp" ? natureLabel : ""} EVs` : " "}</span>
@@ -260,16 +262,24 @@ export default function DraftMatchups() {
     const natureValue = nature === "boost" ? 1.1 : nature === "hinder" ? 0.9 : 1;
     return Math.floor(Math.floor(raw * natureValue) * stageMultiplier(stage));
   };
-  const speedTip = (name: string, side: "A" | "B", opponents: string[]) => {
+  const speedTip = (name: string, side: "A" | "B", opponents: string[]): SpeedBenchmark[] => {
     const own = configFor(side, name);
-    const checks = opponents.filter(opponent => Boolean(opponent)).map(opponent => {
+    return opponents.filter(Boolean).map(opponent => {
       const targetConfig = configFor(side === "A" ? "B" : "A", opponent);
-      const target = speedStat(opponent, targetConfig.ev, targetConfig.nature, targetConfig.stage); if (target == null) return null;
-      const find = (nature: SpeedConfig["nature"]) => { for (let ev = 0; ev <= 252; ev += 4) if ((speedStat(name, ev, nature, own.stage) ?? 0) > target) return ev; return null; };
-      return { opponent, target, neutral: find("neutral"), boosted: find("boost") };
-    }).filter((x): x is {opponent:string;target:number;neutral:number|null;boosted:number|null} => !!x && x.neutral !== 0 && (x.neutral !== null || x.boosted !== null)).sort((a, b) => b.target - a.target);
-    if (!checks.length) return "No opposing Pokémon has a reachable Speed benchmark requiring additional EVs.";
-    return checks.map(x => `${x.opponent} (${x.target} effective Speed): ${[x.neutral !== null ? `neutral ${x.neutral} EVs` : null, x.boosted !== null ? `+Speed ${x.boosted} EVs` : null].filter(Boolean).join("; ")}`).join("\n");
+      const target = speedStat(opponent, targetConfig.ev, targetConfig.nature, targetConfig.stage);
+      if (target == null) return null;
+      const find = (nature: SpeedConfig["nature"]) => {
+        for (let ev = 0; ev <= 252; ev += 4) if ((speedStat(name, ev, nature, own.stage) ?? 0) > target) return ev;
+        return null;
+      };
+      return { opponent, target, hindering: find("hinder"), neutral: find("neutral"), boosted: find("boost") };
+    }).filter((row): row is SpeedBenchmark => row !== null && row.neutral !== 0 && (row.hindering !== null || row.neutral !== null || row.boosted !== null))
+      .sort((a, b) => b.target - a.target || a.opponent.localeCompare(b.opponent));
+  };
+  const showSpeedHover = (event: MouseEvent<HTMLTableCellElement>, name: string, side: "A" | "B") => {
+    const width = Math.min(370, window.innerWidth - 16);
+    const height = Math.min(320, window.innerHeight - 16);
+    setSpeedHover({ side, name, x: Math.max(8, Math.min(event.clientX + 12, window.innerWidth - width - 8)), y: Math.max(8, Math.min(event.clientY + 12, window.innerHeight - height - 8)) });
   };
 
 
@@ -308,7 +318,14 @@ export default function DraftMatchups() {
       {lastRow < 0 && <p className="muted">Choose Pokémon with “Edit matchup” to populate the table.</p>}
     </section>
 
-    
+    {speedHover && (() => {
+      const opponents = speedHover.side === "A" ? activeB : activeA;
+      const rows = speedTip(speedHover.name, speedHover.side, opponents);
+      return <div className="draft-speed-tooltip" role="tooltip" style={{ left: speedHover.x, top: speedHover.y }}>
+        <strong>{speedHover.name} · Speed benchmarks</strong>
+        {rows.length ? <table><thead><tr><th>Pokémon</th><th>Eff. speed</th><th>Hindering</th><th>Neutral</th><th>Boosting</th></tr></thead><tbody>{rows.map(row => <tr key={row.opponent}><th>{row.opponent}</th><td>{row.target}</td><td>{row.hindering === null ? "—" : `${row.hindering} EVs`}</td><td>{row.neutral === null ? "—" : `${row.neutral} EVs`}</td><td>{row.boosted === null ? "—" : `${row.boosted} EVs`}</td></tr>)}</tbody></table> : <p>No additional reachable Speed benchmarks.</p>}
+      </div>;
+    })()}
 
     {typeTeam && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setTypeTeam(null); }}>
       <section className="draft-modal draft-type-modal" role="dialog" aria-modal="true" aria-labelledby="draft-type-title">

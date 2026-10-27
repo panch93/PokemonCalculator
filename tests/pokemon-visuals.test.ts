@@ -5,6 +5,7 @@ describe("Pokémon visual helpers", () => {
   it("uses one square Normal portrait from the SpriteCollab repository", () => {
     expect(getSpriteUrl(1)).toBe("https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/portrait/0001/Normal.png");
     expect(getSpriteUrl(683)).toBe("https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/portrait/0683/Normal.png");
+    expect(getSpriteUrl(1, "Dizzy")).toBe("https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/portrait/0001/Dizzy.png");
     expect(getSpriteUrl(undefined)).toBeNull();
     expect(getSpriteUrl(0)).toBeNull();
   });
