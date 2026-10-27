@@ -26,7 +26,7 @@ export function setRemoteShowdownFormats(formats: ShowdownFormatOption[]): void 
 }
 
 
-/** Combines a small display fallback with the live upstream format catalog. */
+/** Combines a small fallback with the bundled upstream format catalog. */
 export function getAvailableShowdownFormats(): ShowdownFormatOption[] {
   if (availableFormatsCache) return availableFormatsCache;
 
@@ -34,6 +34,10 @@ export function getAvailableShowdownFormats(): ShowdownFormatOption[] {
   for (const format of CURATED_FORMATS) byId.set(format.id, { ...format, source: "bundled" });
   for (const format of remoteFormats) {
     const bundled = byId.get(format.id);
+    if (format.source === "bundled") {
+      byId.set(format.id, { ...format, source: "bundled" });
+      continue;
+    }
     byId.set(format.id, bundled ? {
       ...bundled,
       label: format.label || bundled.label,

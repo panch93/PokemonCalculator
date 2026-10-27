@@ -80,3 +80,7 @@ Pokémon names, rules, and legality data in the browser validator are adapted fr
 ## Browser validator migration
 
 Milestone 4 replaces the earlier diagnostic prototype with the upstream `TeamValidator` adapted for browser execution. See [`MILESTONE_4_OFFICIAL_BROWSER_TEAMVALIDATOR.md`](./MILESTONE_4_OFFICIAL_BROWSER_TEAMVALIDATOR.md) for supported formats, provenance, and verification limits. The complete project release gate still needs to be run in an environment with installed dependencies.
+
+## Pokémon Showdown data source
+
+The app uses a bundled, MIT-licensed snapshot of the official [`smogon/pokemon-showdown`](https://github.com/smogon/pokemon-showdown) repository for species, moves, items, abilities, natures, learnsets, format metadata, and team legality validation. Core battle data and format metadata do not require requests to `play.pokemonshowdown.com` or `raw.githubusercontent.com` at runtime. Update the snapshot deliberately from a reviewed upstream revision when current Showdown data is needed; the loading screen indexes the bundled tables locally and reports intermediate progress.

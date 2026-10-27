@@ -2,27 +2,29 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getAvailableShowdownFormats, setRemoteShowdownFormats, type ShowdownFormatOption } from "../lib/format-validation";
-import { fetchLiveShowdownFormats } from "../lib/showdown-format-config";
+import { getBundledShowdownFormats } from "../lib/showdown-format-config";
 
 type Props = { value: string; onChange: (value: string) => void };
 
-/** Searchable picker backed by the current upstream Pokémon Showdown format config. */
+/** Searchable picker backed by the locally bundled Pokémon Showdown format config. */
 export default function FormatSelector({ value, onChange }: Props) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [formats, setFormats] = useState<ShowdownFormatOption[]>(() => getAvailableShowdownFormats());
-  const [catalogStatus, setCatalogStatus] = useState<"loading" | "live" | "fallback">("loading");
+  const [catalogStatus, setCatalogStatus] = useState<"loading" | "bundled" | "fallback">("loading");
 
   useEffect(() => {
     let cancelled = false;
-    fetchLiveShowdownFormats()
-      .then(fetched => {
-        if (cancelled) return;
-        setRemoteShowdownFormats(fetched);
+    try {
+      const bundled = getBundledShowdownFormats();
+      if (!cancelled) {
+        setRemoteShowdownFormats(bundled);
         setFormats(getAvailableShowdownFormats());
-        setCatalogStatus("live");
-      })
-      .catch(() => { if (!cancelled) { setFormats(getAvailableShowdownFormats()); setCatalogStatus("fallback"); } });
+        setCatalogStatus("bundled");
+      }
+    } catch {
+      if (!cancelled) { setFormats(getAvailableShowdownFormats()); setCatalogStatus("fallback"); }
+    }
     return () => { cancelled = true; };
   }, []);
 
@@ -49,7 +51,7 @@ export default function FormatSelector({ value, onChange }: Props) {
         <span>{format.label}</span>{format.searchShow === false && <small>Hidden from ladder search</small>}
       </button>)}
       {!filtered.length && <p>No matching formats</p>}
-      <p className="format-catalog-status">{catalogStatus === "live" ? "Live Pokémon Showdown config" : catalogStatus === "loading" ? "Loading current formats…" : "Using bundled format list · live config unavailable"}</p>
+      <p className="format-catalog-status">{catalogStatus === "bundled" ? "Bundled Pokémon Showdown config" : catalogStatus === "loading" ? "Loading bundled formats…" : "Using curated format list · bundled config unavailable"}</p>
     </div>}
   </div>;
 }
