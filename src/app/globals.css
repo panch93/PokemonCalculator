@@ -875,3 +875,40 @@ select, select:focus, select option, datalist option {
 .draft-matchup-table-symmetric .draft-ability { padding: 1px 2px; font-size: .65rem; line-height: 1.18; -webkit-line-clamp: 2; overflow-wrap: break-word; word-break: normal; }
 .draft-matchup-table-symmetric .draft-heading-button { max-width: 82px; padding: 2px; font-size: .7rem; line-height: 1.15; }
 .draft-matchup-table-symmetric td { vertical-align: middle; }
+
+/* Compact symmetric draft identity cells: one portrait column at each outer edge. */
+.draft-matchup-table-symmetric { width: 100%; min-width: 1020px; table-layout: fixed; }
+.draft-matchup-table-symmetric .draft-sprite-heading,
+.draft-matchup-table-symmetric .draft-mon-sprite-cell { width: 48px; min-width: 48px; max-width: 48px; padding: 3px; text-align: center; vertical-align: middle; }
+.draft-matchup-table-symmetric .draft-mon-sprite { display: block; width: 40px; height: 40px; max-width: 40px; max-height: 40px; object-fit: contain; image-rendering: pixelated; margin: 0 auto; }
+.draft-matchup-table-symmetric .draft-mon-entry { width: 112px; min-width: 112px; max-width: 112px; padding: 4px 5px; text-align: center; vertical-align: middle; overflow: hidden; }
+.draft-matchup-table-symmetric .draft-mon-details { display: grid; grid-template-rows: auto auto auto; align-content: center; justify-items: center; gap: 2px; width: 100%; min-width: 0; }
+.draft-matchup-table-symmetric .draft-pokemon-name { display: block; width: 100%; min-width: 0; max-width: 100%; padding: 0; margin: 0; font-size: .76rem; font-weight: 800; line-height: 1.1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.draft-matchup-table-symmetric .draft-type-pills { display: flex; flex-wrap: nowrap; justify-content: center; align-items: center; gap: 2px; width: 100%; min-width: 0; max-width: 100%; overflow: hidden; }
+.draft-matchup-table-symmetric .draft-type-pills .type-badge { flex: 0 1 auto; min-width: 0; max-width: 50%; padding: 1px 3px; font-size: .52rem; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.draft-matchup-table-symmetric .draft-abilities { display: flex; flex-wrap: nowrap; justify-content: center; align-items: center; gap: 2px; width: 100%; min-width: 0; max-width: 100%; overflow: hidden; }
+.draft-matchup-table-symmetric .draft-ability { display: block; flex: 0 1 auto; min-width: 0; max-width: 34%; padding: 1px 0; border: 0; border-radius: 0; background: transparent; font-size: .54rem; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: clip; text-align: center; }
+.draft-matchup-table-symmetric .draft-stat-heading,
+.draft-matchup-table-symmetric .draft-base-stat,
+.draft-matchup-table-symmetric .draft-stat-bst,
+.draft-matchup-table-symmetric .draft-stat-spe,
+.draft-matchup-table-symmetric .draft-speed { box-sizing: border-box; width: 50px; min-width: 50px; max-width: 50px; padding: 4px 2px; text-align: center; }
+.draft-matchup-table-symmetric .draft-stat-heading button { display: inline-flex; width: 100%; min-width: 0; align-items: center; justify-content: center; gap: 0; padding: 3px 0; font-size: .68rem; line-height: 1.1; white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-sort-indicator { display: inline-block; width: 9px; flex: 0 0 9px; margin-left: 1px; font-size: .68rem; }
+.draft-matchup-table-symmetric .draft-stat-value { font-size: .82rem; line-height: 1.15; }
+.draft-matchup-table-symmetric .draft-stat-adjuster { min-height: 29px; margin-top: 2px; font-size: 8.5px; line-height: 1.15; white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-ev-line,
+.draft-matchup-table-symmetric .draft-stage-line { display: block; min-height: 10px; white-space: nowrap; }
+.draft-matchup-table-symmetric tbody td { vertical-align: middle; }
+.draft-matchup-table-symmetric tbody td:nth-child(9),
+.draft-matchup-table-symmetric thead th:nth-child(9) { border-right-width: 2px; border-right-color: var(--accent, #93c5fd); }
+.draft-matchup-table-symmetric tbody td:nth-child(10),
+.draft-matchup-table-symmetric thead th:nth-child(10) { border-left-width: 2px; border-left-color: var(--accent, #93c5fd); }
+
+/* Square PMDCollab portrait assets in both sides of the damage matrix; no zoom/crop. */
+.matrix .attacker-info-inner > .attacker-sprite-crop,
+.matrix .defender-identity .defender-sprite-crop { width: 44px; height: 44px; min-width: 44px; min-height: 44px; max-width: 44px; max-height: 44px; flex: 0 0 44px; overflow: hidden; display: flex; align-items: center; justify-content: center; margin: 2px auto; }
+.matrix .attacker-info-inner > .attacker-sprite-crop .matrix-sprite,
+.matrix .defender-identity .defender-sprite-crop .matrix-sprite { display: block; width: 40px; height: 40px; min-width: 40px; min-height: 40px; max-width: 40px; max-height: 40px; object-fit: contain; object-position: center; transform: none; image-rendering: pixelated; }
+.matrix .attacker-info-inner > .attacker-sprite-crop { flex: 0 0 44px; min-height: 44px; height: 44px; }
+.matrix .attacker-info-inner { align-items: stretch; }

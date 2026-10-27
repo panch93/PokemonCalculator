@@ -9,6 +9,7 @@ import { TypeChart } from "../lib/showdown-official/data/typechart";
 import AutocompleteInput from "./AutocompleteInput";
 import SupportCategoryPanel from "./SupportCategoryPanel";
 import FormatSelector from "./FormatSelector";
+import PokemonSprite from "./PokemonSprite";
 import type { Team } from "../lib/types";
 
 type Preset = { label: string; teamA: string[]; teamB: string[] };
@@ -57,6 +58,7 @@ function multiplierLabel(value: number) {
   return value === 0 ? "×0" : `×${Number.isInteger(value) ? value : value.toFixed(2).replace(/0$/, "")}`;
 }
 function typeClass(type: string) { return `type-badge type-${type.toLowerCase().replace(/[^a-z]/g, "")}`; }
+function shortAbilityName(ability: string) { return ability.length > 4 ? `${ability.slice(0, 4)}...` : ability; }
 
 export default function DraftMatchups() {
   const species = useMemo(() => getSpeciesList(), []);
@@ -258,21 +260,19 @@ export default function DraftMatchups() {
     <section className="panel">
       <div className="panel-title-row"><div><h2>{matchupName}</h2><p>Hover over a Speed value for EV calcs.</p></div><div className="draft-team-formats"><label>Matchup format<FormatSelector value={format} onChange={setFormat} /></label></div></div>
       <div className="matrix-scroll draft-table-scroll"><table className="draft-matchup-table draft-matchup-table-symmetric">
-        <thead><tr><th>Types A</th><th>Abilities A</th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("A")}>Team A</button></th>{(["bst", "spd", "spa", "def", "atk", "hp", "spe"] as StatKey[]).map(key => statHeading(key, "A"))}{(["spe", "hp", "atk", "def", "spa", "spd", "bst"] as StatKey[]).map(key => statHeading(key, "B"))}<th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("B")}>Team B</button></th><th>Abilities B</th><th>Types B</th></tr></thead>
+        <thead><tr><th className="draft-sprite-heading" aria-label="Team A portrait"></th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("A")}>Team A</button></th>{(["bst", "spd", "spa", "def", "atk", "hp", "spe"] as StatKey[]).map(key => statHeading(key, "A"))}{(["spe", "hp", "atk", "def", "spa", "spd", "bst"] as StatKey[]).map(key => statHeading(key, "B"))}<th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("B")}>Team B</button></th><th className="draft-sprite-heading" aria-label="Team B portrait"></th></tr></thead>
         <tbody>{Array.from({ length: Math.max(0, lastRow + 1) }, (_, index) => {
           const a = sortedA[index] || "";
           const b = sortedB[index] || "";
           const abilitiesA = a ? getSpeciesAbilities(a) : [];
           const abilitiesB = b ? getSpeciesAbilities(b) : [];
           return <tr key={index}>
-            <td><div className="draft-type-pills">{a && speciesTypes(a).map(type => <span key={type} className={typeClass(type)} title={`Defensive type matchups for ${a}:\n${typeMatchupSummary(speciesTypes(a))}`}>{type}</span>)}</div></td>
-            <td><div className="draft-abilities">{abilitiesA.map(ability => <span key={ability} className="draft-ability" title={getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}>{ability}</span>)}</div></td>
-            <td className="draft-pokemon-name">{a || <span className="muted">—</span>}</td>
+            <td className="draft-mon-sprite-cell"><PokemonSprite species={a} className="draft-mon-sprite" /></td>
+            <td className="draft-mon-entry"><div className="draft-mon-details"><strong className="draft-pokemon-name">{a || <span className="muted">—</span>}</strong><div className="draft-type-pills">{a && speciesTypes(a).map(type => <span key={type} className={typeClass(type)} title={`Defensive type matchups for ${a}:\n${typeMatchupSummary(speciesTypes(a))}`}>{type}</span>)}</div><div className="draft-abilities">{abilitiesA.map(ability => <span key={ability} className="draft-ability" title={`${ability}: ${getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}`}>{shortAbilityName(ability)}</span>)}</div></div></td>
             {(["bst", "spd", "spa", "def", "atk", "hp", "spe"] as StatKey[]).map(key => renderStatCell(a, "A", key))}
             {(["spe", "hp", "atk", "def", "spa", "spd", "bst"] as StatKey[]).map(key => renderStatCell(b, "B", key))}
-            <td className="draft-pokemon-name">{b || <span className="muted">—</span>}</td>
-            <td><div className="draft-abilities">{abilitiesB.map(ability => <span key={ability} className="draft-ability" title={getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}>{ability}</span>)}</div></td>
-            <td><div className="draft-type-pills">{b && speciesTypes(b).map(type => <span key={type} className={typeClass(type)} title={`Defensive type matchups for ${b}:\n${typeMatchupSummary(speciesTypes(b))}`}>{type}</span>)}</div></td>
+            <td className="draft-mon-entry"><div className="draft-mon-details"><strong className="draft-pokemon-name">{b || <span className="muted">—</span>}</strong><div className="draft-type-pills">{b && speciesTypes(b).map(type => <span key={type} className={typeClass(type)} title={`Defensive type matchups for ${b}:\n${typeMatchupSummary(speciesTypes(b))}`}>{type}</span>)}</div><div className="draft-abilities">{abilitiesB.map(ability => <span key={ability} className="draft-ability" title={`${ability}: ${getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}`}>{shortAbilityName(ability)}</span>)}</div></div></td>
+            <td className="draft-mon-sprite-cell"><PokemonSprite species={b} className="draft-mon-sprite" /></td>
           </tr>;
         })}</tbody>
       </table></div>
