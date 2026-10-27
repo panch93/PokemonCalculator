@@ -1,5 +1,6 @@
 import { normalizeFormatIdentifier } from "./format-normalization";
 import type { ShowdownFormatOption } from "./format-types";
+import bundledFormatsJson from "./showdown-official/formats.json";
 
 type StringField = "name" | "section" | "mod" | "gameType" | "team";
 
@@ -161,18 +162,51 @@ export function parseShowdownFormatConfig(source: string): ShowdownFormatOption[
   return formats;
 }
 
-let liveFormatsPromise: Promise<ShowdownFormatOption[]> | null = null;
+let bundledFormatsCache: ShowdownFormatOption[] | null = null;
 
-export function fetchLiveShowdownFormats(): Promise<ShowdownFormatOption[]> {
-  if (!liveFormatsPromise) {
-    liveFormatsPromise = (async () => {
-      const response = await fetch("https://raw.githubusercontent.com/smogon/pokemon-showdown/master/config/formats.ts", { cache: "no-store" });
-      if (!response.ok) throw new Error(`Could not fetch official Pokémon Showdown format config (${response.status})`);
-      return parseShowdownFormatConfig(await response.text());
-    })().catch(error => {
-      liveFormatsPromise = null;
-      throw error;
+/** Return format metadata from the bundled upstream repository snapshot; no network request is made. */
+export function getBundledShowdownFormats(): ShowdownFormatOption[] {
+  if (bundledFormatsCache) return bundledFormatsCache;
+  const formats: ShowdownFormatOption[] = [];
+  let section = "Other";
+  for (const raw of bundledFormatsJson as Array<Record<string, unknown>>) {
+    const nextSection = typeof raw.section === "string" ? raw.section : undefined;
+    if (typeof raw.name !== "string" && typeof raw.label !== "string") {
+      if (nextSection) section = nextSection;
+      continue;
+    }
+    const labelValue = typeof raw.label === "string" ? raw.label : raw.name;
+    if (typeof labelValue !== "string") continue;
+    const label = labelValue;
+    const id = typeof raw.id === "string" && raw.id ? raw.id : normalizeFormatIdentifier(label);
+    if (!id) continue;
+    formats.push({
+      id,
+      label,
+      section: typeof raw.section === "string" ? raw.section : section,
+      source: "bundled",
+      ...(typeof raw.mod === "string" ? { mod: raw.mod } : {}),
+      ...(typeof raw.gameType === "string" ? { gameType: raw.gameType } : {}),
+      ...(typeof raw.team === "string" ? { team: raw.team } : {}),
+      ...(typeof raw.searchShow === "boolean" ? { searchShow: raw.searchShow } : {}),
+      ...(Array.isArray(raw.ruleset) ? { ruleset: raw.ruleset.filter((value): value is string => typeof value === "string") } : {}),
+      ...(Array.isArray(raw.banlist) ? { banlist: raw.banlist.filter((value): value is string => typeof value === "string") } : {}),
     });
   }
-  return liveFormatsPromise;
+  if (formats.length < 100) throw new Error(`Bundled official Pokémon Showdown format config looked incomplete (${formats.length} formats parsed)`);
+  bundledFormatsCache = formats;
+  return formats;
+}
+
+/** Fetch current display metadata from the moving upstream master branch, falling back to the bundled catalog offline. */
+export async function fetchLiveShowdownFormats(): Promise<ShowdownFormatOption[]> {
+  const url = "https://raw.githubusercontent.com/smogon/pokemon-showdown/master/config/formats.ts";
+  try {
+    const response = await fetch(url, { headers: { Accept: "text/plain" }, cache: "no-cache" });
+    if (!response.ok) throw new Error(`Upstream format config request failed (${response.status})`);
+    const formats = parseShowdownFormatConfig(await response.text());
+    return formats.map(format => ({ ...format, source: "remote" as const }));
+  } catch {
+    return getBundledShowdownFormats();
+  }
 }

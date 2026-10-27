@@ -632,3 +632,580 @@ select, select:focus, select option, datalist option {
 .format-validation-result ul { margin:0; padding-left:18px; line-height:1.5; }
 .format-validation-result li + li { margin-top:5px; }
 @media(max-width:700px) { .format-validation-summary,.format-validation-details { grid-template-columns:1fr; } }
+
+
+/* Compact team-column metadata: keep ability/item visually attached to the name. */
+.pokemon-card { grid-template-columns: 24px minmax(0, 1fr); column-gap: 7px; row-gap: 2px; align-items: start; }
+.pokemon-card .slot { grid-column: 1; grid-row: 1 / span 2; padding-top: 2px; }
+.pokemon-card .poke-main { grid-column: 2; grid-row: 1; }
+.pokemon-card .poke-meta-stack { grid-column: 2; grid-row: 2; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 9px; max-width: 100%; }
+.pokemon-card .poke-meta-stack .poke-meta { max-width: 100%; white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
+
+/* Keep zoomed matrix sprites inside their allocated cells instead of spilling over nearby text. */
+.matrix-sprite-crop { position: relative; overflow: hidden; flex-shrink: 0; }
+.matrix .attacker-sprite-crop { width: 42px; height: 38px; margin: 0 auto 2px; }
+.matrix .defender-sprite-crop { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 4px; }
+.matrix-sprite-crop .matrix-sprite { max-width: none; max-height: none; }
+
+/* Navigation shared by Team Lab and the Draft Matchups page. */
+.nav-link { display: inline-flex; align-items: center; justify-content: center; padding: 9px 12px; border: 1px solid var(--accent-2); border-radius: 9px; color: var(--text); text-decoration: none; font-weight: 700; white-space: nowrap; }
+.nav-link:hover { background: #18283b; border-color: #93c5fd; }
+.draft-page { max-width: 1900px; }
+.draft-hero { align-items: flex-start; }
+.draft-hero h1 { margin-top: 7px; }
+.draft-controls { display: flex; align-items: end; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.draft-preset-control { display: grid; gap: 6px; width: min(520px, 100%); }
+.draft-preset-control label { color: var(--muted); font-size: .78rem; }
+.draft-team-counts { display: flex; gap: 14px; margin-right: auto; color: var(--muted); font-size: .85rem; }
+.draft-team-counts strong { color: var(--text); }
+.draft-table-scroll { width: 100%; }
+.draft-matchup-table { width: 100%; min-width: 1100px; border-collapse: collapse; }
+.draft-matchup-table th, .draft-matchup-table td { padding: 9px 8px; border: 1px solid var(--border); text-align: left; vertical-align: middle; }
+.draft-matchup-table thead th { position: sticky; top: 0; z-index: 1; background: var(--panel-2); color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; }
+.draft-matchup-table tbody tr:nth-child(even) { background: rgba(255,255,255,.018); }
+.draft-matchup-table .draft-pokemon-name { min-width: 135px; font-weight: 750; }
+.draft-matchup-table .draft-speed { min-width: 74px; text-align: center; font-size: 1.05rem; font-weight: 850; font-variant-numeric: tabular-nums; background: rgba(96,165,250,.07); }
+.draft-type-pills { display: flex; flex-wrap: wrap; gap: 4px; min-width: 80px; }
+.draft-type-pills .type-badge { font-size: .62rem; }
+.draft-abilities { display: flex; flex-wrap: wrap; gap: 4px; min-width: 130px; }
+.draft-ability { display: inline-flex; align-items: center; border: 1px solid #354153; background: #121b27; color: #d7e0ec; border-radius: 5px; padding: 3px 6px; font-size: .68rem; line-height: 1.3; cursor: help; }
+.draft-typecharts { display: grid; gap: 20px; }
+.draft-typechart h3, .draft-editor-team h3 { margin: 0 0 9px; font-size: .95rem; }
+.draft-typechart-table { border-collapse: collapse; min-width: 100%; width: max-content; }
+.draft-typechart-table th, .draft-typechart-table td { border: 1px solid var(--border); padding: 6px 8px; text-align: center; min-width: 54px; }
+.draft-typechart-table thead th { background: var(--panel-2); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .68rem; }
+.draft-typechart-table tbody th { position: sticky; left: 0; z-index: 1; background: var(--panel); text-align: left; }
+.draft-typechart-table .type-badge { font-size: .61rem; }
+.type-multiplier { font-size: .75rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.type-multiplier.resist { color: #86efac; background: rgba(34,197,94,.08); }
+.type-multiplier.weak { color: #fca5a5; background: rgba(239,68,68,.08); }
+.type-multiplier.immune { color: #93c5fd; background: rgba(59,130,246,.1); }
+.type-multiplier.neutral { color: var(--muted); }
+.draft-modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.72); }
+.draft-modal { width: min(1200px, 100%); max-height: min(90vh, 1000px); overflow: auto; padding: 20px; background: var(--panel); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 25px 90px rgba(0,0,0,.55); }
+.draft-editor-teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.draft-editor-team { min-width: 0; }
+.draft-editor-slot { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; gap: 8px; margin: 7px 0; color: var(--muted); font-size: .75rem; }
+.draft-editor-slot select { min-width: 0; padding: 8px; }
+.draft-editor-actions { justify-content: flex-end; margin-top: 16px; }
+@media (max-width: 700px) {
+  .draft-controls { align-items: stretch; }
+  .draft-preset-control { width: 100%; }
+  .draft-team-counts { width: 100%; }
+  .draft-editor-teams { grid-template-columns: 1fr; }
+  .draft-modal-backdrop { padding: 8px; }
+  .draft-modal { padding: 13px; max-height: 96vh; }
+}
+
+/* The attacker identity column keeps the species, type badges and ability tightly grouped. */
+.matrix .attacker-info-cell { vertical-align: top; }
+.matrix .attacker-info-cell > .matrix-sprite-crop { margin-bottom: 0; }
+.matrix .attacker-info-cell > .matrix-pokemon-name { margin: 0; line-height: 1.15; }
+.matrix .attacker-info-cell > .type-list { height: auto; min-height: 0; margin: 2px 0; overflow: visible; }
+.matrix .attacker-info-cell > .matrix-item { display: block; margin-top: 2px; line-height: 1.2; }
+
+
+/* Doubles and draft matchup additions */
+.move-spread-indicator { display: inline-block; margin-left: 4px; padding: 1px 4px; border-radius: 4px; font-size: 10px; line-height: 1.25; color: #a9d7ff; border: 1px solid #477da8; white-space: nowrap; }
+.draft-heading-button { color: inherit; font: inherit; font-weight: 700; border: 0; background: transparent; padding: 3px; cursor: pointer; text-align: inherit; }
+.draft-heading-button:hover { color: var(--accent, #7db8ff); text-decoration: underline; }
+.draft-tools-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.draft-type-modal { width: min(96vw, 1400px); max-height: 90vh; overflow: auto; }
+.draft-typechart-transposed { min-width: 100%; font-size: 12px; }
+.draft-typechart-transposed th, .draft-typechart-transposed td { white-space: nowrap; padding: 6px; text-align: center; }
+.draft-typechart-transposed tbody th { text-align: left; position: sticky; left: 0; background: var(--panel, #171d28); z-index: 1; }
+.draft-typechart-transposed .resist { background: rgba(38, 166, 91, .22); color: #76e5a1; }
+.draft-typechart-transposed .weak { background: rgba(220, 65, 65, .22); color: #ff9292; }
+.draft-typechart-transposed .immune { background: rgba(38, 166, 91, .3); color: #76e5a1; }
+.draft-matchup-name { display: grid; gap: 6px; margin-bottom: 16px; }
+.draft-matchup-name input { width: 100%; }
+.draft-editor-slot .builder-autocomplete { width: 100%; }
+
+.draft-team-formats { display: flex; flex-wrap: wrap; gap: 12px; align-items: start; }
+.draft-team-formats > label, .draft-format-label { display: flex; flex-direction: column; gap: 5px; min-width: 190px; font-size: .75rem; color: var(--muted); }
+.draft-format-label .format-selector { width: 100%; }
+.draft-typechart-transposed thead th.type-head-good { background: rgba(38, 166, 91, .3); color: #76e5a1; }
+.draft-typechart-transposed thead th.type-head-bad { background: rgba(220, 65, 65, .3); color: #ff9292; }
+.draft-typechart-transposed thead th small { display: block; font-size: .62rem; font-weight: 700; margin-top: 4px; }
+
+/* Bundled Pokémon Showdown data loader */
+.data-loader-shell { min-height: 100vh; display: grid; place-items: center; padding: 28px 16px; background: radial-gradient(ellipse at top, rgba(66, 110, 180, .16), transparent 55%); }
+.data-loader-card { width: min(100%, 620px); padding: clamp(24px, 5vw, 44px); border: 1px solid var(--border, #2f3b4e); box-shadow: 0 24px 80px rgba(0, 0, 0, .24); }
+.data-loader-mark { width: 56px; height: 56px; display: grid; place-items: center; margin-bottom: 22px; border-radius: 16px; background: linear-gradient(135deg, #315f9d, #6d4fc4); color: #fff; font-weight: 900; letter-spacing: .04em; box-shadow: 0 8px 24px rgba(72, 103, 180, .25); }
+.data-loader-eyebrow { margin: 0 0 8px; color: var(--muted, #8995a7); font-size: .73rem; font-weight: 800; letter-spacing: .15em; }
+.data-loader-card h1 { margin: 0 0 10px; font-size: clamp(1.5rem, 4vw, 2rem); }
+.data-loader-intro { margin: 0 0 28px; color: var(--muted, #8995a7); line-height: 1.6; }
+.data-loader-progress-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; font-size: .9rem; }
+.data-loader-progress-meta span { font-variant-numeric: tabular-nums; color: var(--muted, #8995a7); }
+.data-loader-track { height: 9px; overflow: hidden; border-radius: 999px; background: var(--border, #2f3b4e); }
+.data-loader-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #3c8bd9, #7d69e8); transition: width .25s ease; }
+.data-loader-detail { min-height: 2.8em; margin: 12px 0 22px; color: var(--muted, #8995a7); font-size: .9rem; line-height: 1.5; }
+.data-loader-steps { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
+.data-loader-steps li { position: relative; padding-left: 28px; color: var(--muted, #8995a7); font-size: .9rem; }
+.data-loader-steps li::before { content: ""; position: absolute; left: 1px; top: .2em; width: 13px; height: 13px; border: 2px solid var(--border, #526074); border-radius: 50%; }
+.data-loader-steps li.active { color: var(--foreground, #e7edf6); font-weight: 700; }
+.data-loader-steps li.active::before { border-color: #4e91e6; box-shadow: 0 0 0 3px rgba(78, 145, 230, .14); }
+.data-loader-steps li.complete { color: var(--foreground, #e7edf6); }
+.data-loader-steps li.complete::before { border-color: #32a675; background: #32a675; box-shadow: inset 0 0 0 3px var(--panel, #151d2a); }
+.data-loader-footnote { margin: 26px 0 0; padding-top: 16px; border-top: 1px solid var(--border, #2f3b4e); color: var(--muted, #8995a7); font-size: .78rem; }
+.data-loader-footnote code { color: inherit; }
+
+/* Draft Speed settings stay compact beneath the base Speed value. */
+.draft-speed { white-space: nowrap; text-align: center; vertical-align: middle; }
+.draft-speed > strong { display: block; font-size: 14px; }
+.draft-speed-config { display: block; border: 0; background: transparent; color: var(--muted, #98a2b3); font-size: 10px; line-height: 1.2; padding: 1px 2px; margin: 2px auto 0; cursor: pointer; }
+.draft-speed-config:hover { color: var(--accent, #93c5fd); text-decoration: underline; }
+.draft-speed-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.draft-speed-fields label { display: grid; gap: 5px; font-size: 12px; }
+.draft-speed-fields input, .draft-speed-fields select { width: 100%; min-width: 0; }
+@media (max-width: 600px) { .draft-speed-fields { grid-template-columns: 1fr; } }
+/* Use the full sprite image area in the Team Lab matrix rather than zoom-cropping artwork. */
+.matrix-sprite-crop { overflow: visible; }
+.matrix .attacker-sprite-crop { width: 64px; height: 58px; margin: 0 auto 2px; }
+.matrix .defender-sprite-crop { width: 56px; height: 56px; flex: 0 0 56px; }
+.matrix .attacker-info-cell .matrix-sprite { width: 64px; height: 58px; transform: none; object-fit: contain; }
+.matrix .defender-identity .matrix-sprite { width: 56px; height: 56px; flex-basis: 56px; transform: none; object-fit: contain; }
+.matrix .attacker-info-cell .matrix-pokemon-name, .matrix .defender-identity .matrix-pokemon-name { max-width: 100%; overflow-wrap: anywhere; }
+.matrix .attacker-info-cell > .type-list, .matrix .defender-identity .type-list { height: auto; min-height: 0; overflow: visible; flex-wrap: wrap; }
+/* Keep Draft Matchups navigation pinned to the top-right of the Team Lab hero. */
+.hero { position: relative; }
+.hero > .hero-actions { padding-top: 38px; }
+.hero > .hero-actions > .nav-link { position: absolute; top: 0; right: 0; }
+
+/* Keep matrix identity text anchored to the cell edge while the sprite uses spare height. */
+.matrix .attacker-info-cell { display: flex; flex-direction: column; align-items: stretch; text-align: right; vertical-align: top; }
+.matrix .attacker-info-cell > .attacker-sprite-crop { flex: 1 1 auto; min-height: 72px; width: 100%; display: flex; align-items: center; justify-content: center; }
+.matrix .attacker-info-cell > .attacker-sprite-crop .matrix-sprite { width: 100%; max-width: 100%; height: 100%; min-height: 72px; object-fit: contain; }
+.matrix .attacker-info-cell .matrix-pokemon-name { text-align: right; align-self: stretch; }
+.matrix .attacker-info-cell > .type-list { justify-content: flex-end; }
+.matrix .attacker-info-cell > .matrix-item { align-self: stretch; text-align: right; overflow-wrap: anywhere; white-space: normal; }
+.matrix .attacker-info-cell > .matrix-pokemon-controls,
+.matrix .attacker-info-cell > .matrix-current-hp,
+.matrix .attacker-info-cell > .stat-stage-row { margin-top: 3px; }
+
+/* Keep the Pokémon identity as a true table cell so rowSpan merges it beside all four move rows. */
+.matrix .attacker-info-cell { display: table-cell !important; vertical-align: middle !important; padding: 5px; }
+.matrix .attacker-info-inner { display: flex; flex-direction: column; align-items: stretch; width: 100%; min-height: 100%; text-align: right; }
+.matrix .attacker-info-inner > .attacker-sprite-crop { flex: 1 1 auto; min-height: 72px; width: 100%; display: flex; align-items: center; justify-content: center; }
+.matrix .attacker-info-inner > .attacker-sprite-crop .matrix-sprite { width: 100%; max-width: 100%; height: 100%; min-height: 72px; object-fit: contain; }
+.matrix .attacker-info-inner .matrix-pokemon-name { text-align: right; align-self: stretch; }
+.matrix .attacker-info-inner > .type-list { justify-content: flex-end; }
+.matrix .attacker-info-inner > .matrix-item { align-self: stretch; text-align: right; overflow-wrap: anywhere; white-space: normal; }
+.matrix .attacker-info-inner > .matrix-pokemon-controls, .matrix .attacker-info-inner > .matrix-current-hp, .matrix .attacker-info-inner > .stat-stage-row { margin-top: 3px; }
+
+/* Draft matchup stats are compact so both full stat lines fit in the horizontal table. */
+.draft-matchup-table { min-width: 1550px; }
+.draft-matchup-table .draft-base-stat { width: 42px; min-width: 42px; padding: 7px 4px; text-align: center; font-size: .72rem; font-variant-numeric: tabular-nums; color: var(--muted); }
+.draft-matchup-table .draft-speed { cursor: pointer; }
+.draft-matchup-table .draft-speed:hover { background: rgba(255,255,255,.045); }
+.draft-speed-config { cursor: pointer; }
+.stage-positive { color: #42c878; font-weight: 800; }
+.stage-negative { color: #f07878; font-weight: 800; }
+
+
+/* Symmetric Draft Matchups stat line: BST ... HP, Speed | Speed, HP ... BST. */
+.draft-matchup-table-symmetric { min-width: 1660px; table-layout: auto; }
+.draft-matchup-table-symmetric thead th { text-align: center; vertical-align: middle; white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-stat-heading { min-width: 48px; padding: 5px 3px; }
+.draft-matchup-table-symmetric .draft-stat-heading button { appearance: none; border: 0; padding: 3px 2px; background: transparent; color: inherit; font: inherit; font-size: .7rem; text-transform: inherit; letter-spacing: inherit; cursor: pointer; white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-stat-heading button:hover { color: var(--foreground, #eef2ff); }
+.draft-matchup-table-symmetric .draft-sort-indicator { color: var(--accent, #93c5fd); font-size: .7rem; }
+.draft-matchup-table-symmetric .draft-base-stat { text-align: center; padding: 5px 3px; min-width: 43px; width: 43px; font-size: .78rem; font-weight: 750; color: var(--text, #e5e7eb); }
+.draft-matchup-table-symmetric .draft-base-stat span { display: inline-block; min-width: 2ch; }
+.draft-matchup-table-symmetric .draft-stat-bst { min-width: 52px; width: 52px; }
+.draft-matchup-table-symmetric .draft-speed { min-width: 68px; width: 68px; padding: 5px 3px; background: transparent; }
+.draft-matchup-table-symmetric .draft-speed:hover { background: rgba(255,255,255,.055); }
+.draft-matchup-table-symmetric .draft-pokemon-name { min-width: 122px; text-align: center; font-size: .76rem; }
+
+
+
+/* Ensure matrix sprite elements have a concrete visible box and don't inherit cropping/zero-height rules. */
+.matrix .attacker-info-inner > .attacker-sprite-crop { min-height: 84px; height: 84px; flex: 0 0 84px; overflow: visible; }
+.matrix .attacker-info-inner > .attacker-sprite-crop .matrix-sprite { display: block; width: 100%; height: 84px; min-height: 84px; max-width: 100%; object-fit: contain; visibility: visible; opacity: 1; }
+.matrix .defender-identity .defender-sprite-crop { width: 60px; height: 60px; flex: 0 0 60px; overflow: visible; }
+.matrix .defender-identity .matrix-sprite { display: block; width: 60px; height: 60px; min-width: 60px; min-height: 60px; object-fit: contain; visibility: visible; opacity: 1; }
+
+.draft-matchup-table-symmetric .draft-stat-value { display: block; font-size: .78rem; line-height: 1.15; font-weight: 800; font-variant-numeric: tabular-nums; }
+.draft-matchup-table-symmetric .draft-speed { font-size: .78rem; font-weight: 750; }
+.draft-matchup-table-symmetric .draft-stat-adjuster { display: block; width: 100%; min-height: 15px; margin: 2px 0 0; padding: 0; border: 0; background: transparent; color: var(--muted, #98a2b3); font-size: 9px; line-height: 1.25; font-weight: 500; white-space: nowrap; cursor: pointer; }
+.draft-matchup-table-symmetric .draft-stat-adjuster:hover:not(:disabled) { color: var(--accent, #93c5fd); }
+.draft-matchup-table-symmetric .draft-stat-adjuster:disabled { cursor: default; }
+.draft-matchup-table-symmetric .draft-stat-config-placeholder { display: block; height: 15px; margin-top: 2px; font-size: 9px; line-height: 1.25; }
+
+/* Compact Draft Matchups table: retain readable stats on narrower displays. */
+.draft-matchup-table-symmetric { min-width: 1120px; table-layout: fixed; }
+.draft-matchup-table-symmetric .draft-base-stat,
+.draft-matchup-table-symmetric .draft-stat-heading { min-width: 35px; width: 35px; padding: 4px 2px; }
+.draft-matchup-table-symmetric .draft-stat-bst { min-width: 42px; width: 42px; }
+.draft-matchup-table-symmetric .draft-speed { min-width: 43px; width: 43px; padding: 4px 1px; }
+.draft-matchup-table-symmetric .draft-pokemon-name { min-width: 0; width: 96px; max-width: 96px; padding: 5px 3px; overflow-wrap: anywhere; font-size: .7rem; }
+.draft-matchup-table-symmetric .draft-type-pills { min-width: 0; width: 58px; max-width: 58px; gap: 2px; justify-content: center; }
+.draft-matchup-table-symmetric .draft-type-pills .type-badge { max-width: 100%; padding: 1px 3px; font-size: .52rem; }
+.draft-matchup-table-symmetric .draft-abilities { display: grid; grid-template-columns: minmax(0, 1fr); align-content: center; gap: 2px; min-width: 0; width: 84px; max-width: 84px; margin: 0 auto; }
+.draft-matchup-table-symmetric .draft-ability { display: -webkit-box; width: 100%; max-width: 100%; min-width: 0; padding: 2px 3px; font-size: .58rem; line-height: 1.15; white-space: normal; overflow: hidden; overflow-wrap: anywhere; text-overflow: ellipsis; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.draft-matchup-table-symmetric .draft-heading-button { max-width: 96px; white-space: normal; font-size: .65rem; }
+.draft-matchup-table-symmetric .draft-stat-value { font-size: .72rem; }
+.draft-matchup-table-symmetric .draft-stat-adjuster { min-height: 24px; margin-top: 1px; font-size: 8px; line-height: 1.1; white-space: normal; }
+.draft-matchup-table-symmetric .draft-ev-line,
+.draft-matchup-table-symmetric .draft-stage-line { display: block; white-space: nowrap; }
+.draft-matchup-table-symmetric .nature-boost { color: #35ff91; font-weight: 800; text-shadow: 0 0 5px rgba(35, 255, 133, .42); }
+.draft-matchup-table-symmetric .nature-hinder { color: #ff454f; font-weight: 800; text-shadow: 0 0 5px rgba(255, 45, 64, .42); }
+
+/* Final compact-table polish: vivid colour endpoints without glow, readable controls, no overlap. */
+.draft-matchup-table-symmetric { min-width: 1080px; table-layout: fixed; }
+.draft-matchup-table-symmetric .draft-stat-heading { width: 37px; min-width: 37px; padding: 4px 1px; }
+.draft-matchup-table-symmetric .draft-stat-heading button { display: inline-flex; align-items: center; justify-content: center; gap: 1px; width: 100%; padding: 3px 0; font-size: .75rem; line-height: 1.1; white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-sort-indicator { font-size: .74rem; font-weight: 900; }
+.draft-matchup-table-symmetric .draft-sort-indicator.sort-descending { color: #ff414d; }
+.draft-matchup-table-symmetric .draft-sort-indicator.sort-ascending { color: #00d7a2; }
+.draft-matchup-table-symmetric .draft-base-stat { width: 37px; min-width: 37px; padding: 5px 1px; font-size: .8rem; overflow: hidden; }
+.draft-matchup-table-symmetric .draft-stat-bst { width: 42px; min-width: 42px; }
+.draft-matchup-table-symmetric .draft-speed,
+.draft-matchup-table-symmetric .draft-stat-spe { width: 61px; min-width: 61px; padding-left: 2px; padding-right: 2px; }
+.draft-matchup-table-symmetric .draft-stat-value { font-size: .82rem; line-height: 1.2; white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-stat-adjuster { min-height: 25px; margin-top: 2px; font-size: 8.5px; line-height: 1.15; white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-ev-line,
+.draft-matchup-table-symmetric .draft-stage-line { white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-stat-bst span,
+.draft-matchup-table-symmetric .draft-stat-value { text-shadow: none !important; }
+.draft-matchup-table-symmetric .draft-pokemon-name { width: 82px; max-width: 82px; padding: 4px 2px; font-size: .77rem; line-height: 1.15; overflow-wrap: anywhere; }
+.draft-matchup-table-symmetric .draft-type-pills { width: 43px; max-width: 43px; gap: 1px; padding: 0; }
+.draft-matchup-table-symmetric .draft-type-pills .type-badge { padding: 1px 2px; font-size: .52rem; line-height: 1.15; }
+.draft-matchup-table-symmetric .draft-abilities { width: 68px; max-width: 68px; gap: 1px; }
+.draft-matchup-table-symmetric .draft-ability { padding: 1px 2px; font-size: .65rem; line-height: 1.18; -webkit-line-clamp: 2; overflow-wrap: break-word; word-break: normal; }
+.draft-matchup-table-symmetric .draft-heading-button { max-width: 82px; padding: 2px; font-size: .7rem; line-height: 1.15; }
+.draft-matchup-table-symmetric td { vertical-align: middle; }
+
+/* Compact symmetric draft identity cells: one portrait column at each outer edge. */
+.draft-matchup-table-symmetric { width: 100%; min-width: 1020px; table-layout: fixed; }
+.draft-matchup-table-symmetric .draft-sprite-heading,
+.draft-matchup-table-symmetric .draft-mon-sprite-cell { width: 48px; min-width: 48px; max-width: 48px; padding: 3px; text-align: center; vertical-align: middle; }
+.draft-matchup-table-symmetric .draft-mon-sprite { display: block; width: 40px; height: 40px; max-width: 40px; max-height: 40px; object-fit: contain; image-rendering: pixelated; margin: 0 auto; }
+.draft-matchup-table-symmetric .draft-mon-entry { width: 112px; min-width: 112px; max-width: 112px; padding: 4px 5px; text-align: center; vertical-align: middle; overflow: hidden; }
+.draft-matchup-table-symmetric .draft-mon-details { display: grid; grid-template-rows: auto auto auto; align-content: center; justify-items: center; gap: 2px; width: 100%; min-width: 0; }
+.draft-matchup-table-symmetric .draft-pokemon-name { display: block; width: 100%; min-width: 0; max-width: 100%; padding: 0; margin: 0; font-size: .76rem; font-weight: 800; line-height: 1.1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.draft-matchup-table-symmetric .draft-type-pills { display: flex; flex-wrap: nowrap; justify-content: center; align-items: center; gap: 2px; width: 100%; min-width: 0; max-width: 100%; overflow: hidden; }
+.draft-matchup-table-symmetric .draft-type-pills .type-badge { flex: 0 1 auto; min-width: 0; max-width: 50%; padding: 1px 3px; font-size: .52rem; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.draft-matchup-table-symmetric .draft-abilities { display: flex; flex-wrap: nowrap; justify-content: center; align-items: center; gap: 2px; width: 100%; min-width: 0; max-width: 100%; overflow: hidden; }
+.draft-matchup-table-symmetric .draft-ability { display: block; flex: 0 1 auto; min-width: 0; max-width: 34%; padding: 1px 0; border: 0; border-radius: 0; background: transparent; font-size: .54rem; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: clip; text-align: center; }
+.draft-matchup-table-symmetric .draft-stat-heading,
+.draft-matchup-table-symmetric .draft-base-stat,
+.draft-matchup-table-symmetric .draft-stat-bst,
+.draft-matchup-table-symmetric .draft-stat-spe,
+.draft-matchup-table-symmetric .draft-speed { box-sizing: border-box; width: 50px; min-width: 50px; max-width: 50px; padding: 4px 2px; text-align: center; }
+.draft-matchup-table-symmetric .draft-stat-heading button { display: inline-flex; width: 100%; min-width: 0; align-items: center; justify-content: center; gap: 0; padding: 3px 0; font-size: .68rem; line-height: 1.1; white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-sort-indicator { display: inline-block; width: 9px; flex: 0 0 9px; margin-left: 1px; font-size: .68rem; }
+.draft-matchup-table-symmetric .draft-stat-value { font-size: .82rem; line-height: 1.15; }
+.draft-matchup-table-symmetric .draft-stat-adjuster { min-height: 29px; margin-top: 2px; font-size: 8.5px; line-height: 1.15; white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-ev-line,
+.draft-matchup-table-symmetric .draft-stage-line { display: block; min-height: 10px; white-space: nowrap; }
+.draft-matchup-table-symmetric tbody td { vertical-align: middle; }
+
+
+
+/* Square PMDCollab portrait assets in both sides of the damage matrix; no zoom/crop. */
+.matrix .attacker-info-inner > .attacker-sprite-crop,
+.matrix .defender-identity .defender-sprite-crop { width: 44px; height: 44px; min-width: 44px; min-height: 44px; max-width: 44px; max-height: 44px; flex: 0 0 44px; overflow: hidden; display: flex; align-items: center; justify-content: center; margin: 2px auto; }
+.matrix .attacker-info-inner > .attacker-sprite-crop .matrix-sprite,
+.matrix .defender-identity .defender-sprite-crop .matrix-sprite { display: block; width: 40px; height: 40px; min-width: 40px; min-height: 40px; max-width: 40px; max-height: 40px; object-fit: contain; object-position: center; transform: none; image-rendering: pixelated; }
+.matrix .attacker-info-inner > .attacker-sprite-crop { flex: 0 0 44px; min-height: 44px; height: 44px; }
+.matrix .attacker-info-inner { align-items: stretch; }
+
+/* Draft matchup: keep stat settings on three predictable lines (value, EVs, stage). */
+.draft-matchup-table-symmetric .draft-stat-adjuster {
+  display: grid;
+  grid-template-rows: minmax(10px, auto) minmax(10px, auto);
+  align-content: start;
+  justify-items: center;
+  width: 100%;
+  min-height: 22px;
+  margin: 1px 0 0;
+  padding: 0;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.draft-matchup-table-symmetric .draft-ev-line,
+.draft-matchup-table-symmetric .draft-stage-line {
+  display: block;
+  width: 100%;
+  min-height: 10px;
+  line-height: 10px;
+  text-align: center;
+  white-space: nowrap;
+}
+.draft-matchup-table-symmetric .draft-stage-line { margin-top: 1px; }
+
+/* Ability labels use the actual available cell width rather than a fixed 4-character slice. */
+.draft-matchup-table-symmetric .draft-abilities {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  gap: 2px;
+  overflow: hidden;
+}
+.draft-matchup-table-symmetric .draft-ability {
+  display: block;
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+  max-width: none;
+  padding: 1px 2px;
+  border: 1px solid var(--border, #354153);
+  border-radius: 3px;
+  background: rgba(148, 163, 184, 0.06);
+  font-size: .61rem;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+}
+.draft-matchup-table-symmetric button.draft-ability-toggle {
+  appearance: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: .61rem;
+  font-weight: inherit;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.draft-matchup-table-symmetric .draft-ability-toggle:hover { background: rgba(148, 163, 184, 0.15); }
+.draft-matchup-table-symmetric .draft-ability-toggle[aria-pressed="true"] {
+  border-color: #8bc9a4;
+  background: rgba(74, 160, 111, 0.18);
+  color: var(--text, #e6edf5);
+  box-shadow: inset 0 0 0 1px rgba(139, 201, 164, 0.18);
+}
+
+/* The central divider is drawn once, on Team A's Speed edge. */
+
+
+/* Keep the first-column portrait anchored at the top-left of the merged Pokémon cell. */
+.matrix .attacker-info-inner > .attacker-sprite-crop {
+  align-self: flex-start;
+  justify-content: flex-start;
+  flex: 0 0 84px;
+  width: 84px;
+  height: 84px;
+  min-height: 84px;
+  margin: 0 auto 2px 0;
+  overflow: visible;
+}
+.matrix .attacker-info-inner > .attacker-sprite-crop .matrix-sprite {
+  display: block;
+  width: 84px;
+  height: 84px;
+  min-height: 84px;
+  max-width: 84px;
+  object-fit: contain;
+  object-position: left top;
+}
+
+.draft-matchup-table-symmetric .draft-stat-adjuster {
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-flow: row;
+}
+
+
+/* Final single-divider rule: the team boundary is only the right edge of Team A Speed (column 9). */
+
+
+
+/* Speed benchmarks are a compact real table, not a long native title string. */
+.draft-speed-tooltip {
+  position: fixed;
+  z-index: 1200;
+  width: max-content;
+  max-width: min(370px, calc(100vw - 16px));
+  max-height: min(320px, calc(100vh - 16px));
+  overflow: auto;
+  pointer-events: none;
+  padding: 9px;
+  border: 1px solid var(--border, #465268);
+  border-radius: 8px;
+  background: var(--panel, #151d2a);
+  color: var(--foreground, #e7edf6);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, .32);
+  font-size: 11px;
+}
+.draft-speed-tooltip > strong { display: block; margin-bottom: 6px; font-size: 12px; }
+.draft-speed-tooltip table { border-collapse: collapse; width: 100%; font-size: 10px; font-variant-numeric: tabular-nums; }
+.draft-speed-tooltip th,
+.draft-speed-tooltip td { padding: 3px 5px; border: 1px solid var(--border, #354153); text-align: center; white-space: nowrap; }
+.draft-speed-tooltip thead th { color: var(--muted, #a2adbd); font-weight: 700; }
+.draft-speed-tooltip tbody th { text-align: left; font-weight: 600; }
+.draft-speed-tooltip p { margin: 4px 0 0; color: var(--muted, #a2adbd); }
+
+/* Larger square attacker portrait anchored to the top-left of its merged identity cell. */
+.matrix .attacker-info-inner > .attacker-sprite-crop {
+  flex: 0 0 128px;
+  width: 128px;
+  height: 128px;
+  min-height: 128px;
+  max-width: 128px;
+  margin: 0 auto 2px 0;
+  align-self: flex-start;
+  justify-content: flex-start;
+  overflow: visible;
+}
+.matrix .attacker-info-inner > .attacker-sprite-crop .matrix-sprite {
+  display: block;
+  width: 128px;
+  height: 128px;
+  min-height: 128px;
+  max-width: 128px;
+  object-fit: contain;
+  object-position: left top;
+}
+
+
+/* Draft matchup scoring and tera captain controls. */
+.draft-team-counts { flex-wrap: wrap; row-gap: 5px; }
+.draft-editor-slot {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 62px;
+  align-items: center;
+  gap: 5px 7px;
+  margin: 8px 0;
+  padding: 6px;
+  border: 1px solid var(--border, #354153);
+  border-radius: 7px;
+  color: var(--muted, #98a2b3);
+  font-size: .72rem;
+}
+.draft-editor-slot-label { grid-column: 1; grid-row: 1; }
+.draft-editor-slot > .builder-autocomplete { grid-column: 2; grid-row: 1; width: 100%; min-width: 0; }
+.draft-editor-slot > .builder-autocomplete input { min-width: 0; width: 100%; }
+.draft-points-field { grid-column: 3; grid-row: 1; display: flex; align-items: center; gap: 4px; }
+.draft-points-field input { width: 43px; min-width: 0; padding: 5px 3px; }
+.draft-tera-captain-field { grid-column: 2; grid-row: 2; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.draft-tera-captain-field input { margin: 0; }
+.draft-tera-type-field { grid-column: 3; grid-row: 2; display: grid; gap: 2px; }
+.draft-tera-type-field select { width: 100%; min-width: 0; padding: 4px 2px; }
+.draft-editor-empty-control { display: none; }
+.draft-tera-marker { display: block; margin-top: 2px; color: #b6f3d0; font-size: .58rem; font-weight: 700; line-height: 1.1; }
+.draft-matchup-table-symmetric .is-tera-captain { border-top: 1px solid #65dba0 !important; border-bottom: 1px solid #65dba0 !important; }
+.draft-matchup-table-symmetric .draft-mon-entry.is-tera-captain { box-shadow: inset 0 0 0 1px rgba(101,219,160,.45); background: rgba(48, 130, 87, .12); }
+.draft-matchup-table-symmetric .draft-mon-sprite-cell.is-tera-captain:first-child { border-left: 1px solid #65dba0 !important; }
+.draft-matchup-table-symmetric .draft-mon-sprite-cell.is-tera-captain:last-child { border-right: 1px solid #65dba0 !important; }
+
+/* Definitive divider implementation: the only accent divider is after column 9,
+   Team A Speed. Use one-sided borders to prevent collapsed adjacent borders
+   from rendering as a pair of lines. */
+.draft-matchup-table-symmetric {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+.draft-matchup-table-symmetric th,
+.draft-matchup-table-symmetric td {
+  border: 0 !important;
+  border-right: 1px solid var(--border, #354153) !important;
+  border-bottom: 1px solid var(--border, #354153) !important;
+}
+.draft-matchup-table-symmetric tr > :first-child {
+  border-left: 1px solid var(--border, #354153) !important;
+}
+.draft-matchup-table-symmetric thead tr:first-child > th {
+  border-top: 1px solid var(--border, #354153) !important;
+}
+.draft-matchup-table-symmetric tbody tr > :nth-child(9),
+.draft-matchup-table-symmetric thead tr > :nth-child(9) {
+  border-right: 2px solid var(--accent, #93c5fd) !important;
+}
+.draft-matchup-table-symmetric tbody tr > :nth-child(10),
+.draft-matchup-table-symmetric thead tr > :nth-child(10) {
+  border-left: 0 !important;
+}
+
+/* Keep the attacker portrait square but compact enough that identity text stays beside it. */
+.matrix .attacker-info-inner { display: flex !important; flex-direction: column; align-items: stretch; width: 100%; min-width: 0; text-align: right; }
+.matrix .attacker-info-inner > .attacker-identity-top { display: flex; flex-direction: row; align-items: flex-start; justify-content: flex-start; gap: 5px; width: 100%; min-width: 0; }
+.matrix .attacker-info-inner > .attacker-identity-top > .attacker-sprite-crop {
+  flex: 0 0 63px !important;
+  width: 63px !important;
+  height: 57px !important;
+  min-height: 57px !important;
+  max-width: 63px !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  align-self: flex-start;
+}
+.matrix .attacker-info-inner > .attacker-identity-top > .attacker-sprite-crop .matrix-sprite {
+  display: block;
+  width: 63px !important;
+  height: 57px !important;
+  min-height: 57px !important;
+  max-width: 63px !important;
+  object-fit: contain;
+  object-position: left top;
+}
+.matrix .attacker-info-inner .attacker-identity-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.matrix .attacker-info-inner .attacker-identity-text > .matrix-pokemon-name { display: block; width: 100%; min-width: 0; margin: 0; text-align: right; line-height: 1.15; overflow-wrap: anywhere; }
+.matrix .attacker-info-inner .attacker-identity-text > .type-list { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px; width: 100%; min-width: 0; height: auto; min-height: 0; margin: 2px 0 0; overflow: visible; }
+.matrix .attacker-info-inner > .matrix-item,
+.matrix .attacker-info-inner > .matrix-pokemon-controls,
+.matrix .attacker-info-inner > .matrix-current-hp,
+.matrix .attacker-info-inner > .stat-stage-row { width: 100%; min-width: 0; }
+
+@media (max-width: 700px) {
+  .draft-editor-slot { grid-template-columns: 38px minmax(0, 1fr) 56px; gap: 5px; }
+  .draft-points-field input { width: 38px; }
+}
+.draft-matchup-table-symmetric .draft-mon-entry.is-tera-captain { outline: 1px solid #65dba0; outline-offset: -2px; }
+.draft-matchup-table-symmetric .draft-name-line { display: flex; align-items: center; justify-content: center; gap: 3px; width: 100%; min-width: 0; }
+.draft-matchup-table-symmetric .draft-name-line .draft-pokemon-name { flex: 1 1 auto; min-width: 0; }
+.draft-matchup-table-symmetric .draft-inline-tera-select { flex: 0 0 48px; width: 48px; min-width: 0; max-width: 48px; padding: 1px 0; border: 1px solid #65dba0; border-radius: 3px; background: var(--panel, #151d2a); color: var(--text, #e5e7eb); font-size: .52rem; line-height: 1.1; }
+.draft-matchup-table-symmetric tbody tr > .is-tera-captain {
+  border-top: 1px solid #65dba0 !important;
+  border-bottom: 1px solid #65dba0 !important;
+  outline: 1px solid rgba(101, 219, 160, .72);
+  outline-offset: -2px;
+}
+/* Final sizing: 1.5× the 60px top-row portrait, with the identity text beside it. */
+.matrix .attacker-info-inner > .attacker-identity-top > .attacker-sprite-crop {
+  flex-basis: 90px !important;
+  width: 90px !important;
+  height: 90px !important;
+  min-height: 90px !important;
+  max-width: 90px !important;
+}
+.matrix .attacker-info-inner > .attacker-identity-top > .attacker-sprite-crop .matrix-sprite {
+  width: 90px !important;
+  height: 90px !important;
+  min-height: 90px !important;
+  max-width: 90px !important;
+}
+
+/* Keep the battlefield compact while fitting the expanded condition set. */
+.field-toggle-grid { grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px; }
+.field-toggle, .field-cycle { min-width: 0; }
+.field-toggle { padding-left: 5px; padding-right: 5px; }
+.field-toggle > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.field-side-control .field-toggle-state { margin-left: 3px; }
+@media (max-width: 1100px) { .field-toggle-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .field-toggle-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* Draft editor keeps points and captain controls inline with each Pokémon. */
+.draft-editor-slot { grid-template-columns: 48px minmax(0, 1fr) 52px 78px; gap: 5px; }
+.draft-editor-slot-label { white-space: nowrap; }
+.draft-points-field { grid-column: 3; grid-row: 1; }
+.draft-points-field input { width: 42px; }
+.draft-tera-captain-field { grid-column: 4; grid-row: 1; }
+@media (max-width: 700px) { .draft-editor-slot { grid-template-columns: 38px minmax(0, 1fr) 42px 68px; gap: 4px; } }
+/* Slightly enlarge top-row attacker portraits while preserving a side-by-side name area. */
+.matrix .attacker-info-inner > .attacker-identity-top > .attacker-sprite-crop { flex-basis: 96px !important; width: 96px !important; height: 96px !important; min-height: 96px !important; max-width: 96px !important; align-self: flex-start; }
+.matrix .attacker-info-inner > .attacker-identity-top > .attacker-sprite-crop .matrix-sprite { width: 96px !important; height: 96px !important; min-height: 96px !important; max-width: 96px !important; object-fit: contain; }
+.matrix .attacker-info-inner > .attacker-identity-top { align-items: flex-start; justify-content: flex-start; }
+.matrix .attacker-info-inner .attacker-identity-text { flex: 1 1 0; min-width: 0; }
+
+/* Draft Tera status remains visible in both the roster and defensive type popup. */
+.draft-tera-name-marker { color: #65dba0; font-weight: 700; white-space: nowrap; }
+.draft-tera-name-marker small { font-size: .85em; font-weight: 600; }
+.draft-type-tera-captain > th { border-left: 2px solid #65dba0 !important; }
+.draft-type-tera-captain > td { box-shadow: inset 0 1px rgba(101, 219, 160, .45), inset 0 -1px rgba(101, 219, 160, .45); }
+/* Defender portraits in the matrix header use the requested 90px square footprint. */
+.matrix thead .defender-identity .defender-sprite-crop,
+.matrix .defender-header .defender-identity .defender-sprite-crop { width: 90px; height: 90px; min-width: 90px; min-height: 90px; max-width: 90px; max-height: 90px; flex: 0 0 90px; }
+.matrix thead .defender-identity .defender-sprite-crop .matrix-sprite,
+.matrix .defender-header .defender-identity .defender-sprite-crop .matrix-sprite { width: 90px; height: 90px; min-width: 90px; min-height: 90px; max-width: 90px; max-height: 90px; }

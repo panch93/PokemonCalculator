@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import ShowdownDataGate from "../components/ShowdownDataGate";
 
 export const metadata: Metadata = {
   title: "Pokemon Team Lab",
@@ -11,7 +12,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning><ShowdownDataGate>{children}</ShowdownDataGate></body>
     </html>
   );
 }

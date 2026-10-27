@@ -41,6 +41,22 @@ describe("damage calculator wrappers", () => {
     expect(result!.description).not.toContain("blocked by Psychic Terrain");
   });
 
+
+  it("uses the Doubles spread modifier for moves that hit multiple adjacent targets", () => {
+    const attacker = makeSet("Garchomp", "Rough Skin", ["Earthquake"]);
+    const defender = makeSet("Bulbasaur", "Overgrow", ["Flamethrower"]);
+    const singles = calculateMove(attacker, defender, "Earthquake", { ...field, gameType: "Singles" }, undefined, undefined, false, 9);
+    const doubles = calculateMove(attacker, defender, "Earthquake", { ...field, gameType: "Doubles" }, undefined, undefined, false, 9);
+    expect(singles).not.toBeNull();
+    expect(doubles).not.toBeNull();
+    expect(doubles!.max).toBeLessThan(singles!.max);
+  });
+
+  it("exposes spread target metadata for matrix indicators", () => {
+    expect(getMoveDetails("Earthquake", 9)?.target).toBe("allAdjacent");
+    expect(getMoveDetails("Surf", 9)?.target).toBe("allAdjacent");
+  });
+
   it("calculates critical marker range with a separate @smogon/calc run", () => {
     const attacker = makeSet("Charizard", "Blaze", ["Flamethrower"]);
     const defender = makeSet("Bulbasaur", "Overgrow", ["Tackle"]);

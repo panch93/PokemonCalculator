@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useEffect, useMemo, useState } from "react";
 import { sampleTeamA, sampleTeamB } from "../lib/sample-data";
 import { calculateMove } from "../lib/calc";
@@ -9,12 +11,12 @@ import MatchupMatrix from "./MatchupMatrix";
 import FieldPanel from "./FieldPanel";
 import { getLearnsetModeLabel, loadFormatLearnsets } from "../lib/learnsets";
 import FormatLegalityPanel from "./FormatLegalityPanel";
-import { getAvailableShowdownFormats } from "../lib/format-validation";
+import FormatSelector from "./FormatSelector";
 
 const DEFAULT_FIELD: FieldState = {
-  weather: "", terrain: "", defenderStealthRock: false, defenderSpikes: 0, defenderReflect: false,
+  gameType: "Singles", weather: "", terrain: "", defenderStealthRock: false, defenderSpikes: 0, defenderReflect: false,
   defenderLightScreen: false, defenderAuroraVeil: false, defenderLeechSeed: false, defenderSaltCure: false,
-  trickRoom: false, tailwindSide: "",
+  trickRoom: false, tailwindSide: "", protectSide: "", nightmareSide: "", foresightSide: "", chargeSide: "", helpingHandSide: "", flowerGiftSide: "", powerTrickSide: "", steelySpiritSide: "", friendGuardSide: "", batterySide: "", powerSpotSide: "", switchingOutSide: "",
 };
 const ZERO_STAGES = (): StatStages[] => Array.from({ length: 6 }, () => ({ atk: 0, spa: 0, def: 0, spd: 0, spe: 0 }));
 const initialMoves = (team: Team) => team.map(p => p.moves.find(Boolean) || "");
@@ -157,10 +159,10 @@ export default function TeamLab() {
     <main>
       <header className="hero">
         <div><h1>Pokemon Team Lab</h1><p>6v6 matchup analysis powered by the Smogon damage calculator.</p>
-          <div className="top-rule-controls"><label>Mechanics Gen <select aria-label="Battle mechanics generation" value={generation} onChange={e => { const next = Number(e.target.value); setGeneration(next); if (next !== 9) setMechanics({ tera: false }); }}>{Array.from({ length: 9 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Gen {g}{g === 1 ? " · RBY" : g === 2 ? " · GSC" : g === 3 ? " · ADV" : g === 4 ? " · DPP" : g === 5 ? " · BW" : g === 6 ? " · XY" : g === 7 ? " · SM" : g === 8 ? " · SS" : " · SV"}</option>)}<option value={10}>Pokémon Champions</option></select></label><label>Format <input list="team-lab-formats" value={format} onChange={e => setFormat(e.target.value)} aria-label="Battle format" /><datalist id="team-lab-formats">{getAvailableShowdownFormats().map(x => <option key={x.id} value={x.label} />)}<option value="Champions NatDex Draft" /></datalist></label>
+          <div className="top-rule-controls"><label>Mechanics Gen <select aria-label="Battle mechanics generation" value={generation} onChange={e => { const next = Number(e.target.value); setGeneration(next); if (next !== 9) setMechanics({ tera: false }); }}>{Array.from({ length: 9 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Gen {g}{g === 1 ? " · RBY" : g === 2 ? " · GSC" : g === 3 ? " · ADV" : g === 4 ? " · DPP" : g === 5 ? " · BW" : g === 6 ? " · XY" : g === 7 ? " · SM" : g === 8 ? " · SS" : " · SV"}</option>)}<option value={10}>Pokémon Champions</option></select></label><label>Format <FormatSelector value={format} onChange={setFormat} /></label>
           <details className="mechanics-menu"><summary>Battle mechanics</summary><div className="mechanics-options"><label><input type="checkbox" checked={mechanics.tera && generation === 9} disabled={generation !== 9} onChange={e => setMechanics({ tera: e.target.checked })} />Terastallization</label><small>Generations 1–9 use their Smogon Calc generation. Champions is listed as a selectable mode, but the installed @smogon/calc 0.12.0 does not include its dedicated engine, so damage currently falls back to Gen 9 mechanics. Terastallization is available only in Gen 9.</small></div></details></div>
         </div>
-        <div className="hero-actions"><button type="button" onClick={refreshTeamLearnsets} disabled={learnsetStatus === "loading"}>{learnsetStatus === "loading" ? "Loading learnsets…" : "Refresh team learnsets"}</button><span className={`learnset-status ${learnsetStatus}`} role="status">{learnsetStatus === "loading" ? "Learnsets loading" : learnsetStatus === "ready" ? getLearnsetModeLabel(format) : "Learnsets unavailable"}</span><button onClick={() => setTeamsOpen(true)}>Teams · Import / Export</button></div>
+        <div className="hero-actions"><Link className="nav-link" href="/draft">Draft Matchups</Link><button type="button" onClick={refreshTeamLearnsets} disabled={learnsetStatus === "loading"}>{learnsetStatus === "loading" ? "Loading learnsets…" : "Refresh team learnsets"}</button><span className={`learnset-status ${learnsetStatus}`} role="status">{learnsetStatus === "loading" ? "Learnsets loading" : learnsetStatus === "ready" ? getLearnsetModeLabel(format) : "Learnsets unavailable"}</span><button onClick={() => setTeamsOpen(true)}>Teams · Import / Export</button></div>
       </header>
       {!format.trim().toLowerCase().replace(/[^a-z0-9]/g, "").includes("everything") && <FormatLegalityPanel teamA={left} teamB={right} format={format} />}
       <div className="workspace workspace-full">

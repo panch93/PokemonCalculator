@@ -80,3 +80,12 @@ Pokémon names, rules, and legality data in the browser validator are adapted fr
 ## Browser validator migration
 
 Milestone 4 replaces the earlier diagnostic prototype with the upstream `TeamValidator` adapted for browser execution. See [`MILESTONE_4_OFFICIAL_BROWSER_TEAMVALIDATOR.md`](./MILESTONE_4_OFFICIAL_BROWSER_TEAMVALIDATOR.md) for supported formats, provenance, and verification limits. The complete project release gate still needs to be run in an environment with installed dependencies.
+
+## Pokémon Showdown data source
+
+The app uses a bundled, MIT-licensed snapshot of the official [`smogon/pokemon-showdown`](https://github.com/smogon/pokemon-showdown) repository for species, moves, items, abilities, natures, learnsets, format metadata, and team legality validation. Core battle data is loaded from the bundled snapshot. The format catalog first reads the current `master` branch config from `raw.githubusercontent.com/smogon/pokemon-showdown/master/config/formats.ts`, then falls back to bundled format metadata if the request fails. The loading screen indexes bundled tables locally and reports intermediate progress.
+
+
+## Sprite attribution
+
+Pokémon portrait images are loaded directly from [PMDCollab/SpriteCollab](https://github.com/PMDCollab/SpriteCollab), using each available Pokémon's `portrait/<National-Dex-number>/Normal.png` asset from the moving `master` branch. SpriteCollab requests attribution to contributors and is licensed under CC BY-NC 4.0; this project is non-commercial, and users should consult the repository's portrait credits for contributor-level attribution.

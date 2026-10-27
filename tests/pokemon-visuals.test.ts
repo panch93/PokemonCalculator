@@ -1,19 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { getSpriteCandidates, speciesSpriteSlug, typeMatchupSummary } from "../src/lib/pokemon-visuals";
+import { getSpriteUrl, typeMatchupSummary } from "../src/lib/pokemon-visuals";
 
 describe("Pokémon visual helpers", () => {
-  it("normalizes gendered and punctuation-bearing species names", () => {
-    expect(speciesSpriteSlug("Nidoran♀")).toBe("nidoranf");
-    expect(speciesSpriteSlug("Mr. Mime")).toBe("mrmime");
-    expect(speciesSpriteSlug("Farfetch’d")).toBe("farfetchd");
-  });
-
-  it("provides ordered sprite fallbacks", () => {
-    const candidates = getSpriteCandidates("Pikachu");
-    expect(candidates).toHaveLength(4);
-    expect(candidates[0]).toContain("/sprites/gen9/pikachu.png");
-    expect(candidates[3]).toContain("/sprites/dex/pikachu.png");
-    expect(getSpriteCandidates("Iron Valiant")[0]).toContain("/sprites/gen9/ironvaliant.png");
+  it("uses one square Normal portrait from the SpriteCollab repository", () => {
+    expect(getSpriteUrl(1)).toBe("https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/portrait/0001/Normal.png");
+    expect(getSpriteUrl(683)).toBe("https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/portrait/0683/Normal.png");
+    expect(getSpriteUrl(1, "Dizzy")).toBe("https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/portrait/0001/Dizzy.png");
+    expect(getSpriteUrl(undefined)).toBeNull();
+    expect(getSpriteUrl(0)).toBeNull();
   });
 
   it("reports expected type weaknesses and immunities", () => {

@@ -92,14 +92,14 @@ function makePokemon(set: PokemonSet, generation = DEFAULT_GEN, boosts: Partial<
 }
 
 /**
- * Build a fresh singles field for each attacker-vs-defender calculation.
+ * Build a fresh field for each attacker-vs-defender calculation.
  * The UI's hazards/screens always belong to the current defender, regardless
  * of which team is attacking. Never reuse a Field instance: the calc engine
  * clones and can mutate side conditions for abilities such as Infiltrator.
  */
 function makeField(state: FieldState) {
   return new Field({
-    gameType: "Singles",
+    gameType: state.gameType || "Singles",
     weather: state.weather || undefined,
     terrain: state.terrain || undefined,
     defenderSide: {
@@ -241,6 +241,24 @@ export function calculateMove(
     if (critical) (move as unknown as { isCrit: boolean }).isCrit = true;
     const field = makeField(fieldState);
 
+    // Conditions represented by the field UI but not natively exposed by the
+    // calculator are applied here, scoped to the selected attacker/defender.
+    const moveType = String((move as unknown as { type?: string }).type || "");
+    const moveCategory = String((move as unknown as { category?: string }).category || "");
+    if (fieldState.protectSide === "defender" && !/feint|hyperspace|phantom force|shadow force|mighty cleave|breaking swipe/i.test(moveName)) {
+      const maxHp = defenderPokemon.maxHP();
+      const blocked: DamageSummary = { move: moveName, min: 0, max: 0, minPct: 0, maxPct: 0, rawMinPct: 0, rawMaxPct: 0, effectiveHp: maxHp, entryHazardDamage: 0, entryHazardPct: 0, ko: "No damage", description: `${moveName} is blocked by Protect.` };
+      return setCached(key, blocked);
+    }
+    if (fieldState.powerTrickSide) {
+      const target = fieldState.powerTrickSide === "attacker" ? attackerPokemon : defenderPokemon;
+      const raw = (target as unknown as { rawStats?: Record<string, number> }).rawStats;
+      if (raw && typeof raw.atk === "number" && typeof raw.def === "number") [raw.atk, raw.def] = [raw.def, raw.atk];
+    }
+    if (fieldState.foresightSide === "defender" && ["Normal", "Fighting"].includes(moveType) && defenderPokemon.types.includes("Ghost")) {
+      (defenderPokemon.types as string[]).splice(defenderPokemon.types.indexOf("Ghost"), 1);
+    }
+
     // Psychic Terrain blocks opposing positive-priority moves against grounded
     // targets. Airborne targets (e.g. Tornadus-Therian) remain hittable.
     const movePriority = Math.max(Number(move.priority ?? 0), getEffectiveMovePriority(attacker, moveName, fieldState));
@@ -310,6 +328,22 @@ export function calculateMove(
       criticalRange = damageRange((criticalResult as unknown as { damage?: unknown }).damage);
     }
 
+    let conditionMultiplier = 1;
+    if (fieldState.chargeSide === "attacker" && moveType === "Electric") conditionMultiplier *= 2;
+    if (fieldState.helpingHandSide === "attacker") conditionMultiplier *= 1.5;
+    if (fieldState.flowerGiftSide === "attacker" && fieldState.weather === "Sun" && moveCategory === "Physical") conditionMultiplier *= 1.5;
+    if (fieldState.steelySpiritSide === "attacker" && moveType === "Steel") conditionMultiplier *= 1.5;
+    if (fieldState.batterySide === "attacker" && moveCategory === "Special") conditionMultiplier *= 1.3;
+    if (fieldState.powerSpotSide === "attacker") conditionMultiplier *= 1.3;
+    if (fieldState.friendGuardSide === "defender") conditionMultiplier *= 0.75;
+    const applyModifier = (damage: number) => Math.max(0, Math.floor(damage * conditionMultiplier + 0.5));
+    if (conditionMultiplier !== 1) {
+      range.min = applyModifier(range.min);
+      range.max = applyModifier(range.max);
+      if (rolls) for (let i = 0; i < rolls.length; i++) rolls[i] = applyModifier(rolls[i]);
+      if (criticalRange) { criticalRange.min = applyModifier(criticalRange.min); criticalRange.max = applyModifier(criticalRange.max); }
+    }
+
     const entryHazardDamage = defender.currentHp === undefined ? getEntryHazardDamage(defender, defenderPokemon, fieldState) : 0;
     const currentHp = Math.max(1, Math.min(maxHp, Math.floor(defender.currentHp ?? maxHp)));
     const effectiveHp = Math.max(1, currentHp - entryHazardDamage);
@@ -363,6 +397,15 @@ export function calculateMove(
         ? `Toxic removes ${toxicDamage} HP (${(toxicDamage / maxHp * 100).toFixed(1)}% of max HP) on the first toxic turn; the toxic counter is not tracked.${toxicKoNote}`
         : "",
       screenBypassNote,
+      fieldState.nightmareSide === "defender" && defender.status === "slp" ? "Nightmare is active on the sleeping defender; its residual damage is not included in direct move damage." : "",
+      fieldState.switchingOutSide === "defender" ? "The defender is marked as switching out; switch-dependent move effects may differ." : "",
+      fieldState.helpingHandSide === "attacker" ? "Helping Hand damage boost applied." : "",
+      fieldState.chargeSide === "attacker" && moveType === "Electric" ? "Charge doubles the next Electric move's damage." : "",
+      fieldState.flowerGiftSide === "attacker" && fieldState.weather === "Sun" && moveCategory === "Physical" ? "Flower Gift Attack boost applied in sun." : "",
+      fieldState.steelySpiritSide === "attacker" && moveType === "Steel" ? "Steely Spirit damage boost applied." : "",
+      fieldState.batterySide === "attacker" && moveCategory === "Special" ? "Battery Special move boost applied." : "",
+      fieldState.powerSpotSide === "attacker" ? "Power Spot damage boost applied." : "",
+      fieldState.friendGuardSide === "defender" ? "Friend Guard damage reduction applied." : "",
     ].filter(Boolean).join(" ");
     const nativeHazardDescription = /after (stealth rock|spikes|entry hazards)/i.test(baseDescription);
     const appendedHazardText = entryHazardDamage > 0 && !nativeHazardDescription ? ` ${hazardText}` : "";
@@ -430,6 +473,7 @@ export function getMoveDetails(moveName: string, generation = DEFAULT_GEN): Move
       accuracy: numeric(move.accuracy) ?? numeric(raw.accuracy),
       pp: numeric(move.pp) ?? numeric(raw.pp),
       priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0),
+      target: text(raw.target) || text((move as unknown as Record<string, unknown>).target),
       description: getShowdownMoveDescription(moveName) || text(raw.desc) || text(raw.shortDesc) || text(move.desc) || getMoveDescription(moveName, { type: text(move.type) || text(raw.type), category: text(move.category) || text(raw.category), power: numeric(move.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp), accuracy: numeric(move.accuracy) ?? numeric(raw.accuracy), priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0) }),
     };
   } catch {

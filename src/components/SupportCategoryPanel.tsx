@@ -13,7 +13,7 @@ type Entry = { key: string; species: string; move?: string; ability?: string; si
 const CATEGORIES = categoriesData as Category[];
 const id = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-export default function SupportCategoryPanel({ left, right, format, onClose }: { left: Team; right: Team; format: string; onClose: () => void }) {
+export default function SupportCategoryPanel({ left, right, format, onClose, draftMode = false }: { left: Team; right: Team; format: string; onClose: () => void; draftMode?: boolean }) {
   const [teamFilter, setTeamFilter] = useState<"both" | "A" | "B">("both");
   const [pokemonFilter, setPokemonFilter] = useState<"living" | "all">("living");
   const [learnsets, setLearnsets] = useState<Record<string, Set<string> | null>>({});
@@ -39,7 +39,7 @@ export default function SupportCategoryPanel({ left, right, format, onClose }: {
       .filter(side => teamFilter === "both" || side.code === teamFilter)
       .flatMap(side => side.team.flatMap((pokemon: PokemonSet) => {
         if (/^Empty Slot/.test(pokemon.name) || !pokemon.species) return [];
-        if (pokemonFilter === "living" && pokemon.dead) return [];
+        if (!draftMode && pokemonFilter === "living" && pokemon.dead) return [];
         const learnset = learnsets[id(pokemon.species)];
         const moves = category.moves.filter(move => learnset ? learnset.has(id(move)) : false);
         const ability = category.abilities.some(candidate => id(candidate) === id(pokemon.ability)) ? pokemon.ability : "";
@@ -48,17 +48,17 @@ export default function SupportCategoryPanel({ left, right, format, onClose }: {
         return result;
       }));
     return { category, entries };
-  }), [left, right, teamFilter, pokemonFilter, learnsets]);
+  }), [left, right, teamFilter, pokemonFilter, learnsets, draftMode]);
 
   return <div className="teams-modal-backdrop support-modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}><section className="panel support-panel teams-modal support-modal">
     <div className="panel-title-row"><div><h2>Move Support</h2><p>Learnable category moves and selected abilities for the selected teams.</p></div><button type="button" onClick={onClose}>Close</button></div>
     <div className="support-filters" aria-label="Team Support filters">
       <div className="support-toggle-group" role="group" aria-label="Teams to show">
-        <button type="button" className="active" aria-pressed="true" onClick={() => setTeamFilter(current => current === "both" ? "A" : current === "A" ? "B" : "both")}>Teams: {teamFilter === "both" ? "Both" : teamFilter === "A" ? "Team A" : "Team B"} · Change</button>
+        {([ ["both", "Both teams"], ["A", "Team A"], ["B", "Team B"] ] as const).map(([value, label]) => <button type="button" key={value} className={teamFilter === value ? "active" : ""} aria-pressed={teamFilter === value} onClick={() => setTeamFilter(value)}>{label}</button>)}
       </div>
-      <div className="support-toggle-group" role="group" aria-label="Pokémon status filter">
+      {!draftMode && <div className="support-toggle-group" role="group" aria-label="Pokémon status filter">
         <button type="button" className="active" aria-pressed="true" onClick={() => setPokemonFilter(current => current === "living" ? "all" : "living")}>Pokémon: {pokemonFilter === "living" ? "Living only" : "All, including fainted"} · Change</button>
-      </div>
+      </div>}
     </div>
     <div className="support-category-columns">
       {categoryEntries.map(({ category, entries }) => <section className="support-category-column" key={category.id}>

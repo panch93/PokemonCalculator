@@ -1,35 +1,9 @@
 export const POKEMON_TYPES = ["Normal", "Fire", "Water", "Electric", "Grass", "Ice", "Fighting", "Poison", "Ground", "Flying", "Psychic", "Bug", "Rock", "Ghost", "Dragon", "Dark", "Steel", "Fairy"] as const;
 
-export function speciesSpriteSlug(species: string) {
-  // Showdown sprite filenames use the species ID (toID): spaces and punctuation
-  // are removed, not replaced with hyphens (e.g. Iron Valiant -> ironvaliant).
-  return species.trim().toLowerCase()
-    .replace(/♀/g, "f").replace(/♂/g, "m")
-    .replace(/[.’']/g, "").replace(/[^a-z0-9]/g, "");
-}
-
-function hyphenatedSpriteSlug(species: string) {
-  return species.trim().toLowerCase()
-    .replace(/♀/g, "-f").replace(/♂/g, "-m")
-    .replace(/[.’']/g, "").replace(/[ _]+/g, "-")
-    .replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
-}
-
-export function getSpriteCandidates(species: string) {
-  const slug = speciesSpriteSlug(species);
-  const hyphenated = hyphenatedSpriteSlug(species);
-  return [...new Set([
-    `https://play.pokemonshowdown.com/sprites/gen9/${slug}.png`,
-    `https://play.pokemonshowdown.com/sprites/home/${slug}.png`,
-    `https://play.pokemonshowdown.com/sprites/gen5/${slug}.png`,
-    `https://play.pokemonshowdown.com/sprites/dex/${slug}.png`,
-    ...(hyphenated !== slug ? [
-      `https://play.pokemonshowdown.com/sprites/gen9/${hyphenated}.png`,
-      `https://play.pokemonshowdown.com/sprites/home/${hyphenated}.png`,
-      `https://play.pokemonshowdown.com/sprites/gen5/${hyphenated}.png`,
-      `https://play.pokemonshowdown.com/sprites/dex/${hyphenated}.png`,
-    ] : []),
-  ])];
+/** SpriteCollab portraits are stored by National Dex number, with the default emotion named Normal.png. */
+export function getSpriteUrl(dexNumber: number | undefined, emotion: "Normal" | "Dizzy" = "Normal"): string | null {
+  if (typeof dexNumber !== "number" || !Number.isInteger(dexNumber) || dexNumber <= 0) return null;
+  return `https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/portrait/${String(dexNumber).padStart(4, "0")}/${emotion}.png`;
 }
 
 const WEAK_TO: Record<string, string[]> = {
