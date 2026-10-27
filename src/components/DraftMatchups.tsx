@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { useEffect, useMemo, useState } from "react";
 import { getAbility, getSpecies, getSpeciesAbilities, getSpeciesList } from "../lib/showdown-data";
-import { POKEMON_TYPES } from "../lib/pokemon-visuals";
+import { POKEMON_TYPES, typeMatchupSummary } from "../lib/pokemon-visuals";
 import { TypeChart } from "../lib/showdown-official/data/typechart";
 import AutocompleteInput from "./AutocompleteInput";
 import SupportCategoryPanel from "./SupportCategoryPanel";
@@ -178,7 +178,9 @@ export default function DraftMatchups() {
     if (!values.length) return undefined;
     const min = Math.min(...values), max = Math.max(...values);
     const ratio = max === min ? 0.5 : (value - min) / (max - min);
-    return { color: `hsl(${Math.round(2 + ratio * 122)} 78% 64%)` };
+    const hue = Math.round(ratio * 180);
+    const lightness = 49 - Math.round(Math.abs(ratio - 0.5) * 5);
+    return { color: `hsl(${hue} 100% ${lightness}%)`, textShadow: ratio <= 0.5 ? `0 0 5px hsla(0, 100%, 48%, ${0.35 + (0.5 - ratio) * 0.7})` : `0 0 6px hsla(${hue}, 100%, 52%, ${0.35 + (ratio - 0.5) * 0.8})` };
   };
   const renderStatCell = (name: string, side: "A" | "B", key: StatKey) => {
     const stats = name ? baseStats(name) : null;
@@ -191,11 +193,12 @@ export default function DraftMatchups() {
     return <td key={`${side}-${key}`} className={`draft-base-stat draft-stat-${key} ${key === "spe" ? "draft-speed" : ""}`} title={name && key === "spe" ? speedTip(name, side, side === "A" ? activeB : activeA) : undefined} onClick={open}>
       <strong className="draft-stat-value" style={value === null ? undefined : statColor(value, key)}>{value ?? "—"}</strong>
       <button type="button" className="draft-stat-adjuster" aria-label={name ? `Adjust ${STAT_LABELS[key]} EVs and nature for ${name}` : "Adjust stat"} onClick={event => { event.stopPropagation(); open(); }} disabled={!name}>
-        {cfg ? `${cfg.ev} EV` : " "}{key !== "hp" && cfg ? <>{" · "}<span className={natureLabel === "+" ? "stage-positive" : natureLabel === "−" ? "stage-negative" : ""}>{natureLabel || "="}</span>{" · "}<span className={cfg.stage > 0 ? "stage-positive" : cfg.stage < 0 ? "stage-negative" : ""}>{stageLabel}</span></> : key === "hp" ? <span aria-hidden="true"> </span> : null}
+        <span className={`draft-ev-line ${cfg?.nature === "boost" ? "nature-boost" : cfg?.nature === "hinder" ? "nature-hinder" : ""}`}>{cfg ? `${cfg.ev}${key !== "hp" ? natureLabel : ""} EVs` : " "}</span>
+        {key !== "hp" && cfg ? <span className={`draft-stage-line ${cfg.stage > 0 ? "stage-positive" : cfg.stage < 0 ? "stage-negative" : ""}`}>{stageLabel || "0"}</span> : <span className="draft-stage-line" aria-hidden="true"> </span>}
       </button>
     </td>;
   };
-  const statHeading = (key: StatKey, side: "A" | "B") => <th key={`${side}-${key}`} className={`draft-stat-heading draft-stat-${key}`}><button type="button" onClick={() => setSortStat(key)} aria-label={`Sort by ${STAT_LABELS[key]}`} title={`Sort both teams by ${STAT_LABELS[key]}`}>{STAT_LABELS[key]}{sortStat === key ? <span className="draft-sort-indicator"> ↓</span> : null}</button></th>;
+  const statHeading = (key: StatKey, side: "A" | "B") => <th key={`${side}-${key}`} className={`draft-stat-heading draft-stat-${key}`}><button type="button" onClick={() => setSortStat(key)} aria-label={`Sort by ${STAT_LABELS[key]}`} title={`Sort both teams by ${STAT_LABELS[key]}`}>{(key === "spe" ? "Spe" : STAT_LABELS[key])}{sortStat === key ? <span className="draft-sort-indicator"> ↓</span> : null}</button></th>;
   const lastRow = Math.max(sortedA.length, sortedB.length) - 1;
   const asTeam = (names: string[]): Team => names.map(species => ({ name: species, species, item: "", ability: getSpeciesAbilities(species)[0] || "", nature: "Hardy", level: 100, evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: [] }));
   const updateDraft = (side: "A" | "B", index: number, value: string) => {
@@ -246,21 +249,21 @@ export default function DraftMatchups() {
     <section className="panel">
       <div className="panel-title-row"><div><h2>{matchupName}</h2><p>Hover over a Speed value for EV benchmarks against opposing Pokémon at 252 EVs and a boosting nature.</p></div><div className="draft-team-formats"><label>Matchup format<FormatSelector value={format} onChange={setFormat} /></label></div></div>
       <div className="matrix-scroll draft-table-scroll"><table className="draft-matchup-table draft-matchup-table-symmetric">
-        <thead><tr><th>Types A</th><th>Abilities A</th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("A")}>Pokémon Team A · defensive types</button></th>{(["bst", "spd", "spa", "def", "atk", "hp", "spe"] as StatKey[]).map(key => statHeading(key, "A"))}{(["spe", "hp", "atk", "def", "spa", "spd", "bst"] as StatKey[]).map(key => statHeading(key, "B"))}<th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("B")}>Pokémon Team B · defensive types</button></th><th>Abilities B</th><th>Types B</th></tr></thead>
+        <thead><tr><th>Types A</th><th>Abilities A</th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("A")}>Team A</button></th>{(["bst", "spd", "spa", "def", "atk", "hp", "spe"] as StatKey[]).map(key => statHeading(key, "A"))}{(["spe", "hp", "atk", "def", "spa", "spd", "bst"] as StatKey[]).map(key => statHeading(key, "B"))}<th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("B")}>Team B</button></th><th>Abilities B</th><th>Types B</th></tr></thead>
         <tbody>{Array.from({ length: Math.max(0, lastRow + 1) }, (_, index) => {
           const a = sortedA[index] || "";
           const b = sortedB[index] || "";
           const abilitiesA = a ? getSpeciesAbilities(a) : [];
           const abilitiesB = b ? getSpeciesAbilities(b) : [];
           return <tr key={index}>
-            <td><div className="draft-type-pills">{a && speciesTypes(a).map(type => <span key={type} className={typeClass(type)}>{type}</span>)}</div></td>
+            <td><div className="draft-type-pills">{a && speciesTypes(a).map(type => <span key={type} className={typeClass(type)} title={`Defensive type matchups for ${a}:\n${typeMatchupSummary(speciesTypes(a))}`}>{type}</span>)}</div></td>
             <td><div className="draft-abilities">{abilitiesA.map(ability => <span key={ability} className="draft-ability" title={getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}>{ability}</span>)}</div></td>
             <td className="draft-pokemon-name">{a || <span className="muted">—</span>}</td>
             {(["bst", "spd", "spa", "def", "atk", "hp", "spe"] as StatKey[]).map(key => renderStatCell(a, "A", key))}
             {(["spe", "hp", "atk", "def", "spa", "spd", "bst"] as StatKey[]).map(key => renderStatCell(b, "B", key))}
             <td className="draft-pokemon-name">{b || <span className="muted">—</span>}</td>
             <td><div className="draft-abilities">{abilitiesB.map(ability => <span key={ability} className="draft-ability" title={getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}>{ability}</span>)}</div></td>
-            <td><div className="draft-type-pills">{b && speciesTypes(b).map(type => <span key={type} className={typeClass(type)}>{type}</span>)}</div></td>
+            <td><div className="draft-type-pills">{b && speciesTypes(b).map(type => <span key={type} className={typeClass(type)} title={`Defensive type matchups for ${b}:\n${typeMatchupSummary(speciesTypes(b))}`}>{type}</span>)}</div></td>
           </tr>;
         })}</tbody>
       </table></div>

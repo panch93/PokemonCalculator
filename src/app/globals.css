@@ -831,3 +831,22 @@ select, select:focus, select option, datalist option {
 .draft-matchup-table-symmetric .draft-stat-adjuster:hover:not(:disabled) { color: var(--accent, #93c5fd); }
 .draft-matchup-table-symmetric .draft-stat-adjuster:disabled { cursor: default; }
 .draft-matchup-table-symmetric .draft-stat-config-placeholder { display: block; height: 15px; margin-top: 2px; font-size: 9px; line-height: 1.25; }
+
+/* Compact Draft Matchups table: retain readable stats on narrower displays. */
+.draft-matchup-table-symmetric { min-width: 1120px; table-layout: fixed; }
+.draft-matchup-table-symmetric .draft-base-stat,
+.draft-matchup-table-symmetric .draft-stat-heading { min-width: 35px; width: 35px; padding: 4px 2px; }
+.draft-matchup-table-symmetric .draft-stat-bst { min-width: 42px; width: 42px; }
+.draft-matchup-table-symmetric .draft-speed { min-width: 43px; width: 43px; padding: 4px 1px; }
+.draft-matchup-table-symmetric .draft-pokemon-name { min-width: 0; width: 96px; max-width: 96px; padding: 5px 3px; overflow-wrap: anywhere; font-size: .7rem; }
+.draft-matchup-table-symmetric .draft-type-pills { min-width: 0; width: 58px; max-width: 58px; gap: 2px; justify-content: center; }
+.draft-matchup-table-symmetric .draft-type-pills .type-badge { max-width: 100%; padding: 1px 3px; font-size: .52rem; }
+.draft-matchup-table-symmetric .draft-abilities { display: grid; grid-template-columns: minmax(0, 1fr); align-content: center; gap: 2px; min-width: 0; width: 84px; max-width: 84px; margin: 0 auto; }
+.draft-matchup-table-symmetric .draft-ability { display: -webkit-box; width: 100%; max-width: 100%; min-width: 0; padding: 2px 3px; font-size: .58rem; line-height: 1.15; white-space: normal; overflow: hidden; overflow-wrap: anywhere; text-overflow: ellipsis; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.draft-matchup-table-symmetric .draft-heading-button { max-width: 96px; white-space: normal; font-size: .65rem; }
+.draft-matchup-table-symmetric .draft-stat-value { font-size: .72rem; }
+.draft-matchup-table-symmetric .draft-stat-adjuster { min-height: 24px; margin-top: 1px; font-size: 8px; line-height: 1.1; white-space: normal; }
+.draft-matchup-table-symmetric .draft-ev-line,
+.draft-matchup-table-symmetric .draft-stage-line { display: block; white-space: nowrap; }
+.draft-matchup-table-symmetric .nature-boost { color: #35ff91; font-weight: 800; text-shadow: 0 0 5px rgba(35, 255, 133, .42); }
+.draft-matchup-table-symmetric .nature-hinder { color: #ff454f; font-weight: 800; text-shadow: 0 0 5px rgba(255, 45, 64, .42); }
