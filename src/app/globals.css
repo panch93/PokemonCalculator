@@ -749,3 +749,36 @@ select, select:focus, select option, datalist option {
 .data-loader-steps li.complete::before { border-color: #32a675; background: #32a675; box-shadow: inset 0 0 0 3px var(--panel, #151d2a); }
 .data-loader-footnote { margin: 26px 0 0; padding-top: 16px; border-top: 1px solid var(--border, #2f3b4e); color: var(--muted, #8995a7); font-size: .78rem; }
 .data-loader-footnote code { color: inherit; }
+
+/* Draft Speed settings stay compact beneath the base Speed value. */
+.draft-speed { white-space: nowrap; text-align: center; vertical-align: middle; }
+.draft-speed > strong { display: block; font-size: 14px; }
+.draft-speed-config { display: block; border: 0; background: transparent; color: var(--muted, #98a2b3); font-size: 10px; line-height: 1.2; padding: 1px 2px; margin: 2px auto 0; cursor: pointer; }
+.draft-speed-config:hover { color: var(--accent, #93c5fd); text-decoration: underline; }
+.draft-speed-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.draft-speed-fields label { display: grid; gap: 5px; font-size: 12px; }
+.draft-speed-fields input, .draft-speed-fields select { width: 100%; min-width: 0; }
+@media (max-width: 600px) { .draft-speed-fields { grid-template-columns: 1fr; } }
+/* Use the full sprite image area in the Team Lab matrix rather than zoom-cropping artwork. */
+.matrix-sprite-crop { overflow: visible; }
+.matrix .attacker-sprite-crop { width: 64px; height: 58px; margin: 0 auto 2px; }
+.matrix .defender-sprite-crop { width: 56px; height: 56px; flex: 0 0 56px; }
+.matrix .attacker-info-cell .matrix-sprite { width: 64px; height: 58px; transform: none; object-fit: contain; }
+.matrix .defender-identity .matrix-sprite { width: 56px; height: 56px; flex-basis: 56px; transform: none; object-fit: contain; }
+.matrix .attacker-info-cell .matrix-pokemon-name, .matrix .defender-identity .matrix-pokemon-name { max-width: 100%; overflow-wrap: anywhere; }
+.matrix .attacker-info-cell > .type-list, .matrix .defender-identity .type-list { height: auto; min-height: 0; overflow: visible; flex-wrap: wrap; }
+/* Keep Draft Matchups navigation pinned to the top-right of the Team Lab hero. */
+.hero { position: relative; }
+.hero > .hero-actions { padding-top: 38px; }
+.hero > .hero-actions > .nav-link { position: absolute; top: 0; right: 0; }
+
+/* Keep matrix identity text anchored to the cell edge while the sprite uses spare height. */
+.matrix .attacker-info-cell { display: flex; flex-direction: column; align-items: stretch; text-align: right; vertical-align: top; }
+.matrix .attacker-info-cell > .attacker-sprite-crop { flex: 1 1 auto; min-height: 72px; width: 100%; display: flex; align-items: center; justify-content: center; }
+.matrix .attacker-info-cell > .attacker-sprite-crop .matrix-sprite { width: 100%; max-width: 100%; height: 100%; min-height: 72px; object-fit: contain; }
+.matrix .attacker-info-cell .matrix-pokemon-name { text-align: right; align-self: stretch; }
+.matrix .attacker-info-cell > .type-list { justify-content: flex-end; }
+.matrix .attacker-info-cell > .matrix-item { align-self: stretch; text-align: right; overflow-wrap: anywhere; white-space: normal; }
+.matrix .attacker-info-cell > .matrix-pokemon-controls,
+.matrix .attacker-info-cell > .matrix-current-hp,
+.matrix .attacker-info-cell > .stat-stage-row { margin-top: 3px; }
