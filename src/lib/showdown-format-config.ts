@@ -171,17 +171,19 @@ export function getBundledShowdownFormats(): ShowdownFormatOption[] {
   let section = "Other";
   for (const raw of bundledFormatsJson as Array<Record<string, unknown>>) {
     const nextSection = typeof raw.section === "string" ? raw.section : undefined;
-    if (!raw.name) {
+    if (typeof raw.name !== "string" && typeof raw.label !== "string") {
       if (nextSection) section = nextSection;
       continue;
     }
-    const label = String(raw.name);
-    const id = normalizeFormatIdentifier(label);
+    const labelValue = typeof raw.label === "string" ? raw.label : raw.name;
+    if (typeof labelValue !== "string") continue;
+    const label = labelValue;
+    const id = typeof raw.id === "string" && raw.id ? raw.id : normalizeFormatIdentifier(label);
     if (!id) continue;
     formats.push({
       id,
       label,
-      section,
+      section: typeof raw.section === "string" ? raw.section : section,
       source: "bundled",
       ...(typeof raw.mod === "string" ? { mod: raw.mod } : {}),
       ...(typeof raw.gameType === "string" ? { gameType: raw.gameType } : {}),
@@ -196,7 +198,15 @@ export function getBundledShowdownFormats(): ShowdownFormatOption[] {
   return formats;
 }
 
-/** Backwards-compatible name used by older callers; this is local-only now. */
+/** Fetch current display metadata from the moving upstream master branch, falling back to the bundled catalog offline. */
 export async function fetchLiveShowdownFormats(): Promise<ShowdownFormatOption[]> {
-  return getBundledShowdownFormats();
+  const url = "https://raw.githubusercontent.com/smogon/pokemon-showdown/master/config/formats.ts";
+  try {
+    const response = await fetch(url, { headers: { Accept: "text/plain" }, cache: "no-cache" });
+    if (!response.ok) throw new Error(`Upstream format config request failed (${response.status})`);
+    const formats = parseShowdownFormatConfig(await response.text());
+    return formats.map(format => ({ ...format, source: "remote" as const }));
+  } catch {
+    return getBundledShowdownFormats();
+  }
 }
