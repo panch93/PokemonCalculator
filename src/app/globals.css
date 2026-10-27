@@ -850,3 +850,28 @@ select, select:focus, select option, datalist option {
 .draft-matchup-table-symmetric .draft-stage-line { display: block; white-space: nowrap; }
 .draft-matchup-table-symmetric .nature-boost { color: #35ff91; font-weight: 800; text-shadow: 0 0 5px rgba(35, 255, 133, .42); }
 .draft-matchup-table-symmetric .nature-hinder { color: #ff454f; font-weight: 800; text-shadow: 0 0 5px rgba(255, 45, 64, .42); }
+
+/* Final compact-table polish: vivid colour endpoints without glow, readable controls, no overlap. */
+.draft-matchup-table-symmetric { min-width: 1080px; table-layout: fixed; }
+.draft-matchup-table-symmetric .draft-stat-heading { width: 37px; min-width: 37px; padding: 4px 1px; }
+.draft-matchup-table-symmetric .draft-stat-heading button { display: inline-flex; align-items: center; justify-content: center; gap: 1px; width: 100%; padding: 3px 0; font-size: .75rem; line-height: 1.1; white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-sort-indicator { font-size: .74rem; font-weight: 900; }
+.draft-matchup-table-symmetric .draft-sort-indicator.sort-descending { color: #ff414d; }
+.draft-matchup-table-symmetric .draft-sort-indicator.sort-ascending { color: #00d7a2; }
+.draft-matchup-table-symmetric .draft-base-stat { width: 37px; min-width: 37px; padding: 5px 1px; font-size: .8rem; overflow: hidden; }
+.draft-matchup-table-symmetric .draft-stat-bst { width: 42px; min-width: 42px; }
+.draft-matchup-table-symmetric .draft-speed,
+.draft-matchup-table-symmetric .draft-stat-spe { width: 61px; min-width: 61px; padding-left: 2px; padding-right: 2px; }
+.draft-matchup-table-symmetric .draft-stat-value { font-size: .82rem; line-height: 1.2; white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-stat-adjuster { min-height: 25px; margin-top: 2px; font-size: 8.5px; line-height: 1.15; white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-ev-line,
+.draft-matchup-table-symmetric .draft-stage-line { white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-stat-bst span,
+.draft-matchup-table-symmetric .draft-stat-value { text-shadow: none !important; }
+.draft-matchup-table-symmetric .draft-pokemon-name { width: 82px; max-width: 82px; padding: 4px 2px; font-size: .77rem; line-height: 1.15; overflow-wrap: anywhere; }
+.draft-matchup-table-symmetric .draft-type-pills { width: 43px; max-width: 43px; gap: 1px; padding: 0; }
+.draft-matchup-table-symmetric .draft-type-pills .type-badge { padding: 1px 2px; font-size: .52rem; line-height: 1.15; }
+.draft-matchup-table-symmetric .draft-abilities { width: 68px; max-width: 68px; gap: 1px; }
+.draft-matchup-table-symmetric .draft-ability { padding: 1px 2px; font-size: .65rem; line-height: 1.18; -webkit-line-clamp: 2; overflow-wrap: break-word; word-break: normal; }
+.draft-matchup-table-symmetric .draft-heading-button { max-width: 82px; padding: 2px; font-size: .7rem; line-height: 1.15; }
+.draft-matchup-table-symmetric td { vertical-align: middle; }

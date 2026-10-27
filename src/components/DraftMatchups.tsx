@@ -73,6 +73,7 @@ export default function DraftMatchups() {
   const [format, setFormat] = useState("Everything!");
   // Sorting is intentionally session-only: it resets to Speed after a refresh.
   const [sortStat, setSortStat] = useState<StatKey>("spe");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [teamA, setTeamA] = useState<string[]>(() => normalizeTeam(PRESETS[0].teamA));
   const [teamB, setTeamB] = useState<string[]>(() => normalizeTeam(PRESETS[0].teamB));
   const [hydrated, setHydrated] = useState(false);
@@ -170,7 +171,15 @@ export default function DraftMatchups() {
   const activeA = teamA.filter(Boolean);
   const activeB = teamB.filter(Boolean);
   const statValue = (name: string, key: StatKey) => baseStats(name)?.[key] ?? -1;
-  const sortRoster = (roster: string[]) => [...roster].sort((a, b) => statValue(b, sortStat) - statValue(a, sortStat) || (baseSpeed(b) ?? -1) - (baseSpeed(a) ?? -1));
+  const sortRoster = (roster: string[]) => [...roster].filter(Boolean).sort((a, b) => {
+    const delta = statValue(a, sortStat) - statValue(b, sortStat);
+    if (delta !== 0) return sortDirection === "asc" ? delta : -delta;
+    return (baseSpeed(b) ?? -1) - (baseSpeed(a) ?? -1);
+  });
+  const chooseSort = (key: StatKey) => {
+    if (sortStat === key) setSortDirection(current => current === "asc" ? "desc" : "asc");
+    else { setSortStat(key); setSortDirection("asc"); }
+  };
   const sortedA = sortRoster(activeA);
   const sortedB = sortRoster(activeB);
   const statColor = (value: number, key: StatKey) => {
@@ -179,8 +188,8 @@ export default function DraftMatchups() {
     const min = Math.min(...values), max = Math.max(...values);
     const ratio = max === min ? 0.5 : (value - min) / (max - min);
     const hue = Math.round(ratio * 180);
-    const lightness = 49 - Math.round(Math.abs(ratio - 0.5) * 5);
-    return { color: `hsl(${hue} 100% ${lightness}%)`, textShadow: ratio <= 0.5 ? `0 0 5px hsla(0, 100%, 48%, ${0.35 + (0.5 - ratio) * 0.7})` : `0 0 6px hsla(${hue}, 100%, 52%, ${0.35 + (ratio - 0.5) * 0.8})` };
+    const lightness = ratio < 0.15 ? 54 : ratio > 0.85 ? 48 : 50;
+    return { color: `hsl(${hue} 100% ${lightness}%)` };
   };
   const renderStatCell = (name: string, side: "A" | "B", key: StatKey) => {
     const stats = name ? baseStats(name) : null;
@@ -198,7 +207,7 @@ export default function DraftMatchups() {
       </button>
     </td>;
   };
-  const statHeading = (key: StatKey, side: "A" | "B") => <th key={`${side}-${key}`} className={`draft-stat-heading draft-stat-${key}`}><button type="button" onClick={() => setSortStat(key)} aria-label={`Sort by ${STAT_LABELS[key]}`} title={`Sort both teams by ${STAT_LABELS[key]}`}>{(key === "spe" ? "Spe" : STAT_LABELS[key])}{sortStat === key ? <span className="draft-sort-indicator"> ↓</span> : null}</button></th>;
+  const statHeading = (key: StatKey, side: "A" | "B") => <th key={`${side}-${key}`} className={`draft-stat-heading draft-stat-${key}`}><button type="button" onClick={() => chooseSort(key)} aria-label={`Sort by ${STAT_LABELS[key]}${sortStat === key ? ` ${sortDirection === "asc" ? "descending" : "ascending"} next` : ""}`} title={`Sort both teams by ${STAT_LABELS[key]}`}>{(key === "spe" ? "Spe" : STAT_LABELS[key])}{sortStat === key ? <span className={`draft-sort-indicator ${sortDirection === "desc" ? "sort-descending" : "sort-ascending"}`}>{sortDirection === "desc" ? " ↓" : " ↑"}</span> : null}</button></th>;
   const lastRow = Math.max(sortedA.length, sortedB.length) - 1;
   const asTeam = (names: string[]): Team => names.map(species => ({ name: species, species, item: "", ability: getSpeciesAbilities(species)[0] || "", nature: "Hardy", level: 100, evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: [] }));
   const updateDraft = (side: "A" | "B", index: number, value: string) => {
@@ -247,7 +256,7 @@ export default function DraftMatchups() {
     </section>
 
     <section className="panel">
-      <div className="panel-title-row"><div><h2>{matchupName}</h2><p>Hover over a Speed value for EV benchmarks against opposing Pokémon at 252 EVs and a boosting nature.</p></div><div className="draft-team-formats"><label>Matchup format<FormatSelector value={format} onChange={setFormat} /></label></div></div>
+      <div className="panel-title-row"><div><h2>{matchupName}</h2><p>Hover over a Speed value for EV calcs.</p></div><div className="draft-team-formats"><label>Matchup format<FormatSelector value={format} onChange={setFormat} /></label></div></div>
       <div className="matrix-scroll draft-table-scroll"><table className="draft-matchup-table draft-matchup-table-symmetric">
         <thead><tr><th>Types A</th><th>Abilities A</th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("A")}>Team A</button></th>{(["bst", "spd", "spa", "def", "atk", "hp", "spe"] as StatKey[]).map(key => statHeading(key, "A"))}{(["spe", "hp", "atk", "def", "spa", "spd", "bst"] as StatKey[]).map(key => statHeading(key, "B"))}<th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("B")}>Team B</button></th><th>Abilities B</th><th>Types B</th></tr></thead>
         <tbody>{Array.from({ length: Math.max(0, lastRow + 1) }, (_, index) => {
