@@ -32,10 +32,13 @@ function speciesTypes(name: string): string[] {
   const types = getSpecies(name)?.types;
   return Array.isArray(types) ? types.filter((type): type is string => typeof type === "string") : [];
 }
-function baseSpeed(name: string): number | null {
-  const value = getSpecies(name)?.baseStats?.spe;
-  return typeof value === "number" ? value : null;
+function baseStats(name: string): { hp: number; atk: number; def: number; spa: number; spd: number; spe: number; bst: number } | null {
+  const stats = getSpecies(name)?.baseStats;
+  if (!stats) return null;
+  const hp = stats.hp || 0, atk = stats.atk || 0, def = stats.def || 0, spa = stats.spa || 0, spd = stats.spd || 0, spe = stats.spe || 0;
+  return { hp, atk, def, spa, spd, spe, bst: hp + atk + def + spa + spd + spe };
 }
+function baseSpeed(name: string): number | null { return baseStats(name)?.spe ?? null; }
 function multiplier(defender: string, attackType: string): number {
   const types = speciesTypes(defender);
   if (!types.length) return 1;
@@ -205,7 +208,7 @@ export default function DraftMatchups() {
     <section className="panel">
       <div className="panel-title-row"><div><h2>{matchupName}</h2><p>Hover over a Speed value for EV benchmarks against opposing Pokémon at 252 EVs and a boosting nature.</p></div><div className="draft-team-formats"><label>Matchup format<FormatSelector value={format} onChange={setFormat} /></label></div></div>
       <div className="matrix-scroll draft-table-scroll"><table className="draft-matchup-table">
-        <thead><tr><th>Types A</th><th>Abilities A</th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("A")}>Pokémon Team A · defensive types</button></th><th>Speed A</th><th>Speed B</th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("B")}>Pokémon Team B · defensive types</button></th><th>Abilities B</th><th>Types B</th></tr></thead>
+        <thead><tr><th>Types A</th><th>Abilities A</th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("A")}>Pokémon Team A · defensive types</button></th><th>Speed A</th><th>HP A</th><th>Atk A</th><th>Def A</th><th>SpA A</th><th>SpD A</th><th>BST A</th><th>Speed B</th><th>HP B</th><th>Atk B</th><th>Def B</th><th>SpA B</th><th>SpD B</th><th>BST B</th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("B")}>Pokémon Team B · defensive types</button></th><th>Abilities B</th><th>Types B</th></tr></thead>
         <tbody>{Array.from({ length: Math.max(0, lastRow + 1) }, (_, index) => {
           const a = sortedA[index] || "";
           const b = sortedB[index] || "";
@@ -215,8 +218,10 @@ export default function DraftMatchups() {
             <td>{a && <div className="draft-type-pills">{speciesTypes(a).map(type => <span key={type} className={typeClass(type)}>{type}</span>)}</div>}</td>
             <td><div className="draft-abilities">{abilitiesA.map(ability => <span key={ability} className="draft-ability" title={getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}>{ability}</span>)}</div></td>
             <td className="draft-pokemon-name">{a || <span className="muted">—</span>}</td>
-            <td className="draft-speed">{a ? <><strong>{baseSpeed(a) ?? "—"}</strong><button type="button" className="draft-speed-config" title={speedTip(a, "A", activeB)} onClick={() => setSpeedEdit({ side: "A", name: a })}>{configFor("A", a).ev}{configFor("A", a).nature === "boost" ? "+" : configFor("A", a).nature === "hinder" ? "−" : ""} EV · {configFor("A", a).stage > 0 ? `+${configFor("A", a).stage}` : configFor("A", a).stage}</button></> : "—"}</td>
-            <td className="draft-speed">{b ? <><strong>{baseSpeed(b) ?? "—"}</strong><button type="button" className="draft-speed-config" title={speedTip(b, "B", activeA)} onClick={() => setSpeedEdit({ side: "B", name: b })}>{configFor("B", b).ev}{configFor("B", b).nature === "boost" ? "+" : configFor("B", b).nature === "hinder" ? "−" : ""} EV · {configFor("B", b).stage > 0 ? `+${configFor("B", b).stage}` : configFor("B", b).stage}</button></> : "—"}</td>
+            <td className="draft-speed" title={a ? speedTip(a, "A", activeB) : undefined} onClick={() => a && setSpeedEdit({ side: "A", name: a })}>{a ? <><strong>{baseSpeed(a) ?? "—"}</strong><button type="button" className="draft-speed-config" onClick={event => { event.stopPropagation(); setSpeedEdit({ side: "A", name: a }); }}>{configFor("A", a).ev}{configFor("A", a).nature === "boost" ? <span className="stage-positive">+</span> : configFor("A", a).nature === "hinder" ? <span className="stage-negative">−</span> : ""} EV · <span className={configFor("A", a).stage > 0 ? "stage-positive" : configFor("A", a).stage < 0 ? "stage-negative" : ""}>{configFor("A", a).stage > 0 ? `+${configFor("A", a).stage}` : configFor("A", a).stage}</span></button></> : "—"}</td>
+            {(["hp", "atk", "def", "spa", "spd", "bst"] as const).map(key => { const st = a ? baseStats(a) : null; return <td key={`A-${key}`} className="draft-base-stat">{st ? st[key] : "—"}</td>; })}
+            <td className="draft-speed" title={b ? speedTip(b, "B", activeA) : undefined} onClick={() => b && setSpeedEdit({ side: "B", name: b })}>{b ? <><strong>{baseSpeed(b) ?? "—"}</strong><button type="button" className="draft-speed-config" onClick={event => { event.stopPropagation(); setSpeedEdit({ side: "B", name: b }); }}>{configFor("B", b).ev}{configFor("B", b).nature === "boost" ? <span className="stage-positive">+</span> : configFor("B", b).nature === "hinder" ? <span className="stage-negative">−</span> : ""} EV · <span className={configFor("B", b).stage > 0 ? "stage-positive" : configFor("B", b).stage < 0 ? "stage-negative" : ""}>{configFor("B", b).stage > 0 ? `+${configFor("B", b).stage}` : configFor("B", b).stage}</span></button></> : "—"}</td>
+            {(["hp", "atk", "def", "spa", "spd", "bst"] as const).map(key => { const st = b ? baseStats(b) : null; return <td key={`B-${key}`} className="draft-base-stat">{st ? st[key] : "—"}</td>; })}
             <td className="draft-pokemon-name">{b || <span className="muted">—</span>}</td>
             <td><div className="draft-abilities">{abilitiesB.map(ability => <span key={ability} className="draft-ability" title={getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}>{ability}</span>)}</div></td>
             <td><div className="draft-type-pills">{b && speciesTypes(b).map(type => <span key={type} className={typeClass(type)}>{type}</span>)}</div></td>

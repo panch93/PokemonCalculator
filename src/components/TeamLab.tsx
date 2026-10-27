@@ -11,7 +11,7 @@ import MatchupMatrix from "./MatchupMatrix";
 import FieldPanel from "./FieldPanel";
 import { getLearnsetModeLabel, loadFormatLearnsets } from "../lib/learnsets";
 import FormatLegalityPanel from "./FormatLegalityPanel";
-import { getAvailableShowdownFormats } from "../lib/format-validation";
+import FormatSelector from "./FormatSelector";
 
 const DEFAULT_FIELD: FieldState = {
   gameType: "Singles", weather: "", terrain: "", defenderStealthRock: false, defenderSpikes: 0, defenderReflect: false,
@@ -159,7 +159,7 @@ export default function TeamLab() {
     <main>
       <header className="hero">
         <div><h1>Pokemon Team Lab</h1><p>6v6 matchup analysis powered by the Smogon damage calculator.</p>
-          <div className="top-rule-controls"><label>Mechanics Gen <select aria-label="Battle mechanics generation" value={generation} onChange={e => { const next = Number(e.target.value); setGeneration(next); if (next !== 9) setMechanics({ tera: false }); }}>{Array.from({ length: 9 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Gen {g}{g === 1 ? " · RBY" : g === 2 ? " · GSC" : g === 3 ? " · ADV" : g === 4 ? " · DPP" : g === 5 ? " · BW" : g === 6 ? " · XY" : g === 7 ? " · SM" : g === 8 ? " · SS" : " · SV"}</option>)}<option value={10}>Pokémon Champions</option></select></label><label>Format <input list="team-lab-formats" value={format} onChange={e => setFormat(e.target.value)} aria-label="Battle format" /><datalist id="team-lab-formats">{getAvailableShowdownFormats().map(x => <option key={x.id} value={x.label} />)}<option value="Champions NatDex Draft" /></datalist></label>
+          <div className="top-rule-controls"><label>Mechanics Gen <select aria-label="Battle mechanics generation" value={generation} onChange={e => { const next = Number(e.target.value); setGeneration(next); if (next !== 9) setMechanics({ tera: false }); }}>{Array.from({ length: 9 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Gen {g}{g === 1 ? " · RBY" : g === 2 ? " · GSC" : g === 3 ? " · ADV" : g === 4 ? " · DPP" : g === 5 ? " · BW" : g === 6 ? " · XY" : g === 7 ? " · SM" : g === 8 ? " · SS" : " · SV"}</option>)}<option value={10}>Pokémon Champions</option></select></label><label>Format <FormatSelector value={format} onChange={setFormat} /></label>
           <details className="mechanics-menu"><summary>Battle mechanics</summary><div className="mechanics-options"><label><input type="checkbox" checked={mechanics.tera && generation === 9} disabled={generation !== 9} onChange={e => setMechanics({ tera: e.target.checked })} />Terastallization</label><small>Generations 1–9 use their Smogon Calc generation. Champions is listed as a selectable mode, but the installed @smogon/calc 0.12.0 does not include its dedicated engine, so damage currently falls back to Gen 9 mechanics. Terastallization is available only in Gen 9.</small></div></details></div>
         </div>
         <div className="hero-actions"><Link className="nav-link" href="/draft">Draft Matchups</Link><button type="button" onClick={refreshTeamLearnsets} disabled={learnsetStatus === "loading"}>{learnsetStatus === "loading" ? "Loading learnsets…" : "Refresh team learnsets"}</button><span className={`learnset-status ${learnsetStatus}`} role="status">{learnsetStatus === "loading" ? "Learnsets loading" : learnsetStatus === "ready" ? getLearnsetModeLabel(format) : "Learnsets unavailable"}</span><button onClick={() => setTeamsOpen(true)}>Teams · Import / Export</button></div>
