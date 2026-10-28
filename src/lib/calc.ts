@@ -1,7 +1,9 @@
 import { calculate, Generations, Move, Pokemon, Field, TYPE_CHART } from "@smogon/calc";
 import { getMove } from "./showdown-data";
+import { Moves as OFFICIAL_SHOWDOWN_MOVES } from "./showdown-official/data/moves";
 import { getEffectiveMovePriority } from "./battle-order";
 import { DamageSummary, FieldState, MoveDetails, PokemonSet, StatStages } from "./types";
+import { buildDamageDistribution, scaleDamageOutcomes } from "./damage-distribution";
 
 /** Read canonical English move descriptions from the live official Pokémon Showdown data. */
 function getShowdownMoveDescription(name: string): string | undefined {
@@ -226,10 +228,11 @@ export function calculateMove(
   defenderStages: StatStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 },
   critical = false,
   generation = DEFAULT_GEN,
+  includeCriticalRange = true,
 ): DamageSummary | null {
   if (!moveName.trim()) return null;
 
-  const key = `${generation}|${cacheKey(attacker, defender, moveName, fieldState, attackerStages, defenderStages, critical)}`;
+  const key = `${generation}|${includeCriticalRange ? "crit-range" : "no-crit-range"}|${cacheKey(attacker, defender, moveName, fieldState, attackerStages, defenderStages, critical)}`;
   const cached = getCached(key);
   if (cached !== undefined) return cached;
 
@@ -283,7 +286,13 @@ export function calculateMove(
 
     const result = calculate(gen, attackerPokemon, defenderPokemon, move, field);
 
-    const range = damageRange((result as unknown as { damage?: unknown }).damage);
+    const rawDamage = (result as unknown as { damage?: unknown }).damage;
+    const distribution = buildDamageDistribution({ damage: rawDamage, moveName, accuracy: getMoveDetails(moveName, generation)?.accuracy ?? null, item: attacker.item, ability: attacker.ability, category: move.category, defenderAbility: defender.ability, weather: fieldState.weather, generation });
+    if (critical && distribution?.note) distribution.note = distribution.note.replace(/Critical hits are excluded\.?/i, "The histogram is conditional on critical damage and does not include critical-hit probability.");
+    let distributionOutcomes = distribution?.outcomes || [];
+    const successfulOutcomes = distributionOutcomes.filter(outcome => outcome.damage > 0);
+    const distributionRange = successfulOutcomes.length ? { min: Math.min(...successfulOutcomes.map(outcome => outcome.damage)), max: Math.max(...successfulOutcomes.map(outcome => outcome.damage)) } : null;
+    const range = distributionRange || damageRange(rawDamage);
     if (!range) {
       return setCached(key, {
         move: moveName,
@@ -303,7 +312,6 @@ export function calculateMove(
 
     const min = range.min;
     const max = range.max;
-    const rawDamage = (result as unknown as { damage?: unknown }).damage;
     const rolls = Array.isArray(rawDamage) && rawDamage.every(value => typeof value === "number")
       ? [...new Set(rawDamage as number[])].sort((a, b) => a - b)
       : undefined;
@@ -315,7 +323,7 @@ export function calculateMove(
     // alter the result. When the main calculation is already critical, its range
     // is the critical range, so no duplicate run is needed.
     let criticalRange: { min: number; max: number } | null = null;
-    if (!critical) {
+    if (!critical && includeCriticalRange) {
       const criticalMove = new Move(gen, moveName);
       (criticalMove as unknown as { isCrit: boolean }).isCrit = true;
       const criticalResult = calculate(
@@ -338,6 +346,7 @@ export function calculateMove(
     if (fieldState.friendGuardSide === "defender") conditionMultiplier *= 0.75;
     const applyModifier = (damage: number) => Math.max(0, Math.floor(damage * conditionMultiplier + 0.5));
     if (conditionMultiplier !== 1) {
+      if (distribution) { distribution.outcomes = scaleDamageOutcomes(distribution.outcomes, applyModifier); distributionOutcomes = distribution.outcomes; }
       range.min = applyModifier(range.min);
       range.max = applyModifier(range.max);
       if (rolls) for (let i = 0; i < rolls.length; i++) rolls[i] = applyModifier(rolls[i]);
@@ -373,20 +382,21 @@ export function calculateMove(
     const toxicDamage = defender.status === "tox" && !hasAbility(defender, "Magic Guard") && !hasAbility(defender, "Poison Heal")
       ? Math.max(1, Math.floor(maxHp / 16))
       : 0;
-    const damageRolls = rolls?.length ? rolls : null;
     const toxicKoNote = (() => {
       if (!toxicDamage) return "";
-      const directGuaranteed = min + entryHazardDamage >= maxHp;
       const directPossible = max + entryHazardDamage >= maxHp;
-      const toxicGuaranteed = min + entryHazardDamage + toxicDamage >= maxHp;
       const toxicPossible = max + entryHazardDamage + toxicDamage >= maxHp;
-      if (toxicGuaranteed && !directGuaranteed) return " (guaranteed OHKO after toxic damage)";
-      if (!directPossible && toxicPossible && !damageRolls) return " (possible OHKO after toxic damage; exact roll chance unavailable)";
-      if (damageRolls && !directGuaranteed) {
-        const directChance = damageRolls.filter(roll => roll + entryHazardDamage >= maxHp).length / damageRolls.length;
-        const afterChance = damageRolls.filter(roll => roll + entryHazardDamage + toxicDamage >= maxHp).length / damageRolls.length;
-        if (afterChance > directChance) return ` (${(afterChance * 100).toFixed(1)}% chance to OHKO after toxic damage)`;
+      if (!distributionOutcomes.length) {
+        const directGuaranteed = min + entryHazardDamage >= maxHp;
+        const toxicGuaranteed = min + entryHazardDamage + toxicDamage >= maxHp;
+        if (toxicGuaranteed && !directGuaranteed) return " (guaranteed OHKO after toxic damage)";
+        if (!directPossible && toxicPossible) return " (possible OHKO after toxic damage; exact roll chance unavailable)";
+        return "";
       }
+      const directChance = distributionOutcomes.reduce((sum, outcome) => sum + (outcome.damage + entryHazardDamage >= maxHp ? outcome.probability : 0), 0);
+      const afterChance = distributionOutcomes.reduce((sum, outcome) => sum + (outcome.damage + entryHazardDamage + toxicDamage >= maxHp ? outcome.probability : 0), 0);
+      if (afterChance >= 0.999999 && directChance < 0.999999) return " (guaranteed OHKO after toxic damage)";
+      if (afterChance > directChance) return ` (${(afterChance * 100).toFixed(1)}% chance to OHKO after toxic damage)`;
       return "";
     })();
     const baseDescription = safeDescription(result, moveName);
@@ -415,6 +425,7 @@ export function calculateMove(
       min,
       max,
       rolls,
+      ...(distribution ? { histogram: distribution.outcomes, hitCounts: distribution.hitCounts, accuracy: distribution.accuracy, distributionApproximate: distribution.approximate, distributionNote: distribution.note } : {}),
       minPct,
       maxPct,
       ...(criticalRange ? {
@@ -465,12 +476,30 @@ export function getMoveDetails(moveName: string, generation = DEFAULT_GEN): Move
     const raw = (moveTable?.get?.(moveName) || {}) as Record<string, unknown>;
     const text = (value: unknown) => typeof value === "string" ? value : "";
     const numeric = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : null;
+    // Showdown uses `accuracy: true` for moves that do not make a normal
+    // accuracy check. Represent that as 100 in this UI-facing numeric field;
+    // special accuracy rules (e.g. weather or abilities) are handled elsewhere.
+    const accuracyValue = (value: unknown) => value === true ? 100 : numeric(value);
+    // @smogon/calc can expose a default accuracy (often 100) for a Move even
+    // when the move's real accuracy is lower. Prefer the bundled canonical
+    // Showdown table for the current generation. For older generations, use
+    // the generation-specific calculator move table first so changed historical
+    // values are not overwritten by modern data. The `unknown` bridge is
+    // intentional: Showdown's MoveDataTable uses branded ID keys rather than
+    // a plain string index signature, while this normalized ID is a runtime key.
+    const moveId = moveName.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const officialMoves = OFFICIAL_SHOWDOWN_MOVES as unknown as Record<string, { accuracy?: unknown }>;
+    const officialMove = officialMoves[moveId];
+    const loadedMove = getMove(moveName);
+    const accuracy = generation >= 9
+      ? accuracyValue(officialMove?.accuracy) ?? accuracyValue(loadedMove?.accuracy) ?? accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy)
+      : accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy) ?? accuracyValue(loadedMove?.accuracy) ?? accuracyValue(officialMove?.accuracy);
     return {
       name: text(move.name) || moveName,
       type: text(move.type) || text(raw.type) || "Unknown",
       category: text(move.category) || text(raw.category) || "Unknown",
       power: numeric(move.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp),
-      accuracy: numeric(move.accuracy) ?? numeric(raw.accuracy),
+      accuracy,
       pp: numeric(move.pp) ?? numeric(raw.pp),
       priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0),
       target: text(raw.target) || text((move as unknown as Record<string, unknown>).target),

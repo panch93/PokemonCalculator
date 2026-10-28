@@ -22,6 +22,28 @@ describe("damage calculator wrappers", () => {
     expect(result!.max).toBeGreaterThanOrEqual(result!.min);
   });
 
+  it("exposes a probability histogram for ordinary damage rolls", () => {
+    const attacker = makeSet("Charizard", "Blaze", ["Flamethrower"]);
+    const defender = makeSet("Bulbasaur", "Overgrow", ["Tackle"]);
+    const result = calculateMove(attacker, defender, "Flamethrower", field, undefined, undefined, false, 9);
+    expect(result?.histogram?.length).toBeGreaterThan(0);
+    expect(result!.histogram!.reduce((sum, outcome) => sum + outcome.probability, 0)).toBeCloseTo(1);
+    expect(result?.distributionApproximate).toBe(false);
+  });
+
+  it("includes possible early stops in multi-hit damage distributions", () => {
+    const attacker = makeSet("Weavile", "Pressure", ["Triple Axel"]);
+    const defender = makeSet("Bulbasaur", "Overgrow", ["Tackle"]);
+    const result = calculateMove(attacker, defender, "Triple Axel", field, undefined, undefined, false, 9, false);
+    expect(result?.histogram?.length).toBeGreaterThan(0);
+    // Triple Axel's 90% accuracy must come from the bundled move data, not
+    // the @smogon/calc Move class's narrower TypeScript surface.
+    expect(result?.accuracy).toBe(90);
+    expect(result?.hitCounts?.some(outcome => outcome.hits === 1)).toBe(true);
+    expect(result?.hitCounts?.some(outcome => outcome.hits === 3)).toBe(true);
+    expect(result!.histogram!.reduce((sum, outcome) => sum + outcome.probability, 0)).toBeCloseTo(1);
+  });
+
   it("shows Psychic Terrain blocking priority moves against grounded defenders", () => {
     const terrain: FieldState = { ...field, terrain: "Psychic" };
     const attacker = makeSet("Chien-Pao", "Sword of Ruin", ["Sucker Punch"]);
@@ -50,6 +72,18 @@ describe("damage calculator wrappers", () => {
     expect(singles).not.toBeNull();
     expect(doubles).not.toBeNull();
     expect(doubles!.max).toBeLessThan(singles!.max);
+  });
+
+  it("uses canonical accuracy metadata across common move types", () => {
+    // These cover ordinary 100%-accuracy moves, common imperfect-accuracy
+    // moves, and multi-hit moves. The values must come from move data rather
+    // than @smogon/calc's normalized Move object's default accuracy.
+    expect(getMoveDetails("Flamethrower", 9)?.accuracy).toBe(100);
+    expect(getMoveDetails("Hydro Pump", 9)?.accuracy).toBe(80);
+    expect(getMoveDetails("Thunder", 9)?.accuracy).toBe(70);
+    expect(getMoveDetails("Hurricane", 9)?.accuracy).toBe(70);
+    expect(getMoveDetails("Population Bomb", 9)?.accuracy).toBe(90);
+    expect(getMoveDetails("Triple Axel", 9)?.accuracy).toBe(90);
   });
 
   it("exposes spread target metadata for matrix indicators", () => {

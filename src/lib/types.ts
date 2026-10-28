@@ -64,11 +64,20 @@ export type MoveDetails = {
   description: string;
 };
 
+export type DamageHistogramEntry = { damage: number; probability: number };
+export type DamageHitCount = { hits: number; probability: number };
+
 export type DamageSummary = {
   move: string;
   min: number;
   max: number;
   rolls?: number[];
+  /** Probability distribution for the complete move; includes a zero-damage miss outcome when relevant. */
+  histogram?: DamageHistogramEntry[];
+  hitCounts?: DamageHitCount[];
+  accuracy?: number;
+  distributionApproximate?: boolean;
+  distributionNote?: string;
   minPct: number;
   maxPct: number;
   /** Critical damage range computed by @smogon/calc for the same battle state. */

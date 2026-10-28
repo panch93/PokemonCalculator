@@ -1209,3 +1209,83 @@ select, select:focus, select option, datalist option {
 .matrix .defender-header .defender-identity .defender-sprite-crop { width: 90px; height: 90px; min-width: 90px; min-height: 90px; max-width: 90px; max-height: 90px; flex: 0 0 90px; }
 .matrix thead .defender-identity .defender-sprite-crop .matrix-sprite,
 .matrix .defender-header .defender-identity .defender-sprite-crop .matrix-sprite { width: 90px; height: 90px; min-width: 90px; min-height: 90px; max-width: 90px; max-height: 90px; }
+
+/* STAB availability summary at the bottom of the defensive matchup matrix. */
+.draft-stab-summary-row th, .draft-stab-summary-row td {
+  background: var(--panel-2);
+  border-top: 2px solid var(--border-strong, var(--border));
+  font-weight: 750;
+}
+.draft-stab-summary-row th { position: sticky; left: 0; z-index: 2; text-align: left; }
+.draft-stab-summary-row td { font-variant-numeric: tabular-nums; }
+
+/* Lazy damage-roll probability histogram shown when hovering a matrix cell. */
+.matrix-histogram-overlay {
+  position: fixed;
+  z-index: 1200;
+  width: min(360px, calc(100vw - 16px));
+  pointer-events: none;
+}
+.damage-histogram-tooltip {
+  width: 100%;
+  max-height: min(330px, calc(100vh - 16px));
+  overflow: hidden;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel, #171d28);
+  color: var(--text, #f2f4f8);
+  box-shadow: 0 12px 32px rgba(0,0,0,.35);
+  font-size: .75rem;
+}
+.damage-histogram-heading, .damage-histogram-stats, .damage-histogram-axis {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.damage-histogram-heading { font-size: .85rem; }
+.damage-histogram-heading span, .damage-histogram-axis, .damage-histogram-note { color: var(--muted, #aab2c0); }
+.damage-histogram-stats { margin-top: 7px; font-size: .68rem; flex-wrap: wrap; }
+.damage-histogram-chart {
+  display: flex;
+  align-items: end;
+  gap: 2px;
+  height: 116px;
+  margin-top: 12px;
+  padding: 4px 4px 0;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(to top, transparent 24%, var(--border) 25%, transparent 26%, transparent 49%, var(--border) 50%, transparent 51%, transparent 74%, var(--border) 75%, transparent 76%);
+}
+.damage-histogram-bar-wrap { display: flex; flex: 1 1 0; min-width: 1px; height: 100%; align-items: end; }
+.damage-histogram-bar { width: 100%; min-height: 2px; background: #4388c7; border-radius: 2px 2px 0 0; }
+.damage-histogram-axis { margin-top: 4px; font-size: .63rem; }
+.damage-histogram-note { margin: 8px 0 0; font-size: .64rem; line-height: 1.35; }
+
+/* Draft matchup hover analysis. */
+.draft-matchup-analysis-tooltip {
+  position: fixed;
+  z-index: 1150;
+  width: min(460px, calc(100vw - 16px));
+  max-height: min(520px, calc(100vh - 16px));
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel, #171d28);
+  color: var(--text, #f2f4f8);
+  box-shadow: 0 12px 32px rgba(0,0,0,.35);
+  font-size: .75rem;
+  pointer-events: auto;
+}
+.draft-matchup-analysis-title { display: block; margin-bottom: 8px; font-size: .88rem; }
+.draft-matchup-analysis-section { padding: 8px 0; border-top: 1px solid var(--border); }
+.draft-matchup-analysis-section > strong { display: block; font-size: .77rem; }
+.draft-matchup-analysis-section > strong span, .draft-matchup-analysis-section p, .draft-matchup-analysis-section small { color: var(--muted, #aab2c0); }
+.draft-matchup-analysis-section p { margin: 3px 0 6px; font-size: .67rem; }
+.draft-matchup-analysis-section ul { margin: 0; padding-left: 17px; }
+.draft-matchup-analysis-section li { margin: 4px 0; line-height: 1.35; }
+.draft-matchup-analysis-section li small { display: inline; font-size: .66rem; }
+.draft-matchup-analysis-note { margin: 8px 0 4px; color: var(--muted, #aab2c0); font-size: .66rem; line-height: 1.4; }
+.draft-matchup-analysis-tooltip > small { color: var(--muted, #aab2c0); font-size: .63rem; }
+.damage-histogram-hitcounts { margin-top: 6px; font-size: .66rem; line-height: 1.4; color: var(--muted, #aab2c0); }
