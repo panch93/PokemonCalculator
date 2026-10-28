@@ -78,6 +78,7 @@ export function selectDraftCandidateMoves(moveNames: Iterable<string>, generatio
 
 const moveCache = new Map<string, MoveDetails[]>();
 const analysisCache = new Map<string, DraftMatchupAnalysis>();
+const bestAttackCache = new Map<string, { best?: DraftMoveThreat; bestStab?: DraftMoveThreat }>();
 function candidateMoves(species: string, generation: number): MoveDetails[] {
   const key = `${generation}:${normalize(species)}`;
   const cached = moveCache.get(key);
@@ -185,6 +186,9 @@ async function bestAttack(
   counters: { evaluated: number },
   isCancelled: () => boolean,
 ): Promise<{ best?: DraftMoveThreat; bestStab?: DraftMoveThreat }> {
+  const cacheKey = JSON.stringify([generation, attackerProfile, defenderProfile]);
+  const cached = bestAttackCache.get(cacheKey);
+  if (cached) return cached;
   const moves = candidateMoves(attackerProfile.species, generation);
   let best: DraftMoveThreat | undefined;
   let bestStab: DraftMoveThreat | undefined;
@@ -202,7 +206,10 @@ async function bestAttack(
     }
     if ((index + 1) % CHUNK_SIZE === 0) await new Promise<void>(resolve => setTimeout(resolve, 0));
   }
-  return { best, bestStab };
+  const result = { best, bestStab };
+  bestAttackCache.set(cacheKey, result);
+  if (bestAttackCache.size > 4096) bestAttackCache.delete(bestAttackCache.keys().next().value || "");
+  return result;
 }
 
 /**

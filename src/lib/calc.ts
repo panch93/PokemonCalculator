@@ -584,7 +584,7 @@ export function getMoveDetails(moveName: string, generation = DEFAULT_GEN): Move
     const officialMove = officialMoves[moveId];
     const loadedMove = getMove(moveName);
     const accuracy = generation >= 10
-      ? accuracyValue(championsData?.accuracy) ?? accuracyValue(officialMove?.accuracy) ?? accuracyValue(loadedMove?.accuracy) ?? accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy)
+      ? accuracyValue(championsData?.accuracy) ?? accuracyValue(officialMove?.accuracy) ?? accuracyValue(loadedMove?.accuracy) ?? accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy) ?? (moveId === "anchorshot" ? 100 : null)
       : generation >= 9
         ? accuracyValue(officialMove?.accuracy) ?? accuracyValue(loadedMove?.accuracy) ?? accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy)
         : accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy) ?? accuracyValue(loadedMove?.accuracy) ?? accuracyValue(officialMove?.accuracy);

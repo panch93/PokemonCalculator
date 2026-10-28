@@ -41,3 +41,11 @@ Accuracy currently accounts for Wide Lens, Zoom Lens (assuming its condition is 
 - Draft matchup hover lists all qualifying threats and walls/checks, annotates each opposing Pokémon as faster/slower/tied using the configured Speed EVs/Stat Points, nature and stage, and uses selected abilities in damage calculations. Species with one ability start with it enabled; every listed ability can be toggled.
 - The stat editor can reset the edited stat's EVs/Stat Points, nature and stage. Defensive type matchups include configured immunity/resistance abilities and super-effective damage-reduction abilities.
 - Mechanics Gen 10 now uses bundled official Champions move metadata and Champions learnsets through the shared calculator adapter. Champions Stat Points are mapped to the level-50 stat formula in draft analysis. This reuses the official mod data rather than silently treating all moves as standard Gen 9 moves; script-driven effects that cannot be represented by the calculator remain approximate.
+
+
+## v2.3.1 draft hover and histogram updates
+
+- Draft Matchups precomputes every team member's matchup summary when the roster or relevant settings change. Four independent count hovers—Hits, Walls, Hit by, and Walled by—display the relevant opponent list. Directed best-attack analyses are cached and reused across reverse matchup views.
+- Speed labels use green for slower opponents and orange for faster opponents relative to the hovered Pokémon.
+- The multi-hit damage popup uses a fine-bin bar histogram (up to 180 bins) rather than a smoothed curve. It trims approximately 3% cumulative probability from each tail when the discrete distribution allows it; damage/HKO cell coloring continues to use the median total damage.
+- The Anchor Shot Gen 10 accuracy metadata fallback is explicitly set to 100% when the bundled Champions override omits inherited accuracy.

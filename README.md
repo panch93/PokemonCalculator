@@ -1,4 +1,4 @@
-# Pokémon Team Lab — v2.3.0
+# Pokémon Team Lab — v2.3.1
 
 A browser-based Pokémon team matchup lab built with Next.js, React, TypeScript, `@smogon/calc`, live Pokémon Showdown discovery data, and the upstream TeamValidator adapted for browser execution.
 
@@ -6,8 +6,8 @@ A browser-based Pokémon team matchup lab built with Next.js, React, TypeScript,
 
 - 6v6 matchup matrix with damage ranges, estimated KO tiers, type matchups, and uniform move-details popups. Multi-hit moves add a filled probability curve.
 - Multi-hit-aware damage distributions for common moves such as Triple Axel and Population Bomb, including hit-count/accuracy probabilities and relevant accuracy/hit-count items and abilities.
-- Draft Matchups hover analysis for potential threats, opposing walls/checks, the Pokémon it may wall, best STAB/coverage moves, and approximate 70% damage probabilities. Analysis uses configured offensive/defensive EVs or Champions Stat Points, natures, and stat stages on both sides. Each matchup saves its mechanics generation.
-- Generation-aware damage calculations for generations 1–9 plus a Pokémon Champions adapter that uses bundled official Champions move metadata and learnsets with the compatible Gen 9 damage formula. Script-driven effects that require a full battle engine may remain approximate.
+- Draft Matchups matchup counts are precomputed for Hits, Walls, Hit by, and Walled by; hovering each count opens its own detailed list. Directed attack results are cached and reused across all four lists. Analysis uses configured offensive/defensive EVs or Champions Stat Points, natures, and stat stages on both sides. Each matchup saves its mechanics generation.
+- Generation-aware damage calculations for generations 1–9 plus the existing Pokémon Champions metadata adapter, which uses bundled official Champions move metadata and learnsets with the compatible Gen 9 damage formula. Script-driven effects that require a full battle engine may remain approximate.
 - Team builder with Pokémon, moves, abilities, items, EVs/IVs, nature, Tera type, and field controls.
 - Showdown paste import/export and browser-local persistence.
 - Move coverage and support-category panels, sprites, speed/priority helpers, weather and terrain modifiers, and entry-hazard estimates.
@@ -75,7 +75,7 @@ The separate learnset panel is still useful for discovering species moves, but i
 1. Run `npm run check:release` on the target Node version.
 2. Run differential tests against the same upstream Pokémon Showdown source revision before deployment; do not enable unsupported mods until their data dependencies are bundled.
 3. Smoke-test team import/export, format changes, unsupported custom formats, and mobile layout.
-4. Review the GitHub Pages base path and deployment environment before tagging `v2.3.0`.
+4. Review the GitHub Pages base path and deployment environment before tagging `v2.3.1`.
 
 ## Data and licensing
 

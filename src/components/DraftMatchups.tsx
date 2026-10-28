@@ -102,10 +102,10 @@ export default function DraftMatchups() {
   const [supportOpen, setSupportOpen] = useState(false);
   const [speedEdit, setSpeedEdit] = useState<{ side: "A" | "B"; name: string; stat: Exclude<StatKey, "bst"> } | null>(null);
   const [speedHover, setSpeedHover] = useState<{ side: "A" | "B"; name: string; x: number; y: number } | null>(null);
-  const [matchupHover, setMatchupHover] = useState<{ side: "A" | "B"; name: string; x: number; y: number } | null>(null);
-  const [matchupAnalysis, setMatchupAnalysis] = useState<DraftMatchupAnalysis | null>(null);
+  type MatchupHoverKind = "hits" | "walls" | "hitBy" | "walledBy";
+  const [matchupHover, setMatchupHover] = useState<{ side: "A" | "B"; name: string; kind: MatchupHoverKind; x: number; y: number } | null>(null);
+  const [matchupAnalyses, setMatchupAnalyses] = useState<Record<string, DraftMatchupAnalysis>>({});
   const [matchupAnalysisLoading, setMatchupAnalysisLoading] = useState(false);
-  const [matchupAnalysisError, setMatchupAnalysisError] = useState("");
   const matchupHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   type SpeedConfig = { ev: number; nature: "boost" | "neutral" | "hinder"; stage: number };
   type StatConfig = { ev: number; nature: "boost" | "neutral" | "hinder"; stage: number };
@@ -123,54 +123,66 @@ export default function DraftMatchups() {
   const [teamA, setTeamA] = useState<string[]>(() => normalizeTeam(PRESETS[0].teamA));
   const [teamB, setTeamB] = useState<string[]>(() => normalizeTeam(PRESETS[0].teamB));
   const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    if (!matchupHover) {
-      setMatchupAnalysis(null);
-      setMatchupAnalysisLoading(false);
-      setMatchupAnalysisError("");
-      return;
-    }
-    let cancelled = false;
-    const profileFor = (side: "A" | "B", name: string): DraftPokemonProfile => {
-      const key = `${side}:${name}`;
-      const selectedTera = teraCaptains[key] ? teraTypes[key] : undefined;
-      const championsMode = isChampionsFormat(format);
-      const configuredStat = (stat: "hp" | "atk" | "def" | "spa" | "spd" | "spe") => {
-        const raw = stat === "spe"
-          ? speedConfigs[key] || { ev: 252, nature: "boost" as const, stage: 0 }
-          : statConfigs[`${side}:${name}:${stat}`] || { ev: 0, nature: "neutral" as const, stage: 0 };
-        return { ...raw, ev: clampDraftStat(raw.ev, format) };
-      };
-      const stats: NonNullable<DraftPokemonProfile["stats"]> = {
-        hp: configuredStat("hp"), atk: configuredStat("atk"), def: configuredStat("def"),
-        spa: configuredStat("spa"), spd: configuredStat("spd"), spe: configuredStat("spe"),
-      };
-      return {
-        species: name,
-        ability: (() => {
-          const abilities = getSpeciesAbilitiesForGeneration(name, mechanicsGeneration);
-          if (Object.prototype.hasOwnProperty.call(abilityOverrides, key)) {
-            const selected = abilityOverrides[key] || "";
-            return abilities.includes(selected) ? selected : "";
-          }
-          return abilities.length === 1 ? abilities[0] : "";
-        })(),
-        teraType: selectedTera && selectedTera !== "None" ? selectedTera : undefined,
-        stats,
-        championsMode,
-        level: championsMode ? 50 : 100,
-      };
+  const profileFor = (side: "A" | "B", name: string): DraftPokemonProfile => {
+    const key = `${side}:${name}`;
+    const selectedTera = teraCaptains[key] ? teraTypes[key] : undefined;
+    const championsMode = isChampionsFormat(format);
+    const configuredStat = (stat: "hp" | "atk" | "def" | "spa" | "spd" | "spe") => {
+      const raw = stat === "spe"
+        ? speedConfigs[key] || { ev: 252, nature: "boost" as const, stage: 0 }
+        : statConfigs[`${side}:${name}:${stat}`] || { ev: 0, nature: "neutral" as const, stage: 0 };
+      return { ...raw, ev: clampDraftStat(raw.ev, format) };
     };
-    const opposingNames = [...new Set((matchupHover.side === "A" ? teamB : teamA).filter(Boolean))];
-    setMatchupAnalysis(null);
+    const stats: NonNullable<DraftPokemonProfile["stats"]> = {
+      hp: configuredStat("hp"), atk: configuredStat("atk"), def: configuredStat("def"),
+      spa: configuredStat("spa"), spd: configuredStat("spd"), spe: configuredStat("spe"),
+    };
+    const abilities = getSpeciesAbilitiesForGeneration(name, mechanicsGeneration);
+    const selectedAbility = Object.prototype.hasOwnProperty.call(abilityOverrides, key)
+      ? (abilityOverrides[key] || "")
+      : abilities.length === 1 ? abilities[0] : "";
+    return {
+      species: name,
+      ability: abilities.includes(selectedAbility) ? selectedAbility : "",
+      teraType: selectedTera && selectedTera !== "None" ? selectedTera : undefined,
+      stats,
+      championsMode,
+      level: championsMode ? 50 : 100,
+    };
+  };
+
+  // Precompute every Pokémon's view of the opposing roster. The analysis module
+  // caches each directed attacker/defender calculation, so the reverse view
+  // reuses the same move results rather than repeating the damage work.
+  useEffect(() => {
+    let cancelled = false;
+    const namesA: string[] = [...new Set(teamA.filter((name): name is string => Boolean(name)))];
+    const namesB: string[] = [...new Set(teamB.filter((name): name is string => Boolean(name)))];
+    setMatchupAnalyses({});
     setMatchupAnalysisLoading(true);
-    setMatchupAnalysisError("");
-    analyzeDraftPokemon(profileFor(matchupHover.side, matchupHover.name), opposingNames.map(name => profileFor(matchupHover.side === "A" ? "B" : "A", name)), mechanicsGeneration, () => cancelled)
-      .then(result => { if (!cancelled) setMatchupAnalysis(result); })
-      .catch(() => { if (!cancelled) setMatchupAnalysisError("Matchup analysis could not be calculated for this Pokémon."); })
-      .finally(() => { if (!cancelled) setMatchupAnalysisLoading(false); });
+    const run = async () => {
+      const next: Record<string, DraftMatchupAnalysis> = {};
+      const queue: Array<{ side: "A" | "B"; name: string; opponents: string[] }> = [
+        ...namesA.map(name => ({ side: "A" as const, name, opponents: namesB })),
+        ...namesB.map(name => ({ side: "B" as const, name, opponents: namesA })),
+      ];
+      for (const entry of queue) {
+        if (cancelled) return;
+        const result = await analyzeDraftPokemon(
+          profileFor(entry.side, entry.name),
+          entry.opponents.map(name => profileFor(entry.side === "A" ? "B" : "A", name)),
+          mechanicsGeneration,
+          () => cancelled,
+        );
+        if (cancelled) return;
+        next[`${entry.side}:${entry.name}`] = result;
+        setMatchupAnalyses({ ...next });
+      }
+      if (!cancelled) setMatchupAnalysisLoading(false);
+    };
+    run().catch(() => { if (!cancelled) setMatchupAnalysisLoading(false); });
     return () => { cancelled = true; };
-  }, [matchupHover?.side, matchupHover?.name, teamA, teamB, abilityOverrides, teraCaptains, teraTypes, speedConfigs, statConfigs, format, mechanicsGeneration]);
+  }, [teamA, teamB, abilityOverrides, teraCaptains, teraTypes, speedConfigs, statConfigs, format, mechanicsGeneration]);
   useEffect(() => () => { if (matchupHoverTimer.current) clearTimeout(matchupHoverTimer.current); }, []);
 
   const storageKey = "pokemon-team-lab-draft-matchups-v2";
@@ -426,12 +438,30 @@ export default function DraftMatchups() {
     cancelMatchupHoverHide();
     matchupHoverTimer.current = setTimeout(() => setMatchupHover(null), 140);
   };
-  const showMatchupHover = (event: MouseEvent<HTMLElement>, name: string, side: "A" | "B") => {
+  const showMatchupHover = (event: MouseEvent<HTMLElement>, name: string, side: "A" | "B", kind: MatchupHoverKind) => {
     cancelMatchupHoverHide();
     const width = Math.min(460, window.innerWidth - 16);
     const height = Math.min(520, window.innerHeight - 16);
-    setMatchupHover({ side, name, x: Math.max(8, Math.min(event.clientX + 14, window.innerWidth - width - 8)), y: Math.max(8, Math.min(event.clientY + 14, window.innerHeight - height - 8)) });
+    setMatchupHover({ side, name, kind, x: Math.max(8, Math.min(event.clientX + 14, window.innerWidth - width - 8)), y: Math.max(8, Math.min(event.clientY + 14, window.innerHeight - height - 8)) });
   };
+  const analysisFor = (side: "A" | "B", name: string) => matchupAnalyses[`${side}:${name}`];
+  const matchupRowsFor = (side: "A" | "B", name: string, kind: MatchupHoverKind): DraftOpponentResult[] => {
+    const rows = analysisFor(side, name)?.opponents || [];
+    const filtered = kind === "hits" ? rows.filter(row => row.threat)
+      : kind === "walls" ? rows.filter(row => row.attackerWalls)
+      : kind === "hitBy" ? rows.filter(row => (row.bestReply?.maxPct || 0) >= 70)
+      : rows.filter(row => row.wallsAttacker);
+    return filtered.sort((a, b) => {
+      const damage = (row: DraftOpponentResult) => kind === "walls" || kind === "hitBy" ? (row.bestReply?.maxPct || 0) : (row.bestAttack?.maxPct || 0);
+      return kind === "walls" || kind === "walledBy" ? damage(a) - damage(b) : damage(b) - damage(a);
+    });
+  };
+  const matchupCount = (side: "A" | "B", name: string, kind: MatchupHoverKind) => {
+    const analysis = analysisFor(side, name);
+    if (!analysis) return null;
+    return matchupRowsFor(side, name, kind).length;
+  };
+  const matchupKindLabel: Record<MatchupHoverKind, string> = { hits: "Hits", walls: "Walls", hitBy: "Hit by", walledBy: "Walled by" };
 
 
   return <main className="draft-page">
@@ -458,10 +488,10 @@ export default function DraftMatchups() {
           const abilitiesB = b ? abilitiesFor(b) : [];
           return <tr key={index}>
             <td className={`draft-mon-sprite-cell ${a && isTeraCaptain("A", a) ? "is-tera-captain" : ""}`}><PokemonSprite species={a} className="draft-mon-sprite" /></td>
-            <td className={`draft-mon-entry ${a && isTeraCaptain("A", a) ? "is-tera-captain" : ""}`}><div className="draft-mon-details"><div className="draft-name-line"><strong className="draft-pokemon-name" onMouseEnter={a ? event => showMatchupHover(event, a, "A") : undefined} onMouseLeave={hideMatchupHover}>{a ? <>{a}{isTeraCaptain("A", a) ? <span className="draft-tera-name-marker" title={`Tera Captain · ${selectedTeraType("A", a) || "no Tera type"}`}> (T)</span> : null}</> : <span className="muted">—</span>}</strong>{a && isTeraCaptain("A", a) ? <select className="draft-inline-tera-select" aria-label={`${a} Tera type`} title="Tera captain type" value={teraTypeValue("A", a)} onChange={event => setTeraTypeFor("A", a, event.target.value)}>{TERA_TYPES.map(type => <option key={type} value={type}>{type}</option>)}</select> : null}</div><div className="draft-type-pills">{a && speciesTypes(a).map(type => <span key={type} className={typeClass(type)} title={`Defensive type matchups for ${a}:\n${defensiveSummary(a, "A")}`}>{type}</span>)}</div><div className="draft-abilities">{abilitiesA.map(ability => { const defensiveEffect = Boolean(getAbilityDefenseEffect(ability)); const selected = enabledAbility("A", a) === ability; const title = `${ability}: ${getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}${defensiveEffect ? `\n${abilityDefenseDescription(ability)}` : "\nThis ability is used in damage calculations when enabled; it does not change the type-chart multipliers unless a defensive effect is listed."}`; return <button type="button" key={ability} className={`draft-ability draft-ability-toggle ${selected ? "is-enabled" : ""}`} title={title} aria-pressed={selected} onClick={() => toggleAbility("A", a, ability)}>{shortAbilityName(ability)}</button>; })}</div></div></td>
+            <td className={`draft-mon-entry ${a && isTeraCaptain("A", a) ? "is-tera-captain" : ""}`}><div className="draft-mon-details"><div className="draft-name-line" onMouseLeave={hideMatchupHover}><strong className="draft-pokemon-name">{a ? <>{a}{isTeraCaptain("A", a) ? <span className="draft-tera-name-marker" title={`Tera Captain · ${selectedTeraType("A", a) || "no Tera type"}`}> (T)</span> : null}</> : <span className="muted">—</span>}</strong>{a ? <span className="draft-matchup-counts">{(["hits", "walls", "hitBy", "walledBy"] as MatchupHoverKind[]).map(kind => <button type="button" key={kind} className={`draft-matchup-count ${matchupHover?.side === "A" && matchupHover.name === a && matchupHover.kind === kind ? "active" : ""}`} onMouseEnter={event => showMatchupHover(event, a, "A", kind)} onFocus={event => { const rect = event.currentTarget.getBoundingClientRect(); showMatchupHover({ clientX: rect.left, clientY: rect.top } as MouseEvent<HTMLElement>, a, "A", kind); }} onBlur={hideMatchupHover} title={`${matchupKindLabel[kind]}: matching opposing Pokémon`}>{matchupKindLabel[kind]} <b>{matchupCount("A", a, kind) ?? "…"}</b></button>)}</span> : null}{a && isTeraCaptain("A", a) ? <select className="draft-inline-tera-select" aria-label={`${a} Tera type`} title="Tera captain type" value={teraTypeValue("A", a)} onChange={event => setTeraTypeFor("A", a, event.target.value)}>{TERA_TYPES.map(type => <option key={type} value={type}>{type}</option>)}</select> : null}</div><div className="draft-type-pills">{a && speciesTypes(a).map(type => <span key={type} className={typeClass(type)} title={`Defensive type matchups for ${a}:\n${defensiveSummary(a, "A")}`}>{type}</span>)}</div><div className="draft-abilities">{abilitiesA.map(ability => { const defensiveEffect = Boolean(getAbilityDefenseEffect(ability)); const selected = enabledAbility("A", a) === ability; const title = `${ability}: ${getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}${defensiveEffect ? `\n${abilityDefenseDescription(ability)}` : "\nThis ability is used in damage calculations when enabled; it does not change the type-chart multipliers unless a defensive effect is listed."}`; return <button type="button" key={ability} className={`draft-ability draft-ability-toggle ${selected ? "is-enabled" : ""}`} title={title} aria-pressed={selected} onClick={() => toggleAbility("A", a, ability)}>{shortAbilityName(ability)}</button>; })}</div></div></td>
             {(["bst", "spd", "spa", "def", "atk", "hp", "spe"] as StatKey[]).map(key => renderStatCell(a, "A", key))}
             {(["spe", "hp", "atk", "def", "spa", "spd", "bst"] as StatKey[]).map(key => renderStatCell(b, "B", key))}
-            <td className={`draft-mon-entry ${b && isTeraCaptain("B", b) ? "is-tera-captain" : ""}`}><div className="draft-mon-details"><div className="draft-name-line"><strong className="draft-pokemon-name" onMouseEnter={b ? event => showMatchupHover(event, b, "B") : undefined} onMouseLeave={hideMatchupHover}>{b ? <>{b}{isTeraCaptain("B", b) ? <span className="draft-tera-name-marker" title={`Tera Captain · ${selectedTeraType("B", b) || "no Tera type"}`}> (T)</span> : null}</> : <span className="muted">—</span>}</strong>{b && isTeraCaptain("B", b) ? <select className="draft-inline-tera-select" aria-label={`${b} Tera type`} title="Tera captain type" value={teraTypeValue("B", b)} onChange={event => setTeraTypeFor("B", b, event.target.value)}>{TERA_TYPES.map(type => <option key={type} value={type}>{type}</option>)}</select> : null}</div><div className="draft-type-pills">{b && speciesTypes(b).map(type => <span key={type} className={typeClass(type)} title={`Defensive type matchups for ${b}:\n${defensiveSummary(b, "B")}`}>{type}</span>)}</div><div className="draft-abilities">{abilitiesB.map(ability => { const defensiveEffect = Boolean(getAbilityDefenseEffect(ability)); const selected = enabledAbility("B", b) === ability; const title = `${ability}: ${getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}${defensiveEffect ? `\n${abilityDefenseDescription(ability)}` : "\nThis ability is used in damage calculations when enabled; it does not change the type-chart multipliers unless a defensive effect is listed."}`; return <button type="button" key={ability} className={`draft-ability draft-ability-toggle ${selected ? "is-enabled" : ""}`} title={title} aria-pressed={selected} onClick={() => toggleAbility("B", b, ability)}>{shortAbilityName(ability)}</button>; })}</div></div></td>
+            <td className={`draft-mon-entry ${b && isTeraCaptain("B", b) ? "is-tera-captain" : ""}`}><div className="draft-mon-details"><div className="draft-name-line" onMouseLeave={hideMatchupHover}><strong className="draft-pokemon-name">{b ? <>{b}{isTeraCaptain("B", b) ? <span className="draft-tera-name-marker" title={`Tera Captain · ${selectedTeraType("B", b) || "no Tera type"}`}> (T)</span> : null}</> : <span className="muted">—</span>}</strong>{b ? <span className="draft-matchup-counts">{(["hits", "walls", "hitBy", "walledBy"] as MatchupHoverKind[]).map(kind => <button type="button" key={kind} className={`draft-matchup-count ${matchupHover?.side === "B" && matchupHover.name === b && matchupHover.kind === kind ? "active" : ""}`} onMouseEnter={event => showMatchupHover(event, b, "B", kind)} onFocus={event => { const rect = event.currentTarget.getBoundingClientRect(); showMatchupHover({ clientX: rect.left, clientY: rect.top } as MouseEvent<HTMLElement>, b, "B", kind); }} onBlur={hideMatchupHover} title={`${matchupKindLabel[kind]}: matching opposing Pokémon`}>{matchupKindLabel[kind]} <b>{matchupCount("B", b, kind) ?? "…"}</b></button>)}</span> : null}{b && isTeraCaptain("B", b) ? <select className="draft-inline-tera-select" aria-label={`${b} Tera type`} title="Tera captain type" value={teraTypeValue("B", b)} onChange={event => setTeraTypeFor("B", b, event.target.value)}>{TERA_TYPES.map(type => <option key={type} value={type}>{type}</option>)}</select> : null}</div><div className="draft-type-pills">{b && speciesTypes(b).map(type => <span key={type} className={typeClass(type)} title={`Defensive type matchups for ${b}:\n${defensiveSummary(b, "B")}`}>{type}</span>)}</div><div className="draft-abilities">{abilitiesB.map(ability => { const defensiveEffect = Boolean(getAbilityDefenseEffect(ability)); const selected = enabledAbility("B", b) === ability; const title = `${ability}: ${getAbility(ability)?.desc || getAbility(ability)?.shortDesc || "No ability description available."}${defensiveEffect ? `\n${abilityDefenseDescription(ability)}` : "\nThis ability is used in damage calculations when enabled; it does not change the type-chart multipliers unless a defensive effect is listed."}`; return <button type="button" key={ability} className={`draft-ability draft-ability-toggle ${selected ? "is-enabled" : ""}`} title={title} aria-pressed={selected} onClick={() => toggleAbility("B", b, ability)}>{shortAbilityName(ability)}</button>; })}</div></div></td>
             <td className={`draft-mon-sprite-cell ${b && isTeraCaptain("B", b) ? "is-tera-captain" : ""}`}><PokemonSprite species={b} className="draft-mon-sprite" /></td>
           </tr>;
         })}</tbody>
@@ -479,25 +509,29 @@ export default function DraftMatchups() {
     })()}
 
     {matchupHover && <div className="draft-matchup-analysis-tooltip" role="tooltip" style={{ left: matchupHover.x, top: matchupHover.y }} onMouseEnter={cancelMatchupHoverHide} onMouseLeave={hideMatchupHover}>
-      <strong className="draft-matchup-analysis-title">{matchupHover.name} · Potential matchups</strong>
-      {matchupAnalysisLoading && <p className="muted">Calculating eligible moves and damage ranges…</p>}
-      {matchupAnalysisError && <p>{matchupAnalysisError}</p>}
-      {matchupAnalysis && (() => {
-        const threats = matchupAnalysis.opponents.filter(row => row.threat).sort((a, b) => (b.bestAttack?.maxPct || 0) - (a.bestAttack?.maxPct || 0));
-        const wallsBy = matchupAnalysis.opponents.filter(row => row.wallsAttacker).sort((a, b) => (a.bestAttack?.maxPct || 0) - (b.bestAttack?.maxPct || 0));
-        const walls = matchupAnalysis.opponents.filter(row => row.attackerWalls).sort((a, b) => (a.bestReply?.maxPct || 0) - (b.bestReply?.maxPct || 0));
-        const moveLine = (row: DraftOpponentResult, move: "bestAttack" | "bestReply") => {
-          const result = row[move];
+      <strong className="draft-matchup-analysis-title">{matchupHover.name} · {matchupKindLabel[matchupHover.kind]} ({analysisFor(matchupHover.side, matchupHover.name) ? matchupRowsFor(matchupHover.side, matchupHover.name, matchupHover.kind).length : "…"})</strong>
+      {matchupAnalysisLoading && !analysisFor(matchupHover.side, matchupHover.name) && <p className="muted">Precomputing matchup results…</p>}
+      {(() => {
+        const analysis = analysisFor(matchupHover.side, matchupHover.name);
+        if (!analysis) return null;
+        const kind = matchupHover.kind;
+        const rows = matchupRowsFor(matchupHover.side, matchupHover.name, kind);
+        const moveKey: "bestAttack" | "bestReply" = kind === "walls" || kind === "hitBy" ? "bestReply" : "bestAttack";
+        const moveLine = (row: DraftOpponentResult) => {
+          const result = row[moveKey];
           return result ? `${result.move} (${result.stab ? "STAB" : "coverage"} · ${result.type}) · ${result.minPct.toFixed(0)}–${result.maxPct.toFixed(0)}%` : "No eligible move found";
         };
-        const section = (title: string, rows: DraftOpponentResult[], move: "bestAttack" | "bestReply", description: string) => <section className="draft-matchup-analysis-section" key={title}><strong>{title} <span>({rows.length})</span></strong><p>{description}</p>{rows.length ? <ul>{rows.map(row => { const speed = compareDraftSpeeds(row.species); return <li key={row.species}><b>{row.species}</b> <small className={`draft-speed-relation ${speed.tone}`} title={speed.title}>{speed.label}</small> — {moveLine(row, move)}{move === "bestAttack" && row.bestAttack && row.bestAttack.chance70 > 0 ? <small> · ≥70% chance: {row.bestAttack.chance70.toFixed(1)}%</small> : null}{move === "bestAttack" && row.bestStabAttack && !row.bestAttack?.stab ? <small> · best STAB: {row.bestStabAttack.move} ({row.bestStabAttack.minPct.toFixed(0)}–{row.bestStabAttack.maxPct.toFixed(0)}%)</small> : null}</li>; })}</ul> : <p className="muted">No matchups meet this initial threshold.</p>}</section>;
+        const description = kind === "hits" ? "Opposing Pokémon this Pokémon can threaten (best move reaches at least 70% damage)."
+          : kind === "walls" ? "Opposing Pokémon whose best eligible reply deals 35% damage or less to this Pokémon."
+          : kind === "hitBy" ? "Opposing Pokémon whose best eligible move can deal at least 70% damage to this Pokémon."
+          : "Opposing Pokémon this Pokémon struggles to threaten (its best eligible move tops out at 35% damage or less).";
         return <>
-          {section("Can threaten", threats, "bestAttack", "At least one eligible move can reach 70% damage.")}
-          {section("Walls / checks it", wallsBy, "bestAttack", "Its best eligible move tops out at 35% damage or less.")}
-          {section("It can wall", walls, "bestReply", "The opponent's best eligible reply tops out at 35% damage or less.")}
-          <p className="draft-matchup-analysis-note">Approximate potential: top 3 eligible moves per type/category, configured EVs/Stat Points, natures and stages, selected ability (single-ability species start enabled), no items or field effects. Negative-priority moves and moves below 70% accuracy are excluded. Variable-power moves use the baseline state. Critical-hit chance is not included.</p>
-          {mechanicsGeneration === 10 && <p className="draft-matchup-analysis-note">Uses bundled official Champions move data, Champions learnsets and level-50 Stat Point calculations through the shared damage engine. Script-driven effects that the damage engine cannot represent directly remain approximate.</p>}
-          <small>{matchupAnalysis.movesEvaluated} move calculations · lazy-loaded and cached by the damage engine</small>
+          <p className="draft-matchup-analysis-description">{description}</p>
+          {rows.length ? <ul>{rows.map(row => {
+            const speed = compareDraftSpeeds(row.species);
+            return <li key={row.species}><b>{row.species}</b> <small className={`draft-speed-relation ${speed.tone}`} title={speed.title}>{speed.label}</small> — {moveLine(row)}{moveKey === "bestAttack" && row.bestAttack && row.bestAttack.chance70 > 0 ? <small> · ≥70% chance: {row.bestAttack.chance70.toFixed(1)}%</small> : null}</li>;
+          })}</ul> : <p className="muted">No opposing Pokémon match this category.</p>}
+          <small>Damage calculations are shared and cached across all four hover lists.</small>
         </>;
       })()}
     </div>}
