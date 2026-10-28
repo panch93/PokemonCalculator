@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { binDamageDistribution, buildDamageDistribution, combineDamageDistributions, getMultiHitProfile } from "../src/lib/damage-distribution";
+import { binDamageDistribution, buildDamageDistribution, combineDamageDistributions, getMultiHitProfile, medianDamageOutcome, medianSuccessfulHitCount } from "../src/lib/damage-distribution";
 
 describe("damage probability aggregation", () => {
   it("retains roll multiplicity and includes the miss probability", () => {
@@ -61,6 +61,21 @@ describe("damage probability aggregation", () => {
       { damage: 3, probability: 0.5 },
       { damage: 4, probability: 0.25 },
     ]);
+  });
+
+  it("calculates weighted median damage and successful hit count", () => {
+    expect(medianDamageOutcome([
+      { damage: 0, probability: 0.1 },
+      { damage: 10, probability: 0.2 },
+      { damage: 20, probability: 0.7 },
+    ])).toBe(20);
+    expect(medianSuccessfulHitCount([
+      { hits: 0, probability: 0.1 },
+      { hits: 1, probability: 0.09 },
+      { hits: 2, probability: 0.081 },
+      { hits: 3, probability: 0.729 },
+    ])).toBe(3);
+    expect(medianSuccessfulHitCount([{ hits: 0, probability: 1 }])).toBeNull();
   });
 
   it("bins a long histogram while preserving total probability", () => {

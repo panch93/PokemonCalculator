@@ -7,11 +7,16 @@ export { DRAFT_STRONG_HIT_THRESHOLD, DRAFT_WALL_THRESHOLD } from "./draft-matchu
 const MAX_MOVES_PER_TYPE_CATEGORY = 3;
 const CHUNK_SIZE = 16;
 
+export type DraftStatConfig = { ev: number; nature: "boost" | "neutral" | "hinder"; stage: number };
 export type DraftPokemonProfile = {
   species: string;
   ability?: string;
   /** Include Stellar when the captain selected Stellar; it affects offensive STAB but not defensive typing. */
   teraType?: string;
+  /** Configured EVs (or Champions Stat Points), natures, and stages from the draft editor. */
+  stats?: Partial<Record<StatId, DraftStatConfig>>;
+  championsMode?: boolean;
+  level?: number;
 };
 export type DraftMoveThreat = {
   move: string;
@@ -49,7 +54,6 @@ const blankField: FieldState = {
   defenderReflect: false, defenderLightScreen: false, defenderAuroraVeil: false,
   defenderLeechSeed: false, defenderSaltCure: false, trickRoom: false, tailwindSide: "",
 };
-const zeroStats = (): Stats => ({ hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 });
 const fullIvs = (): Stats => ({ hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 });
 const statId = (category: string): StatId => category === "Special" ? "spa" : "atk";
 const defenseId = (category: string): StatId => category === "Special" ? "spd" : "def";
@@ -84,21 +88,61 @@ function candidateMoves(species: string, generation: number): MoveDetails[] {
   return moves;
 }
 
+const STAT_IDS: StatId[] = ["hp", "atk", "def", "spa", "spd", "spe"];
+const defaultStatConfig: DraftStatConfig = { ev: 0, nature: "neutral", stage: 0 };
+
+/** Champions stat points map to the EV term used by the compatible Gen 9 calculator. */
+export function championsStatPointsToCalcEvs(value: number): number {
+  const points = Math.max(0, Math.min(32, Math.round(Number(value) || 0)));
+  return points === 0 ? 0 : (2 * points - 1) * 4;
+}
+
+function configFor(profile: DraftPokemonProfile, stat: StatId): DraftStatConfig {
+  const config = profile.stats?.[stat] || defaultStatConfig;
+  const maximum = profile.championsMode ? 32 : 252;
+  return {
+    ev: Math.max(0, Math.min(maximum, Math.round(Number(config.ev) || 0))),
+    nature: config.nature || "neutral",
+    stage: Math.max(-6, Math.min(6, Math.round(Number(config.stage) || 0))),
+  };
+}
+
+function calcEvs(profile: DraftPokemonProfile, stat: StatId): number {
+  const value = configFor(profile, stat).ev;
+  return profile.championsMode ? championsStatPointsToCalcEvs(value) : value;
+}
+
+function natureForStat(stat: StatId, effect: DraftStatConfig["nature"]): string {
+  if (effect === "neutral" || stat === "hp") return "Hardy";
+  const natures: Record<string, { boost: string; hinder: string }> = {
+    atk: { boost: "Adamant", hinder: "Modest" }, spa: { boost: "Modest", hinder: "Adamant" },
+    def: { boost: "Bold", hinder: "Lonely" }, spd: { boost: "Calm", hinder: "Naughty" },
+    spe: { boost: "Timid", hinder: "Brave" },
+  };
+  return natures[stat]?.[effect] || "Hardy";
+}
+
+function stagesFor(profile: DraftPokemonProfile) {
+  return {
+    atk: configFor(profile, "atk").stage,
+    def: configFor(profile, "def").stage,
+    spa: configFor(profile, "spa").stage,
+    spd: configFor(profile, "spd").stage,
+    spe: configFor(profile, "spe").stage,
+  };
+}
+
 function makeDraftSet(profile: DraftPokemonProfile, move: MoveDetails, role: "attacker" | "defender"): PokemonSet {
-  const evs = zeroStats();
-  if (role === "attacker") evs[statId(move.category)] = 252;
-  else {
-    evs.hp = 252;
-    evs[defenseId(move.category)] = 252;
-  }
-  evs.spe = 4;
+  const relevantStat = role === "attacker" ? statId(move.category) : defenseId(move.category);
+  const relevantConfig = configFor(profile, relevantStat);
+  const evs = Object.fromEntries(STAT_IDS.map(stat => [stat, calcEvs(profile, stat)])) as Stats;
   return {
     name: profile.species,
     species: profile.species,
     item: "",
     ability: profile.ability || "",
-    nature: "Hardy",
-    level: 100,
+    nature: natureForStat(relevantStat, relevantConfig.nature),
+    level: profile.level || (profile.championsMode ? 50 : 100),
     teraType: profile.teraType || "",
     evs,
     ivs: fullIvs(),
@@ -106,8 +150,8 @@ function makeDraftSet(profile: DraftPokemonProfile, move: MoveDetails, role: "at
   };
 }
 
-function summarizeMove(move: MoveDetails, result: DamageSummary, attacker: DraftPokemonProfile, defender: PokemonSet): DraftMoveThreat {
-  const maxHp = getPokemonHp(defender).max || 1;
+function summarizeMove(move: MoveDetails, result: DamageSummary, attacker: DraftPokemonProfile, defender: PokemonSet, generation: number): DraftMoveThreat {
+  const maxHp = getPokemonHp(defender, generation).max || 1;
   const originalTypes = getSpecies(attacker.species)?.types || [];
   const stab = originalTypes.includes(move.type) || attacker.teraType === move.type;
   const thresholdHp = maxHp * (DRAFT_STRONG_HIT_THRESHOLD / 100);
@@ -147,10 +191,10 @@ async function bestAttack(
     const move = moves[index];
     const attacker = makeDraftSet(attackerProfile, move, "attacker");
     const defender = makeDraftSet(defenderProfile, move, "defender");
-    const result = calculateMove(attacker, defender, move.name, blankField, undefined, undefined, false, generation, false);
+    const result = calculateMove(attacker, defender, move.name, blankField, stagesFor(attackerProfile), stagesFor(defenderProfile), false, generation, false);
     counters.evaluated++;
     if (result) {
-      const candidate = summarizeMove(move, result, attackerProfile, defender);
+      const candidate = summarizeMove(move, result, attackerProfile, defender, generation);
       if (isBetterMove(candidate, best)) best = candidate;
       if (candidate.stab && isBetterMove(candidate, bestStab)) bestStab = candidate;
     }
@@ -160,10 +204,9 @@ async function bestAttack(
 }
 
 /**
- * Analyze one hovered draft Pokémon against the opposing roster. Damage uses a
- * neutral, unboosted, no-item baseline with 252 EVs in the relevant attacking
- * stat and 252 HP / 252 relevant defense EVs. Results are potential matchups,
- * not guaranteed set-based battle predictions.
+ * Analyze one hovered draft Pokémon against the opposing roster using the
+ * configured EVs/Champions Stat Points, natures, and stat stages on both sides.
+ * Items and field effects remain neutral; results are potential move-pool matchups.
  */
 export async function analyzeDraftPokemon(
   attacker: DraftPokemonProfile,
@@ -206,7 +249,7 @@ export async function analyzeDraftPokemon(
     opponents: results,
     movesEvaluated: counters.evaluated,
     approximate: true,
-    note: "Potential matchups only: top three eligible moves per type/category, neutral nature, no items or field effects, and 252 EVs in the relevant attacking/defending stats. Damage and multi-hit probabilities inherit the calculator's supported mechanics; this is not a guaranteed set or battle prediction.",
+    note: "Potential matchups only: top three eligible moves per type/category, configured EVs/Stat Points, natures, and stat stages on both sides; no items or field effects. Damage and multi-hit probabilities inherit the calculator's supported mechanics; this is not a guaranteed set or battle prediction.",
   };
   if (!isCancelled()) {
     analysisCache.set(cacheKey, analysis);

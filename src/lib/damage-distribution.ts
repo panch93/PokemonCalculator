@@ -211,6 +211,34 @@ export function buildDamageDistribution(input: DistributionInput): DamageDistrib
   return { outcomes: normalized, hitCounts, accuracy: accuracy * 100, isMultiHit: true, approximate: true, note: approximations.join(" ") };
 }
 
+
+/** Weighted median outcome; equal-probability damage rolls retain their weight. */
+export function medianDamageOutcome(outcomes: DamageOutcome[]): number {
+  if (!outcomes.length) return 0;
+  const sorted = [...outcomes].filter(outcome => outcome.probability > 0).sort((a, b) => a.damage - b.damage);
+  const total = sorted.reduce((sum, outcome) => sum + outcome.probability, 0);
+  if (!total) return 0;
+  let cumulative = 0;
+  for (const outcome of sorted) {
+    cumulative += outcome.probability;
+    if (cumulative >= total / 2) return outcome.damage;
+  }
+  return sorted[sorted.length - 1]?.damage ?? 0;
+}
+
+/** Weighted median hit count conditional on the move connecting at least once. */
+export function medianSuccessfulHitCount(hitCounts: HitCountOutcome[]): number | null {
+  const successful = hitCounts.filter(entry => entry.hits > 0 && entry.probability > 0).sort((a, b) => a.hits - b.hits);
+  const total = successful.reduce((sum, entry) => sum + entry.probability, 0);
+  if (!total) return null;
+  let cumulative = 0;
+  for (const entry of successful) {
+    cumulative += entry.probability;
+    if (cumulative >= total / 2) return entry.hits;
+  }
+  return successful[successful.length - 1]?.hits ?? null;
+}
+
 /** Group a large outcome distribution into display bins without losing total probability. */
 export function binDamageDistribution(outcomes: DamageOutcome[], maxBins = 24): DamageOutcome[] {
   if (outcomes.length <= maxBins) return outcomes;
@@ -223,7 +251,7 @@ export function binDamageDistribution(outcomes: DamageOutcome[], maxBins = 24): 
     const bin = Math.min(maxBins - 1, Math.floor((outcome.damage - min) / width));
     bins.set(bin, (bins.get(bin) || 0) + outcome.probability);
   }
-  return [...bins.entries()].sort((a, b) => a[0] - b[0]).map(([bin, probability]) => ({ damage: Math.round(min + (bin + 0.5) * width), probability }));
+  return [...bins.entries()].sort((a, b) => a[0] - b[0]).map(([bin, probability]) => ({ damage: Math.round((min + (bin + 0.5) * width) * 10) / 10, probability }));
 }
 
 /** Apply a deterministic post-calculation modifier and merge any newly identical outcomes. */

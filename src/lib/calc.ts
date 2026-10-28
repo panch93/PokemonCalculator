@@ -3,7 +3,7 @@ import { getMove } from "./showdown-data";
 import { Moves as OFFICIAL_SHOWDOWN_MOVES } from "./showdown-official/data/moves";
 import { getEffectiveMovePriority } from "./battle-order";
 import { DamageSummary, FieldState, MoveDetails, PokemonSet, StatStages } from "./types";
-import { buildDamageDistribution, scaleDamageOutcomes } from "./damage-distribution";
+import { buildDamageDistribution, medianDamageOutcome, scaleDamageOutcomes } from "./damage-distribution";
 
 /** Read canonical English move descriptions from the live official Pokémon Showdown data. */
 function getShowdownMoveDescription(name: string): string | undefined {
@@ -238,8 +238,8 @@ export function calculateMove(
 
   try {
     const gen = getGen(generation);
-    const attackerPokemon = makePokemon(attacker, generation, { atk: attackerStages.atk, spa: attackerStages.spa }, fieldState);
-    const defenderPokemon = makePokemon(defender, generation, { def: defenderStages.def, spd: defenderStages.spd }, fieldState);
+    const attackerPokemon = makePokemon(attacker, generation, { atk: attackerStages.atk, spa: attackerStages.spa, def: attackerStages.def, spd: attackerStages.spd, spe: attackerStages.spe }, fieldState);
+    const defenderPokemon = makePokemon(defender, generation, { atk: defenderStages.atk, spa: defenderStages.spa, def: defenderStages.def, spd: defenderStages.spd, spe: defenderStages.spe }, fieldState);
     const move = new Move(gen, moveName);
     if (critical) (move as unknown as { isCrit: boolean }).isCrit = true;
     const field = makeField(fieldState);
@@ -250,7 +250,7 @@ export function calculateMove(
     const moveCategory = String((move as unknown as { category?: string }).category || "");
     if (fieldState.protectSide === "defender" && !/feint|hyperspace|phantom force|shadow force|mighty cleave|breaking swipe/i.test(moveName)) {
       const maxHp = defenderPokemon.maxHP();
-      const blocked: DamageSummary = { move: moveName, min: 0, max: 0, minPct: 0, maxPct: 0, rawMinPct: 0, rawMaxPct: 0, effectiveHp: maxHp, entryHazardDamage: 0, entryHazardPct: 0, ko: "No damage", description: `${moveName} is blocked by Protect.` };
+      const blocked: DamageSummary = { move: moveName, min: 0, max: 0, maxHp, medianDamage: 0, minPct: 0, maxPct: 0, rawMinPct: 0, rawMaxPct: 0, effectiveHp: maxHp, entryHazardDamage: 0, entryHazardPct: 0, ko: "No damage", description: `${moveName} is blocked by Protect.` };
       return setCached(key, blocked);
     }
     if (fieldState.powerTrickSide) {
@@ -271,6 +271,8 @@ export function calculateMove(
         move: moveName,
         min: 0,
         max: 0,
+        maxHp: maxHp,
+        medianDamage: 0,
         minPct: 0,
         maxPct: 0,
         rawMinPct: 0,
@@ -298,6 +300,8 @@ export function calculateMove(
         move: moveName,
         min: 0,
         max: 0,
+        maxHp: defenderPokemon.maxHP(),
+        medianDamage: 0,
         minPct: 0,
         maxPct: 0,
         rawMinPct: 0,
@@ -310,8 +314,7 @@ export function calculateMove(
       });
     }
 
-    const min = range.min;
-    const max = range.max;
+    const isMultiHitDistribution = Boolean(distribution?.isMultiHit);
     const rolls = Array.isArray(rawDamage) && rawDamage.every(value => typeof value === "number")
       ? [...new Set(rawDamage as number[])].sort((a, b) => a - b)
       : undefined;
@@ -328,8 +331,8 @@ export function calculateMove(
       (criticalMove as unknown as { isCrit: boolean }).isCrit = true;
       const criticalResult = calculate(
         gen,
-        makePokemon(attacker, generation, { atk: attackerStages.atk, spa: attackerStages.spa }, fieldState),
-        makePokemon(defender, generation, { def: defenderStages.def, spd: defenderStages.spd }, fieldState),
+        makePokemon(attacker, generation, { atk: attackerStages.atk, spa: attackerStages.spa, def: attackerStages.def, spd: attackerStages.spd, spe: attackerStages.spe }, fieldState),
+        makePokemon(defender, generation, { atk: defenderStages.atk, spa: defenderStages.spa, def: defenderStages.def, spd: defenderStages.spd, spe: defenderStages.spe }, fieldState),
         criticalMove,
         makeField(fieldState),
       );
@@ -352,6 +355,13 @@ export function calculateMove(
       if (rolls) for (let i = 0; i < rolls.length; i++) rolls[i] = applyModifier(rolls[i]);
       if (criticalRange) { criticalRange.min = applyModifier(criticalRange.min); criticalRange.max = applyModifier(criticalRange.max); }
     }
+
+    // Derive displayed ranges and the median only after all deterministic field
+    // modifiers have been applied to the range and probability distribution.
+    const min = range.min;
+    const max = range.max;
+    const medianOutcomes = isMultiHitDistribution ? (distribution?.outcomes || []).filter(outcome => outcome.damage > 0) : distribution?.outcomes || [];
+    const medianDamage = medianOutcomes.length ? medianDamageOutcome(medianOutcomes) : Math.floor((min + max) / 2);
 
     const entryHazardDamage = defender.currentHp === undefined ? getEntryHazardDamage(defender, defenderPokemon, fieldState) : 0;
     const currentHp = Math.max(1, Math.min(maxHp, Math.floor(defender.currentHp ?? maxHp)));
@@ -424,6 +434,8 @@ export function calculateMove(
       move: moveName,
       min,
       max,
+      maxHp,
+      medianDamage,
       rolls,
       ...(distribution ? { histogram: distribution.outcomes, hitCounts: distribution.hitCounts, accuracy: distribution.accuracy, distributionApproximate: distribution.approximate, distributionNote: distribution.note } : {}),
       minPct,
@@ -438,7 +450,9 @@ export function calculateMove(
       entryHazardDamage,
       entryHazardPct,
       // KO estimates use the Pokémon's current HP, while the displayed damage percentages above remain max-HP based.
-      ko: koLabel((min / effectiveHp) * 100, (max / effectiveHp) * 100),
+      ko: isMultiHitDistribution
+        ? (() => { const medianKo = koLabel((medianDamage / effectiveHp) * 100, (medianDamage / effectiveHp) * 100); return medianKo === "No damage" ? medianKo : `Median ${medianKo}`; })()
+        : koLabel((min / effectiveHp) * 100, (max / effectiveHp) * 100),
       description: `${baseDescription}${appendedHazardText}${residualNotes ? ` ${residualNotes}` : ""}`,
     });
   } catch {

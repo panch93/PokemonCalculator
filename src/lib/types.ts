@@ -71,6 +71,10 @@ export type DamageSummary = {
   move: string;
   min: number;
   max: number;
+  /** Defender maximum HP, used to express histograms in total-HP percentages. */
+  maxHp: number;
+  /** Probability-weighted median damage across the full move distribution. */
+  medianDamage?: number;
   rolls?: number[];
   /** Probability distribution for the complete move; includes a zero-damage miss outcome when relevant. */
   histogram?: DamageHistogramEntry[];

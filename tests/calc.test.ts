@@ -39,9 +39,23 @@ describe("damage calculator wrappers", () => {
     // Triple Axel's 90% accuracy must come from the bundled move data, not
     // the @smogon/calc Move class's narrower TypeScript surface.
     expect(result?.accuracy).toBe(90);
+    expect(result?.maxHp).toBeGreaterThan(0);
+    expect(result?.medianDamage).toBeGreaterThan(0);
+    expect(result?.ko).toContain("Median");
     expect(result?.hitCounts?.some(outcome => outcome.hits === 1)).toBe(true);
     expect(result?.hitCounts?.some(outcome => outcome.hits === 3)).toBe(true);
     expect(result!.histogram!.reduce((sum, outcome) => sum + outcome.probability, 0)).toBeCloseTo(1);
+  });
+
+  it("applies configured offensive and defensive stat stages to damage", () => {
+    const attacker = makeSet("Charizard", "Blaze", ["Flamethrower"]);
+    const defender = makeSet("Bulbasaur", "Overgrow", ["Tackle"]);
+    const neutralStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 };
+    const boostedAttack = calculateMove(attacker, defender, "Flamethrower", field, { ...neutralStages, spa: 2 }, neutralStages, false, 9, false);
+    const boostedDefense = calculateMove(attacker, defender, "Flamethrower", field, neutralStages, { ...neutralStages, spd: 2 }, false, 9, false);
+    const neutral = calculateMove(attacker, defender, "Flamethrower", field, neutralStages, neutralStages, false, 9, false);
+    expect(boostedAttack?.max).toBeGreaterThan(neutral!.max);
+    expect(boostedDefense?.max).toBeLessThan(neutral!.max);
   });
 
   it("shows Psychic Terrain blocking priority moves against grounded defenders", () => {

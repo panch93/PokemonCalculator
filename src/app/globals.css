@@ -1223,13 +1223,13 @@ select, select:focus, select option, datalist option {
 .matrix-histogram-overlay {
   position: fixed;
   z-index: 1200;
-  width: min(360px, calc(100vw - 16px));
-  pointer-events: none;
+  width: min(390px, calc(100vw - 16px));
+  pointer-events: auto;
 }
 .damage-histogram-tooltip {
   width: 100%;
-  max-height: min(330px, calc(100vh - 16px));
-  overflow: hidden;
+  max-height: min(440px, calc(100vh - 16px));
+  overflow: auto;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -1289,3 +1289,12 @@ select, select:focus, select option, datalist option {
 .draft-matchup-analysis-note { margin: 8px 0 4px; color: var(--muted, #aab2c0); font-size: .66rem; line-height: 1.4; }
 .draft-matchup-analysis-tooltip > small { color: var(--muted, #aab2c0); font-size: .63rem; }
 .damage-histogram-hitcounts { margin-top: 6px; font-size: .66rem; line-height: 1.4; color: var(--muted, #aab2c0); }
+
+.damage-histogram-details { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; }
+.damage-histogram-details summary { cursor: pointer; color: var(--muted, #aab2c0); font-size: .66rem; }
+.damage-histogram-details pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0 0; font: inherit; font-size: .64rem; line-height: 1.4; }
+.draft-ev-input-with-max { display: flex; align-items: center; gap: 6px; }
+.draft-ev-input-with-max input { min-width: 0; flex: 1 1 auto; }
+.draft-ev-input-with-max button { flex: 0 0 auto; white-space: nowrap; }
+
+.matrix .damage-inline .damage-multihit-label { white-space: normal; line-height: 1.2; overflow-wrap: anywhere; font-size: .61rem; }

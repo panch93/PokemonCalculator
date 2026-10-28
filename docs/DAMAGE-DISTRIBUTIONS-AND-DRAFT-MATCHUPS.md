@@ -32,3 +32,12 @@ Accuracy currently accounts for Wide Lens, Zoom Lens (assuming its condition is 
 - `tests/damage-distribution.test.ts` tests roll multiplicity, probability normalization, multi-hit convolution, per-hit accuracy, accuracy modifiers, hit-count modifiers, and histogram binning.
 - `tests/draft-matchup-rules.test.ts` tests the move eligibility filters and starting thresholds.
 - `tests/calc.test.ts` includes integration checks that normal moves expose a histogram and Triple Axel includes early-stop hit counts.
+
+## v2.2.0 matrix and draft matchup updates
+
+- Multi-hit matrix cells show the possible successful hit-count range, the probability-weighted median hit count, and the total-HP damage range. The fill marker and HKO label use the median total damage for multi-hit moves; the label explicitly says `Median` to avoid implying a guaranteed result.
+- The multi-hit hover is a single combined popup: percentage-based histogram plus expandable move/battle details. Single-hit moves keep the existing compact native tooltip without a histogram.
+- Histogram damage axes are percentages of the defender's maximum HP. Miss/no-damage probability and KO chance remain separate probability indicators.
+- Draft matchup analysis now consumes each Pokémon's configured HP/offensive/defensive EVs, natures, and stat stages on both sides. The candidate-move analysis remains approximate and does not model held items or field effects.
+- Each saved draft matchup stores its own mechanics-generation selection. Pokémon Champions formats use 0–32 Stat Points per stat, mapped to the equivalent EV term at level 50 for the available calculator, and speed benchmarks use the same Stat Point scale.
+- The installed `@smogon/calc` engine does not provide a dedicated Pokémon Champions battle engine. Selecting Pokémon Champions therefore uses the compatible Gen 9 damage engine with the Champions Stat Point/level conversion; Champions-exclusive damage mechanics may differ.

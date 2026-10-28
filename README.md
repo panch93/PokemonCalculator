@@ -1,12 +1,12 @@
-# Pokémon Team Lab — v2.1.0
+# Pokémon Team Lab — v2.2.0
 
 A browser-based Pokémon team matchup lab built with Next.js, React, TypeScript, `@smogon/calc`, live Pokémon Showdown discovery data, and the upstream TeamValidator adapted for browser execution.
 
 ## Features
 
-- 6v6 matchup matrix with damage ranges, estimated KO tiers, type matchups, move details, and hoverable damage-roll histograms.
+- 6v6 matchup matrix with damage ranges, estimated KO tiers, type matchups, and move details. Multi-hit moves open a combined damage histogram and move-details hover.
 - Multi-hit-aware damage distributions for common moves such as Triple Axel and Population Bomb, including hit-count/accuracy probabilities and relevant accuracy/hit-count items and abilities.
-- Draft Matchups hover analysis for potential threats, opposing walls/checks, the Pokémon it may wall, best STAB/coverage moves, and approximate 70% damage probabilities. The defensive matchup popup also counts learnable STAB types, including selected Tera types.
+- Draft Matchups hover analysis for potential threats, opposing walls/checks, the Pokémon it may wall, best STAB/coverage moves, and approximate 70% damage probabilities. Analysis uses configured offensive/defensive EVs or Champions Stat Points, natures, and stat stages on both sides. Each matchup saves its mechanics generation.
 - Generation-aware damage calculations for generations 1–9. Pokémon Champions can be selected for exploration, but the installed damage calculator does **not** provide a dedicated Champions engine; this mode currently falls back to Gen 9 damage mechanics.
 - Team builder with Pokémon, moves, abilities, items, EVs/IVs, nature, Tera type, and field controls.
 - Showdown paste import/export and browser-local persistence.
@@ -67,15 +67,15 @@ The separate learnset panel is still useful for discovering species moves, but i
 - Custom draft rules, custom bans, and National Dex legality require explicitly bundled ruleset/mod data before they can be validated accurately.
 - Legality validation is currently limited to user-supplied teams in formats using the bundled base-generation mods for Gen 1–9. The small `Learnset?` marker beside a move is only a species-learnset hint and is not a format legality result.
 - Some field effects are modeled as estimates and are documented in the relevant UI notes.
-- Damage histograms exclude critical-hit probability (the Critical toggle shows a distribution conditional on critical damage); some multi-hit and accuracy interactions use explicit approximations. See [the damage distribution and draft matchup design notes](docs/DAMAGE-DISTRIBUTIONS-AND-DRAFT-MATCHUPS.md).
-- Draft matchup hover results are potential-moveset estimates: top three eligible moves per type/category, neutral nature, 252 EVs in the relevant attacking/defending stats, no items or field effects, and no full set/turn-sequence simulation.
+- Damage histograms use percentages of total HP and exclude critical-hit probability (the Critical toggle shows a distribution conditional on critical damage); some multi-hit and accuracy interactions use explicit approximations. Histograms are shown for multi-hit moves; single-hit moves retain the existing compact tooltip. See [the damage distribution and draft matchup design notes](docs/DAMAGE-DISTRIBUTIONS-AND-DRAFT-MATCHUPS.md).
+- Draft matchup hover results are potential-moveset estimates: top three eligible moves per type/category, configured EVs/Stat Points, natures and stages, no items or field effects, and no full set/turn-sequence simulation.
 
 ## Release checklist
 
 1. Run `npm run check:release` on the target Node version.
 2. Run differential tests against the same upstream Pokémon Showdown source revision before deployment; do not enable unsupported mods until their data dependencies are bundled.
 3. Smoke-test team import/export, format changes, unsupported custom formats, and mobile layout.
-4. Review the GitHub Pages base path and deployment environment before tagging `v2.1.0`.
+4. Review the GitHub Pages base path and deployment environment before tagging `v2.2.0`.
 
 ## Data and licensing
 
