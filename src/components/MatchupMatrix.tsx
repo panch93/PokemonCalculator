@@ -244,7 +244,7 @@ export default function MatchupMatrix(props: Props) {
   const showHistogramHover = (event: MouseEvent<HTMLButtonElement>, move: string, result: NonNullable<Matchup["best"]>, description: string) => {
     cancelHistogramHoverHide();
     // Both single- and multi-hit moves use the same popup. The popup only draws
-    // the probability curve when hit-count variation makes it useful.
+    // the probability histogram when hit-count variation makes it useful.
     const width = Math.min(390, window.innerWidth - 16);
     const height = Math.min(440, window.innerHeight - 16);
     setHistogramHover({ move, result, description, x: Math.max(8, Math.min(event.clientX + 12, window.innerWidth - width - 8)), y: Math.max(8, Math.min(event.clientY + 12, window.innerHeight - height - 8)) });

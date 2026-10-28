@@ -1,6 +1,6 @@
 "use client";
 
-import { prepareDamageCurve } from "../lib/damage-curve";
+import { prepareDamageHistogram } from "../lib/damage-histogram";
 import type { DamageHistogramEntry, DamageSummary } from "../lib/types";
 
 type Props = { move: string; result: DamageSummary; description?: string };
@@ -13,7 +13,8 @@ export default function DamageHistogramTooltip({ move, result, description }: Pr
   const isMultiHit = Boolean(result.hitCounts?.some(entry => entry.hits > 1));
   const maxHp = result.maxHp || (result.maxPct > 0 ? result.max / (result.maxPct / 100) : result.effectiveHp);
   const percentOutcomes = outcomes.map(outcome => ({ damage: percent(outcome.damage, maxHp), probability: outcome.probability }));
-  const bars = isMultiHit ? prepareDamageCurve(percentOutcomes, 180) : [];
+  const successfulPercentOutcomes = percentOutcomes.filter(outcome => outcome.damage > 0 && outcome.probability > 0);
+  const bars = isMultiHit ? prepareDamageHistogram(percentOutcomes, 180, 0.03) : [];
   const peak = Math.max(...bars.map(outcome => outcome.probability), 0.0001);
   const chartWidth = 340;
   const chartHeight = 126;
@@ -21,10 +22,15 @@ export default function DamageHistogramTooltip({ move, result, description }: Pr
   const plotRight = 332;
   const plotTop = 10;
   const plotBottom = 88;
-  const xMin = bars[0]?.damage ?? 0;
-  const xMax = bars[bars.length - 1]?.damage ?? 100;
+  // Keep the full successful-damage domain on the x-axis. The removed tails
+  // therefore appear as blank margins instead of being stretched back to the
+  // chart edges, which previously made the cutoff visually impossible to see.
+  const xMin = successfulPercentOutcomes.length ? Math.min(...successfulPercentOutcomes.map(outcome => outcome.damage)) : 0;
+  const xMax = successfulPercentOutcomes.length ? Math.max(...successfulPercentOutcomes.map(outcome => outcome.damage)) : 100;
   const xSpan = Math.max(0.1, xMax - xMin);
-  const barWidth = bars.length ? Math.max(0.7, (plotRight - plotLeft) / bars.length) : 0;
+  const gaps = bars.map((outcome, index) => index > 0 ? outcome.damage - bars[index - 1].damage : Infinity).filter(gap => gap > 0 && Number.isFinite(gap));
+  const minimumBinStep = gaps.length ? Math.min(...gaps) : xSpan;
+  const barWidth = bars.length ? Math.max(0.7, ((plotRight - plotLeft) * minimumBinStep) / xSpan) : 0;
   const barRects = bars.map((outcome, index) => {
     const x = plotLeft + ((outcome.damage - xMin) / xSpan) * (plotRight - plotLeft);
     const height = (outcome.probability / peak) * (plotBottom - plotTop);
@@ -55,7 +61,7 @@ export default function DamageHistogramTooltip({ move, result, description }: Pr
     <div className="damage-histogram-stats"><span>KO chance: <b>{koChance.toFixed(1)}%</b></span><span>Miss/no damage: <b>{missChance.toFixed(1)}%</b></span><span>Accuracy: <b>{result.accuracy == null ? "—" : `${result.accuracy.toFixed(1)}%`}</b></span></div>
     {successfulHitCounts.length ? <div className="damage-histogram-hitcounts"><b>Hit count:</b> {successfulHitCounts.map(entry => `${entry.hits} ${entry.hits === 1 ? "hit" : "hits"} ${(entry.probability * 100).toFixed(1)}%`).join(" · ")}</div> : null}
     {isMultiHit && bars.length > 1 ? <>
-      <div className="damage-histogram-median">Median: <b>{medianPct.toFixed(1)}% HP</b> · <b>{(medianProbability * 100).toFixed(2)}% at the marked point</b></div>
+      <div className="damage-histogram-median">Median: <b>{medianPct.toFixed(1)}% HP</b> · <b>{(medianProbability * 100).toFixed(2)}% conditional probability at the marked bin</b></div>
       <svg className="damage-histogram-bars" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label={`Fine-bin damage probability histogram for ${move}; dotted line marks median damage`}>
         {[0.25, 0.5, 0.75].map(fraction => <line key={fraction} x1={plotLeft} x2={plotRight} y1={plotBottom - fraction * (plotBottom - plotTop)} y2={plotBottom - fraction * (plotBottom - plotTop)} className="damage-curve-gridline" />)}
         {barRects.map(bar => <rect key={bar.index} x={bar.x} y={bar.y} width={Math.max(0.5, bar.width - 0.25)} height={Math.max(0, bar.height)} className="damage-histogram-bar"><title>{bar.damage.toFixed(1)}% HP · {(bar.probability * 100).toFixed(3)}% probability</title></rect>)}
@@ -64,7 +70,7 @@ export default function DamageHistogramTooltip({ move, result, description }: Pr
         <line x1={plotLeft} x2={plotRight} y1={plotBottom} y2={plotBottom} className="damage-curve-axis-line" />
         {ticks.map((tick, index) => <g key={index}><line x1={tick.x} x2={tick.x} y1={plotBottom} y2={plotBottom + 3} className="damage-curve-axis-line" /><text x={tick.x} y={plotBottom + 14} textAnchor={index === 0 ? "start" : index === 4 ? "end" : "middle"} className="damage-curve-axis-label">{tick.value.toFixed(1)}%</text></g>)}
       </svg>
-      <p className="damage-histogram-note">Bars show the approximate probability distribution. The x-axis is defender maximum HP%; at least 3% cumulative probability is trimmed from each tail when the discrete distribution permits it. {result.distributionNote || "Damage probabilities are based on the calculator's available rolls."}</p>
+      <p className="damage-histogram-note">Bars show the distribution conditional on at least one damaging hit; the miss/no-damage chance is listed separately above. The x-axis is defender maximum HP%, with the original damage range retained so the omitted tails appear as blank margins. Approximately 3% cumulative probability is trimmed from each tail where the discrete bins permit it. {result.distributionNote || "Damage probabilities are based on the calculator's available rolls."}</p>
     </> : null}
     {description ? <details className="damage-histogram-details" open><summary>Move and battle details</summary><pre>{description}</pre></details> : null}
   </div>;

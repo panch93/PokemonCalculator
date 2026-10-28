@@ -38,6 +38,24 @@ describe("damage probability aggregation", () => {
     expect(result!.firstHitMax).toBe(6);
   });
 
+  it("models Population Bomb's ten independent accuracy checks and per-hit damage rolls", () => {
+    const result = buildDamageDistribution({
+      damage: Array.from({ length: 10 }, () => [10, 11]),
+      moveName: "Population Bomb",
+      accuracy: 90,
+      generation: 9,
+    });
+    expect(result).not.toBeNull();
+    expect(result!.hitCounts?.find(entry => entry.hits === 0)?.probability).toBeCloseTo(0.1);
+    expect(result!.hitCounts?.find(entry => entry.hits === 1)?.probability).toBeCloseTo(0.09);
+    expect(result!.hitCounts?.find(entry => entry.hits === 2)?.probability).toBeCloseTo(0.081);
+    expect(result!.hitCounts?.find(entry => entry.hits === 10)?.probability).toBeCloseTo(Math.pow(0.9, 10));
+    expect(result!.outcomes.find(outcome => outcome.damage === 0)?.probability).toBeCloseTo(0.1);
+    expect(result!.outcomes.find(outcome => outcome.damage === 10)?.probability).toBeCloseTo(0.045);
+    expect(result!.outcomes.find(outcome => outcome.damage === 11)?.probability).toBeCloseTo(0.045);
+    expect(result!.outcomes.reduce((sum, outcome) => sum + outcome.probability, 0)).toBeCloseTo(1);
+  });
+
   it("applies accuracy-boosting items and accuracy-bypassing abilities", () => {
     const wideLens = buildDamageDistribution({ damage: [10, 20], moveName: "Population Bomb", accuracy: 90, item: "Wide Lens" });
     const noGuard = buildDamageDistribution({ damage: [10, 20], moveName: "Tackle", accuracy: 70, ability: "No Guard" });
