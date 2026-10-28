@@ -75,6 +75,9 @@ export type DamageSummary = {
   maxHp: number;
   /** Probability-weighted median damage across the full move distribution. */
   medianDamage?: number;
+  /** First successful hit damage range for multi-hit move labels, as a percentage of maximum HP. */
+  firstHitMinPct?: number;
+  firstHitMaxPct?: number;
   rolls?: number[];
   /** Probability distribution for the complete move; includes a zero-damage miss outcome when relevant. */
   histogram?: DamageHistogramEntry[];

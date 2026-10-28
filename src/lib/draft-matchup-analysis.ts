@@ -1,5 +1,5 @@
 import { calculateMove, getMoveDetails, getPokemonHp } from "./calc";
-import { getHistoricalSpeciesLearnset, getSpecies } from "./showdown-data";
+import { getChampionsSpeciesLearnset, getHistoricalSpeciesLearnset, getSpecies } from "./showdown-data";
 import type { DamageSummary, FieldState, MoveDetails, PokemonSet, StatId, Stats } from "./types";
 import { DRAFT_STRONG_HIT_THRESHOLD, DRAFT_WALL_THRESHOLD, isEligibleDraftMove } from "./draft-matchup-rules";
 
@@ -82,7 +82,9 @@ function candidateMoves(species: string, generation: number): MoveDetails[] {
   const key = `${generation}:${normalize(species)}`;
   const cached = moveCache.get(key);
   if (cached) return cached;
-  const learnset = getHistoricalSpeciesLearnset(species);
+  const learnset = generation >= 10
+    ? (getChampionsSpeciesLearnset(species) || getHistoricalSpeciesLearnset(species))
+    : getHistoricalSpeciesLearnset(species);
   const moves = selectDraftCandidateMoves(learnset || [], generation);
   moveCache.set(key, moves);
   return moves;

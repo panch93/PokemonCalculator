@@ -1247,20 +1247,16 @@ select, select:focus, select option, datalist option {
 .damage-histogram-heading { font-size: .85rem; }
 .damage-histogram-heading span, .damage-histogram-axis, .damage-histogram-note { color: var(--muted, #aab2c0); }
 .damage-histogram-stats { margin-top: 7px; font-size: .68rem; flex-wrap: wrap; }
-.damage-histogram-chart {
-  display: flex;
-  align-items: end;
-  gap: 2px;
-  height: 116px;
-  margin-top: 12px;
-  padding: 4px 4px 0;
-  border-bottom: 1px solid var(--border);
-  background: linear-gradient(to top, transparent 24%, var(--border) 25%, transparent 26%, transparent 49%, var(--border) 50%, transparent 51%, transparent 74%, var(--border) 75%, transparent 76%);
-}
-.damage-histogram-bar-wrap { display: flex; flex: 1 1 0; min-width: 1px; height: 100%; align-items: end; }
-.damage-histogram-bar { width: 100%; min-height: 2px; background: #4388c7; border-radius: 2px 2px 0 0; }
-.damage-histogram-axis { margin-top: 4px; font-size: .63rem; }
-.damage-histogram-note { margin: 8px 0 0; font-size: .64rem; line-height: 1.35; }
+.damage-histogram-median { margin-top: 9px; font-size: .68rem; color: var(--muted, #aab2c0); }
+.damage-histogram-curve { display: block; width: 100%; height: auto; margin-top: 3px; overflow: visible; }
+.damage-curve-gridline { stroke: var(--border); stroke-width: .65; opacity: .7; }
+.damage-curve-area { fill: rgba(67, 136, 199, .27); stroke: none; }
+.damage-curve-line { fill: none; stroke: #4388c7; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+.damage-curve-median-line { stroke: var(--text, #f2f4f8); stroke-width: 1.2; stroke-dasharray: 3 3; opacity: .9; }
+.damage-curve-median-point { fill: #4388c7; stroke: var(--panel, #171d28); stroke-width: 1.2; }
+.damage-curve-axis-line { stroke: var(--muted, #aab2c0); stroke-width: .7; }
+.damage-curve-axis-label { fill: var(--muted, #aab2c0); font-size: 8px; }
+.damage-histogram-note { margin: 5px 0 0; font-size: .64rem; line-height: 1.35; }
 
 /* Draft matchup hover analysis. */
 .draft-matchup-analysis-tooltip {
@@ -1298,3 +1294,12 @@ select, select:focus, select option, datalist option {
 .draft-ev-input-with-max button { flex: 0 0 auto; white-space: nowrap; }
 
 .matrix .damage-inline .damage-multihit-label { white-space: normal; line-height: 1.2; overflow-wrap: anywhere; font-size: .61rem; }
+
+/* Draft hover speed comparisons and per-stat reset controls. */
+.draft-speed-relation { display: inline-block; margin-left: 4px; font-size: .62rem; font-weight: 500; white-space: normal; }
+.draft-speed-relation.faster { color: #67c68b; }
+.draft-speed-relation.slower { color: #e7ae62; }
+.draft-speed-relation.tie, .draft-speed-relation.unknown { color: var(--muted, #aab2c0); }
+.draft-stat-modal-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+.draft-stat-modal-actions button { white-space: nowrap; }
+@media (max-width: 600px) { .draft-stat-modal-actions { justify-content: flex-start; } }

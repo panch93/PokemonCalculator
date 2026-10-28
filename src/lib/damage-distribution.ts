@@ -21,6 +21,9 @@ export type DamageDistribution = {
   isMultiHit: boolean;
   approximate: boolean;
   note?: string;
+  /** Damage range for the first successful hit, before hit-count aggregation. */
+  firstHitMin?: number;
+  firstHitMax?: number;
 };
 
 type DistributionInput = {
@@ -153,13 +156,15 @@ export function buildDamageDistribution(input: DistributionInput): DamageDistrib
   const isMultiHit = Boolean(inferredProfile && inferredProfile.maxHits > 1);
   const accuracy = effectiveAccuracy(input) / 100;
   const singleHitRolls = uniformRolls(perHitRolls[0]);
+  const firstHitMin = singleHitRolls.length ? singleHitRolls[0].damage : undefined;
+  const firstHitMax = singleHitRolls.length ? singleHitRolls[singleHitRolls.length - 1].damage : undefined;
 
   if (!isMultiHit) {
     const outcomes = singleHitRolls.map(outcome => ({ damage: outcome.damage, probability: outcome.probability * accuracy }));
     if (accuracy < 1) outcomes.push({ damage: 0, probability: 1 - accuracy });
     const zoomLensApproximation = (input.generation ?? 9) >= 4 && id(input.item || "") === "zoomlens";
     const note = [accuracy < 1 ? "Miss probability included." : "", zoomLensApproximation ? "Zoom Lens assumes its accuracy condition is met." : "", "Critical hits are excluded."].filter(Boolean).join(" ");
-    return { outcomes: normalize(outcomes), accuracy: accuracy * 100, isMultiHit: false, approximate: zoomLensApproximation, note };
+    return { outcomes: normalize(outcomes), accuracy: accuracy * 100, isMultiHit: false, approximate: zoomLensApproximation, note, firstHitMin, firstHitMax };
   }
 
   const hitProfiles = inferredProfile!;
@@ -208,7 +213,7 @@ export function buildDamageDistribution(input: DistributionInput): DamageDistrib
   if (!nested && hitProfiles.increasingPower) approximations.push("This move's increasing per-hit power is approximated using the first hit's damage distribution.");
   if ((input.generation ?? 9) >= 4 && input.item && id(input.item) === "zoomlens") approximations.push("Zoom Lens assumes its accuracy condition is met.");
   approximations.push("Multi-hit count and accuracy probabilities use the supported ruleset approximation; critical hits are excluded.");
-  return { outcomes: normalized, hitCounts, accuracy: accuracy * 100, isMultiHit: true, approximate: true, note: approximations.join(" ") };
+  return { outcomes: normalized, hitCounts, accuracy: accuracy * 100, isMultiHit: true, approximate: true, note: approximations.join(" "), firstHitMin, firstHitMax };
 }
 
 

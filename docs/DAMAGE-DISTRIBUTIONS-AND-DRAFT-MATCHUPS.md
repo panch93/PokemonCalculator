@@ -4,7 +4,7 @@
 
 - `src/lib/damage-distribution.ts` is a pure probability aggregation layer. It consumes the damage rolls exposed by `@smogon/calc`; it does not duplicate the Pokémon damage formula.
 - `src/lib/calc.ts` attaches the distribution to `DamageSummary`, uses successful outcomes to derive the displayed minimum/maximum, and avoids the extra critical-hit calculation when callers pass `includeCriticalRange: false`.
-- `src/components/DamageHistogramTooltip.tsx` renders a compact binned histogram when a matrix damage cell is hovered. The underlying distribution remains unbinned for probability and KO calculations.
+- `src/lib/damage-curve.ts` trims cumulative probability tails below 1% at either end and prepares a bounded curve for display. `src/components/DamageHistogramTooltip.tsx` uses the same popup for all matrix cells, drawing a filled probability curve only for multi-hit moves.
 - `src/lib/draft-matchup-analysis.ts` lazily analyzes a hovered draft Pokémon against the opposing roster, with `src/lib/draft-matchup-rules.ts` holding independently testable eligibility thresholds.
 - `src/components/DraftMatchups.tsx` renders the three hover sections: Pokémon it can threaten, Pokémon that wall/check it, and Pokémon it may wall.
 
@@ -33,11 +33,11 @@ Accuracy currently accounts for Wide Lens, Zoom Lens (assuming its condition is 
 - `tests/draft-matchup-rules.test.ts` tests the move eligibility filters and starting thresholds.
 - `tests/calc.test.ts` includes integration checks that normal moves expose a histogram and Triple Axel includes early-stop hit counts.
 
-## v2.2.0 matrix and draft matchup updates
+## v2.3.0 matrix and draft matchup updates
 
-- Multi-hit matrix cells show the possible successful hit-count range, the probability-weighted median hit count, and the total-HP damage range. The fill marker and HKO label use the median total damage for multi-hit moves; the label explicitly says `Median` to avoid implying a guaranteed result.
-- The multi-hit hover is a single combined popup: percentage-based histogram plus expandable move/battle details. Single-hit moves keep the existing compact native tooltip without a histogram.
-- Histogram damage axes are percentages of the defender's maximum HP. Miss/no-damage probability and KO chance remain separate probability indicators.
-- Draft matchup analysis now consumes each Pokémon's configured HP/offensive/defensive EVs, natures, and stat stages on both sides. The candidate-move analysis remains approximate and does not model held items or field effects.
-- Each saved draft matchup stores its own mechanics-generation selection. Pokémon Champions formats use 0–32 Stat Points per stat, mapped to the equivalent EV term at level 50 for the available calculator, and speed benchmarks use the same Stat Point scale.
-- The installed `@smogon/calc` engine does not provide a dedicated Pokémon Champions battle engine. Selecting Pokémon Champions therefore uses the compatible Gen 9 damage engine with the Champions Stat Point/level conversion; Champions-exclusive damage mechanics may differ.
+- Multi-hit matrix labels show the possible successful hit-count range and median count compactly (for example, `1–8 (6) × 23.5–33.5%`). The percentage range is the first hit's damage, not the complete multi-hit move. The bar fill and HKO label continue to use median total damage.
+- Single-hit and multi-hit cells use one consistent popup. Single-hit popups show the summary and move/battle details without a chart; multi-hit popups add a filled probability curve.
+- The curve's x-axis is defender maximum HP percentage, with intermediate tick labels and a dotted median marker. Cumulative tails below 1% probability are excluded at either end of the plotted range. KO chance and miss/no-damage probability remain explicit.
+- Draft matchup hover lists all qualifying threats and walls/checks, annotates each opposing Pokémon as faster/slower/tied using the configured Speed EVs/Stat Points, nature and stage, and uses selected abilities in damage calculations. Species with one ability start with it enabled; every listed ability can be toggled.
+- The stat editor can reset the edited stat's EVs/Stat Points, nature and stage. Defensive type matchups include configured immunity/resistance abilities and super-effective damage-reduction abilities.
+- Mechanics Gen 10 now uses bundled official Champions move metadata and Champions learnsets through the shared calculator adapter. Champions Stat Points are mapped to the level-50 stat formula in draft analysis. This reuses the official mod data rather than silently treating all moves as standard Gen 9 moves; script-driven effects that cannot be represented by the calculator remain approximate.

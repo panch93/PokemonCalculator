@@ -1,13 +1,13 @@
-# Pokémon Team Lab — v2.2.0
+# Pokémon Team Lab — v2.3.0
 
 A browser-based Pokémon team matchup lab built with Next.js, React, TypeScript, `@smogon/calc`, live Pokémon Showdown discovery data, and the upstream TeamValidator adapted for browser execution.
 
 ## Features
 
-- 6v6 matchup matrix with damage ranges, estimated KO tiers, type matchups, and move details. Multi-hit moves open a combined damage histogram and move-details hover.
+- 6v6 matchup matrix with damage ranges, estimated KO tiers, type matchups, and uniform move-details popups. Multi-hit moves add a filled probability curve.
 - Multi-hit-aware damage distributions for common moves such as Triple Axel and Population Bomb, including hit-count/accuracy probabilities and relevant accuracy/hit-count items and abilities.
 - Draft Matchups hover analysis for potential threats, opposing walls/checks, the Pokémon it may wall, best STAB/coverage moves, and approximate 70% damage probabilities. Analysis uses configured offensive/defensive EVs or Champions Stat Points, natures, and stat stages on both sides. Each matchup saves its mechanics generation.
-- Generation-aware damage calculations for generations 1–9. Pokémon Champions can be selected for exploration, but the installed damage calculator does **not** provide a dedicated Champions engine; this mode currently falls back to Gen 9 damage mechanics.
+- Generation-aware damage calculations for generations 1–9 plus a Pokémon Champions adapter that uses bundled official Champions move metadata and learnsets with the compatible Gen 9 damage formula. Script-driven effects that require a full battle engine may remain approximate.
 - Team builder with Pokémon, moves, abilities, items, EVs/IVs, nature, Tera type, and field controls.
 - Showdown paste import/export and browser-local persistence.
 - Move coverage and support-category panels, sprites, speed/priority helpers, weather and terrain modifiers, and entry-hazard estimates.
@@ -63,11 +63,11 @@ The separate learnset panel is still useful for discovering species moves, but i
 ## Known limitations
 
 - This is a team-planning and damage-estimation tool, not a turn-by-turn battle simulator. It does not fully model switching sequences, recovery loops, or every conditional battle interaction.
-- The damage calculator does not yet include a dedicated Pokémon Champions engine.
+- Pokémon Champions uses bundled official move metadata and the shared compatible damage formula; it is not a complete turn-by-turn implementation of every Champions script-driven effect.
 - Custom draft rules, custom bans, and National Dex legality require explicitly bundled ruleset/mod data before they can be validated accurately.
 - Legality validation is currently limited to user-supplied teams in formats using the bundled base-generation mods for Gen 1–9. The small `Learnset?` marker beside a move is only a species-learnset hint and is not a format legality result.
 - Some field effects are modeled as estimates and are documented in the relevant UI notes.
-- Damage histograms use percentages of total HP and exclude critical-hit probability (the Critical toggle shows a distribution conditional on critical damage); some multi-hit and accuracy interactions use explicit approximations. Histograms are shown for multi-hit moves; single-hit moves retain the existing compact tooltip. See [the damage distribution and draft matchup design notes](docs/DAMAGE-DISTRIBUTIONS-AND-DRAFT-MATCHUPS.md).
+- Multi-hit probability curves use percentages of total HP and exclude critical-hit probability (the Critical toggle shows a distribution conditional on critical damage). Curves trim cumulative probability tails below 1% at either end; some multi-hit and accuracy interactions remain approximate. Single-hit moves use the same popup layout without the curve. See [the damage distribution and draft matchup design notes](docs/DAMAGE-DISTRIBUTIONS-AND-DRAFT-MATCHUPS.md).
 - Draft matchup hover results are potential-moveset estimates: top three eligible moves per type/category, configured EVs/Stat Points, natures and stages, no items or field effects, and no full set/turn-sequence simulation.
 
 ## Release checklist
@@ -75,7 +75,7 @@ The separate learnset panel is still useful for discovering species moves, but i
 1. Run `npm run check:release` on the target Node version.
 2. Run differential tests against the same upstream Pokémon Showdown source revision before deployment; do not enable unsupported mods until their data dependencies are bundled.
 3. Smoke-test team import/export, format changes, unsupported custom formats, and mobile layout.
-4. Review the GitHub Pages base path and deployment environment before tagging `v2.2.0`.
+4. Review the GitHub Pages base path and deployment environment before tagging `v2.3.0`.
 
 ## Data and licensing
 

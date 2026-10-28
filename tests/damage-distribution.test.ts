@@ -34,6 +34,8 @@ describe("damage probability aggregation", () => {
     expect(result!.hitCounts?.find(entry => entry.hits === 1)?.probability).toBeCloseTo(0.09);
     expect(result!.hitCounts?.find(entry => entry.hits === 2)?.probability).toBeCloseTo(0.081);
     expect(result!.hitCounts?.find(entry => entry.hits === 3)?.probability).toBeCloseTo(0.729);
+    expect(result!.firstHitMin).toBe(5);
+    expect(result!.firstHitMax).toBe(6);
   });
 
   it("applies accuracy-boosting items and accuracy-bypassing abilities", () => {

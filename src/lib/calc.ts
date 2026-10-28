@@ -1,9 +1,11 @@
 import { calculate, Generations, Move, Pokemon, Field, TYPE_CHART } from "@smogon/calc";
 import { getMove } from "./showdown-data";
 import { Moves as OFFICIAL_SHOWDOWN_MOVES } from "./showdown-official/data/moves";
+import { Moves as CHAMPIONS_MOVE_OVERRIDES } from "./showdown-official/data/mods/champions/moves";
 import { getEffectiveMovePriority } from "./battle-order";
 import { DamageSummary, FieldState, MoveDetails, PokemonSet, StatStages } from "./types";
 import { buildDamageDistribution, medianDamageOutcome, scaleDamageOutcomes } from "./damage-distribution";
+import Dex from "./showdown-official/sim/dex";
 
 /** Read canonical English move descriptions from the live official Pokémon Showdown data. */
 function getShowdownMoveDescription(name: string): string | undefined {
@@ -36,6 +38,41 @@ const getGen = (generation: number) => {
   const generationNum = Math.max(1, Math.min(9, Math.round(generation || DEFAULT_GEN))) as Parameters<typeof Generations.get>[0];
   return Generations.get(generationNum);
 };
+
+
+/** Official Pokémon Showdown move metadata for the bundled Pokémon Champions mod. */
+function getChampionsMoveData(moveName: string): Record<string, unknown> | null {
+  try {
+    const moveId = moveName.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const overrides = CHAMPIONS_MOVE_OVERRIDES as unknown as Record<string, { isNonstandard?: unknown } | undefined>;
+    const override = overrides[moveId];
+    const move = Dex.mod("champions").moves.get(moveName) as unknown as Record<string, unknown>;
+    if (!move || move.exists === false) return null;
+    // An explicit nonstandard marker in the Champions mod means the move is
+    // unavailable there. Do not reject an explicitly overridden move just
+    // because its parent Gen 9 entry was marked Past (e.g. Anchor Shot).
+    if (override?.isNonstandard) return null;
+    if (!override && move.isNonstandard) return null;
+    return move;
+  } catch {
+    return null;
+  }
+}
+
+/** Adapt Champions move data to @smogon/calc's Gen 9 Move shape. */
+function applyChampionsMoveData(move: Move, moveName: string): boolean {
+  const data = getChampionsMoveData(moveName);
+  if (!data) return false;
+  const target = move as unknown as Record<string, unknown>;
+  if (typeof data.basePower === "number") target.bp = data.basePower;
+  if (typeof data.type === "string") target.type = data.type;
+  if (typeof data.category === "string") target.category = data.category;
+  if (typeof data.accuracy === "number") target.accuracy = data.accuracy;
+  else if (data.accuracy === true) target.accuracy = 100;
+  if (typeof data.priority === "number") target.priority = data.priority;
+  if (data.flags && typeof data.flags === "object") target.flags = data.flags;
+  return true;
+}
 
 const TYPE_NAMES = [
   "Normal", "Fighting", "Flying", "Poison", "Ground", "Rock", "Bug", "Ghost",
@@ -237,10 +274,26 @@ export function calculateMove(
   if (cached !== undefined) return cached;
 
   try {
+    // Gen 10 is the bundled Pokémon Champions ruleset. Do not silently calculate
+    // a move that the official Champions mod marks as unavailable.
+    if (generation >= 10 && !getChampionsMoveData(moveName)) return setCached(key, null);
     const gen = getGen(generation);
     const attackerPokemon = makePokemon(attacker, generation, { atk: attackerStages.atk, spa: attackerStages.spa, def: attackerStages.def, spd: attackerStages.spd, spe: attackerStages.spe }, fieldState);
     const defenderPokemon = makePokemon(defender, generation, { atk: defenderStages.atk, spa: defenderStages.spa, def: defenderStages.def, spd: defenderStages.spd, spe: defenderStages.spe }, fieldState);
-    const move = new Move(gen, moveName);
+    let move: Move;
+    try {
+      move = new Move(gen, moveName);
+    } catch (error) {
+      const championsData = generation >= 10 ? getChampionsMoveData(moveName) : null;
+      if (!championsData) throw error;
+      // Some Champions moves are absent from the Gen 9 calculator's move table.
+      // Use a neutral move shell, then replace its move metadata below.
+      move = new Move(gen, "Tackle");
+      const shell = move as unknown as Record<string, unknown>;
+      shell.name = typeof championsData.name === "string" ? championsData.name : moveName;
+      shell.id = moveName.toLowerCase().replace(/[^a-z0-9]/g, "");
+    }
+    if (generation >= 10) applyChampionsMoveData(move, moveName);
     if (critical) (move as unknown as { isCrit: boolean }).isCrit = true;
     const field = makeField(fieldState);
 
@@ -327,7 +380,18 @@ export function calculateMove(
     // is the critical range, so no duplicate run is needed.
     let criticalRange: { min: number; max: number } | null = null;
     if (!critical && includeCriticalRange) {
-      const criticalMove = new Move(gen, moveName);
+      let criticalMove: Move;
+      try {
+        criticalMove = new Move(gen, moveName);
+      } catch (error) {
+        const championsData = generation >= 10 ? getChampionsMoveData(moveName) : null;
+        if (!championsData) throw error;
+        criticalMove = new Move(gen, "Tackle");
+        const shell = criticalMove as unknown as Record<string, unknown>;
+        shell.name = typeof championsData.name === "string" ? championsData.name : moveName;
+        shell.id = moveName.toLowerCase().replace(/[^a-z0-9]/g, "");
+      }
+      if (generation >= 10) applyChampionsMoveData(criticalMove, moveName);
       (criticalMove as unknown as { isCrit: boolean }).isCrit = true;
       const criticalResult = calculate(
         gen,
@@ -349,7 +413,12 @@ export function calculateMove(
     if (fieldState.friendGuardSide === "defender") conditionMultiplier *= 0.75;
     const applyModifier = (damage: number) => Math.max(0, Math.floor(damage * conditionMultiplier + 0.5));
     if (conditionMultiplier !== 1) {
-      if (distribution) { distribution.outcomes = scaleDamageOutcomes(distribution.outcomes, applyModifier); distributionOutcomes = distribution.outcomes; }
+      if (distribution) {
+        distribution.outcomes = scaleDamageOutcomes(distribution.outcomes, applyModifier);
+        distributionOutcomes = distribution.outcomes;
+        if (distribution.firstHitMin !== undefined) distribution.firstHitMin = applyModifier(distribution.firstHitMin);
+        if (distribution.firstHitMax !== undefined) distribution.firstHitMax = applyModifier(distribution.firstHitMax);
+      }
       range.min = applyModifier(range.min);
       range.max = applyModifier(range.max);
       if (rolls) for (let i = 0; i < rolls.length; i++) rolls[i] = applyModifier(rolls[i]);
@@ -437,7 +506,7 @@ export function calculateMove(
       maxHp,
       medianDamage,
       rolls,
-      ...(distribution ? { histogram: distribution.outcomes, hitCounts: distribution.hitCounts, accuracy: distribution.accuracy, distributionApproximate: distribution.approximate, distributionNote: distribution.note } : {}),
+      ...(distribution ? { histogram: distribution.outcomes, hitCounts: distribution.hitCounts, accuracy: distribution.accuracy, distributionApproximate: distribution.approximate, distributionNote: distribution.note, ...(distribution.firstHitMin !== undefined && maxHp > 0 ? { firstHitMinPct: distribution.firstHitMin / maxHp * 100 } : {}), ...(distribution.firstHitMax !== undefined && maxHp > 0 ? { firstHitMaxPct: distribution.firstHitMax / maxHp * 100 } : {}) } : {}),
       minPct,
       maxPct,
       ...(criticalRange ? {
@@ -484,8 +553,17 @@ export function koLabel(minPct: number, maxPct: number) {
 /** Return generation-specific move metadata from the same data bundled with @smogon/calc. */
 export function getMoveDetails(moveName: string, generation = DEFAULT_GEN): MoveDetails | null {
   try {
+    const championsData = generation >= 10 ? getChampionsMoveData(moveName) : null;
+    if (generation >= 10 && !championsData) return null;
     const gen = getGen(generation);
-    const move = new Move(gen, moveName) as unknown as Record<string, unknown>;
+    let move: Record<string, unknown>;
+    try {
+      move = new Move(gen, moveName) as unknown as Record<string, unknown>;
+    } catch (error) {
+      if (!championsData) throw error;
+      move = new Move(gen, "Tackle") as unknown as Record<string, unknown>;
+      move.name = typeof championsData.name === "string" ? championsData.name : moveName;
+    }
     const moveTable = (gen as unknown as { moves?: { get?: (name: string) => unknown } }).moves;
     const raw = (moveTable?.get?.(moveName) || {}) as Record<string, unknown>;
     const text = (value: unknown) => typeof value === "string" ? value : "";
@@ -505,19 +583,26 @@ export function getMoveDetails(moveName: string, generation = DEFAULT_GEN): Move
     const officialMoves = OFFICIAL_SHOWDOWN_MOVES as unknown as Record<string, { accuracy?: unknown }>;
     const officialMove = officialMoves[moveId];
     const loadedMove = getMove(moveName);
-    const accuracy = generation >= 9
-      ? accuracyValue(officialMove?.accuracy) ?? accuracyValue(loadedMove?.accuracy) ?? accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy)
-      : accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy) ?? accuracyValue(loadedMove?.accuracy) ?? accuracyValue(officialMove?.accuracy);
+    const accuracy = generation >= 10
+      ? accuracyValue(championsData?.accuracy) ?? accuracyValue(officialMove?.accuracy) ?? accuracyValue(loadedMove?.accuracy) ?? accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy)
+      : generation >= 9
+        ? accuracyValue(officialMove?.accuracy) ?? accuracyValue(loadedMove?.accuracy) ?? accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy)
+        : accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy) ?? accuracyValue(loadedMove?.accuracy) ?? accuracyValue(officialMove?.accuracy);
+    const resolvedName = text(championsData?.name) || text(move.name) || moveName;
+    const resolvedType = text(championsData?.type) || text(move.type) || text(raw.type) || "Unknown";
+    const resolvedCategory = text(championsData?.category) || text(move.category) || text(raw.category) || "Unknown";
+    const resolvedPower = numeric(championsData?.basePower) ?? numeric(move.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp);
+    const resolvedPriority = typeof championsData?.priority === "number" ? championsData.priority : typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0);
     return {
-      name: text(move.name) || moveName,
-      type: text(move.type) || text(raw.type) || "Unknown",
-      category: text(move.category) || text(raw.category) || "Unknown",
-      power: numeric(move.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp),
+      name: resolvedName,
+      type: resolvedType,
+      category: resolvedCategory,
+      power: resolvedPower,
       accuracy,
-      pp: numeric(move.pp) ?? numeric(raw.pp),
-      priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0),
-      target: text(raw.target) || text((move as unknown as Record<string, unknown>).target),
-      description: getShowdownMoveDescription(moveName) || text(raw.desc) || text(raw.shortDesc) || text(move.desc) || getMoveDescription(moveName, { type: text(move.type) || text(raw.type), category: text(move.category) || text(raw.category), power: numeric(move.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp), accuracy: numeric(move.accuracy) ?? numeric(raw.accuracy), priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0) }),
+      pp: numeric(championsData?.pp) ?? numeric(move.pp) ?? numeric(raw.pp),
+      priority: resolvedPriority,
+      target: text(championsData?.target) || text(raw.target) || text((move as unknown as Record<string, unknown>).target),
+      description: text(championsData?.desc) || text(championsData?.shortDesc) || getShowdownMoveDescription(moveName) || text(raw.desc) || text(raw.shortDesc) || text(move.desc) || getMoveDescription(moveName, { type: resolvedType, category: resolvedCategory, power: resolvedPower, accuracy, priority: resolvedPriority }),
     };
   } catch {
     return null;

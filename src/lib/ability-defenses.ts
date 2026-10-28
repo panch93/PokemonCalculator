@@ -3,7 +3,7 @@
  * Keep this table data-driven so generation-specific ability changes are easy to update.
  * Values multiply the normal type effectiveness; 0 means immunity.
  */
-export type AbilityDefenseEffect = { immuneTo?: string[]; multipliers?: Record<string, number> };
+export type AbilityDefenseEffect = { immuneTo?: string[]; multipliers?: Record<string, number>; superEffectiveMultiplier?: number; blocksNonSuperEffective?: boolean };
 
 const entries: Record<string, AbilityDefenseEffect> = {
   "water absorb": { immuneTo: ["Water"] },
@@ -22,18 +22,25 @@ const entries: Record<string, AbilityDefenseEffect> = {
   "water bubble": { multipliers: { Fire: 0.5 } },
   "purifying salt": { multipliers: { Ghost: 0.5 } },
   "fluffy": { multipliers: { Fire: 2 } },
+  "filter": { superEffectiveMultiplier: 0.75 },
+  "solid rock": { superEffectiveMultiplier: 0.75 },
+  "prism armor": { superEffectiveMultiplier: 0.75 },
+  "wonder guard": { blocksNonSuperEffective: true },
 };
 
 export function getAbilityDefenseEffect(ability: string): AbilityDefenseEffect | undefined {
   return entries[ability.trim().toLowerCase()];
 }
 
-export function abilityDefenseMultiplier(ability: string, attackType: string): number | null {
+export function abilityDefenseMultiplier(ability: string, attackType: string, typeEffectiveness = 1): number | null {
   const effect = getAbilityDefenseEffect(ability);
   if (!effect) return null;
   if (effect.immuneTo?.some(type => type.toLowerCase() === attackType.toLowerCase())) return 0;
+  if (effect.blocksNonSuperEffective && typeEffectiveness <= 1) return 0;
   const multiplier = Object.entries(effect.multipliers || {}).find(([type]) => type.toLowerCase() === attackType.toLowerCase())?.[1];
-  return multiplier ?? null;
+  if (multiplier !== undefined) return multiplier;
+  if (typeEffectiveness > 1 && effect.superEffectiveMultiplier !== undefined) return effect.superEffectiveMultiplier;
+  return null;
 }
 
 export function abilityDefenseDescription(ability: string): string {
@@ -44,5 +51,7 @@ export function abilityDefenseDescription(ability: string): string {
   for (const [type, multiplier] of Object.entries(effect.multipliers || {})) {
     parts.push(`${multiplier < 1 ? "Resists" : "Takes increased damage from"} ${type} (${multiplier}×)`);
   }
+  if (effect.superEffectiveMultiplier !== undefined) parts.push(`Super-effective damage ×${effect.superEffectiveMultiplier}`);
+  if (effect.blocksNonSuperEffective) parts.push("Blocks damaging moves that are not super effective");
   return parts.join("; ");
 }

@@ -41,6 +41,9 @@ describe("damage calculator wrappers", () => {
     expect(result?.accuracy).toBe(90);
     expect(result?.maxHp).toBeGreaterThan(0);
     expect(result?.medianDamage).toBeGreaterThan(0);
+    expect(result?.firstHitMinPct).toBeGreaterThan(0);
+    expect(result?.firstHitMaxPct).toBeGreaterThanOrEqual(result!.firstHitMinPct!);
+    expect(result?.firstHitMaxPct).toBeLessThan(result!.maxPct);
     expect(result?.ko).toContain("Median");
     expect(result?.hitCounts?.some(outcome => outcome.hits === 1)).toBe(true);
     expect(result?.hitCounts?.some(outcome => outcome.hits === 3)).toBe(true);
@@ -98,6 +101,12 @@ describe("damage calculator wrappers", () => {
     expect(getMoveDetails("Hurricane", 9)?.accuracy).toBe(70);
     expect(getMoveDetails("Population Bomb", 9)?.accuracy).toBe(90);
     expect(getMoveDetails("Triple Axel", 9)?.accuracy).toBe(90);
+  });
+
+  it("uses official Champions move metadata when mechanics generation 10 is selected", () => {
+    expect(getMoveDetails("Anchor Shot", 9)?.power).toBe(80);
+    expect(getMoveDetails("Anchor Shot", 10)?.power).toBe(90);
+    expect(getMoveDetails("Anchor Shot", 10)?.accuracy).toBe(100);
   });
 
   it("exposes spread target metadata for matrix indicators", () => {
