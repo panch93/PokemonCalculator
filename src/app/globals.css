@@ -973,10 +973,10 @@ select, select:focus, select option, datalist option {
 }
 .draft-matchup-table-symmetric .draft-ability-toggle:hover { background: rgba(148, 163, 184, 0.15); }
 .draft-matchup-table-symmetric .draft-ability-toggle[aria-pressed="true"] {
-  border-color: #8bc9a4;
-  background: rgba(74, 160, 111, 0.18);
+  border-color: #8792a2;
+  background: rgba(148, 163, 184, 0.20);
   color: var(--text, #e6edf5);
-  box-shadow: inset 0 0 0 1px rgba(139, 201, 164, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.16);
 }
 
 /* The central divider is drawn once, on Team A's Speed edge. */
@@ -1156,8 +1156,8 @@ select, select:focus, select option, datalist option {
 .draft-matchup-table-symmetric .draft-mon-entry.is-tera-captain { outline: 1px solid #65dba0; outline-offset: -2px; }
 .draft-matchup-table-symmetric .draft-name-line { display: flex; align-items: center; justify-content: center; gap: 3px; width: 100%; min-width: 0; }
 .draft-matchup-counts { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 2px; min-width: 0; max-width: 100%; white-space: nowrap; }
-.draft-matchup-count { border: 0; border-radius: 3px; background: transparent; color: var(--muted, #aab2c0); padding: 1px 2px; font: inherit; font-size: .46rem; line-height: 1.2; white-space: nowrap; cursor: pointer; }
-.draft-matchup-count b { color: var(--text, #f2f4f8); font-weight: 800; }
+.draft-matchup-count { border: 0; border-radius: 3px; background: transparent; color: var(--muted, #aab2c0); padding: 1px 2px; font: inherit; font-size: .76rem; font-weight: 400; line-height: 1.1; white-space: nowrap; cursor: pointer; }
+.draft-matchup-count b { color: var(--text, #f2f4f8); font-weight: 400; }
 .draft-matchup-count:hover, .draft-matchup-count.active, .draft-matchup-count:focus-visible { background: var(--border); color: var(--text, #f2f4f8); outline: none; }
 .draft-matchup-analysis-description { margin: 3px 0 8px; font-size: .68rem; color: var(--muted, #aab2c0); }
 .draft-matchup-table-symmetric .draft-name-line .draft-pokemon-name { flex: 1 1 auto; min-width: 0; }

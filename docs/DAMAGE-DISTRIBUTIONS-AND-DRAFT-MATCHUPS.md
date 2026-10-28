@@ -49,3 +49,10 @@ Accuracy currently accounts for Wide Lens, Zoom Lens (assuming its condition is 
 - Speed labels use green for slower opponents and orange for faster opponents relative to the hovered Pokémon.
 - The multi-hit damage popup uses a fine-bin bar histogram (up to 180 bins) rather than a smoothed curve. It trims approximately 3% cumulative probability from each tail when the discrete distribution allows it; damage/HKO cell coloring continues to use the median total damage.
 - The Anchor Shot Gen 10 accuracy metadata fallback is explicitly set to 100% when the bundled Champions override omits inherited accuracy.
+
+
+## v2.3.2 Champions and UI fixes
+
+- The user-facing mechanics value 10 maps to `@smogon/calc`'s native Champions generation object with `num === 0`. The existing `calculate` import dispatches this generation to `calculateChampions` in the upstream calculator. The bundled Pokémon Showdown Champions move data remains a fallback for move entries missing from the calculator's own data, not a substitute for the Champions damage formula.
+- Draft matchup count labels use the Pokémon-name font size with normal weight; selected abilities use a neutral grey treatment.
+- Histogram trimming removes discrete outcomes from both tails until the cumulative probability is at or near the 3% target. It avoids retaining tiny edge tails when the next outcome is a small increment, and avoids removing a disproportionately large central outcome just to cross the cutoff.

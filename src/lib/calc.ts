@@ -35,6 +35,12 @@ function getMoveDescription(
 
 const DEFAULT_GEN = 9;
 const getGen = (generation: number) => {
+  // The current @smogon/calc Champions mechanics are registered at gen.num === 0
+  // (see damage-calc/calc/src/calc.ts). The app's user-facing value is 10, so
+  // translate it to the library's dedicated Champions generation instead of
+  // clamping it to Gen 9. Upstream calculate() dispatches gen.num === 0 to
+  // calculateChampions.
+  if (generation >= 10) return Generations.get(0 as Parameters<typeof Generations.get>[0]);
   const generationNum = Math.max(1, Math.min(9, Math.round(generation || DEFAULT_GEN))) as Parameters<typeof Generations.get>[0];
   return Generations.get(generationNum);
 };
@@ -59,7 +65,7 @@ function getChampionsMoveData(moveName: string): Record<string, unknown> | null 
   }
 }
 
-/** Adapt Champions move data to @smogon/calc's Gen 9 Move shape. */
+/** Adapt official Champions metadata only for moves missing from the installed calc data. */
 function applyChampionsMoveData(move: Move, moveName: string): boolean {
   const data = getChampionsMoveData(moveName);
   if (!data) return false;
@@ -281,19 +287,24 @@ export function calculateMove(
     const attackerPokemon = makePokemon(attacker, generation, { atk: attackerStages.atk, spa: attackerStages.spa, def: attackerStages.def, spd: attackerStages.spd, spe: attackerStages.spe }, fieldState);
     const defenderPokemon = makePokemon(defender, generation, { atk: defenderStages.atk, spa: defenderStages.spa, def: defenderStages.def, spd: defenderStages.spd, spe: defenderStages.spe }, fieldState);
     let move: Move;
+    let usedChampionsMoveFallback = false;
     try {
+      // With the Champions Generation object, this resolves the move directly
+      // from @smogon/calc's native Champions data and uses calculateChampions.
       move = new Move(gen, moveName);
     } catch (error) {
       const championsData = generation >= 10 ? getChampionsMoveData(moveName) : null;
       if (!championsData) throw error;
-      // Some Champions moves are absent from the Gen 9 calculator's move table.
-      // Use a neutral move shell, then replace its move metadata below.
+      // Fallback only for a move missing from the installed calc package's data.
+      // The damage formula still dispatches through calculate(gen, ...), with
+      // gen.num === 0 for Champions.
       move = new Move(gen, "Tackle");
       const shell = move as unknown as Record<string, unknown>;
       shell.name = typeof championsData.name === "string" ? championsData.name : moveName;
       shell.id = moveName.toLowerCase().replace(/[^a-z0-9]/g, "");
+      usedChampionsMoveFallback = true;
     }
-    if (generation >= 10) applyChampionsMoveData(move, moveName);
+    if (generation >= 10 && usedChampionsMoveFallback) applyChampionsMoveData(move, moveName);
     if (critical) (move as unknown as { isCrit: boolean }).isCrit = true;
     const field = makeField(fieldState);
 
@@ -381,6 +392,7 @@ export function calculateMove(
     let criticalRange: { min: number; max: number } | null = null;
     if (!critical && includeCriticalRange) {
       let criticalMove: Move;
+      let usedChampionsMoveFallback = false;
       try {
         criticalMove = new Move(gen, moveName);
       } catch (error) {
@@ -390,8 +402,9 @@ export function calculateMove(
         const shell = criticalMove as unknown as Record<string, unknown>;
         shell.name = typeof championsData.name === "string" ? championsData.name : moveName;
         shell.id = moveName.toLowerCase().replace(/[^a-z0-9]/g, "");
+        usedChampionsMoveFallback = true;
       }
-      if (generation >= 10) applyChampionsMoveData(criticalMove, moveName);
+      if (generation >= 10 && usedChampionsMoveFallback) applyChampionsMoveData(criticalMove, moveName);
       (criticalMove as unknown as { isCrit: boolean }).isCrit = true;
       const criticalResult = calculate(
         gen,

@@ -103,10 +103,23 @@ describe("damage calculator wrappers", () => {
     expect(getMoveDetails("Triple Axel", 9)?.accuracy).toBe(90);
   });
 
-  it("uses official Champions move metadata when mechanics generation 10 is selected", () => {
+  it("uses native Champions mechanics and official move metadata when generation 10 is selected", () => {
     expect(getMoveDetails("Anchor Shot", 9)?.power).toBe(80);
     expect(getMoveDetails("Anchor Shot", 10)?.power).toBe(90);
     expect(getMoveDetails("Anchor Shot", 10)?.accuracy).toBe(100);
+    const result = calculateMove(
+      makeSet("Pikachu", "Static", ["Anchor Shot"]),
+      makeSet("Snorlax", "Immunity", ["Tackle"]),
+      "Anchor Shot",
+      field,
+      undefined,
+      undefined,
+      false,
+      10,
+      false,
+    );
+    expect(result).not.toBeNull();
+    expect(result?.max).toBeGreaterThan(0);
   });
 
   it("exposes spread target metadata for matrix indicators", () => {

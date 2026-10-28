@@ -64,7 +64,7 @@ export default function DamageHistogramTooltip({ move, result, description }: Pr
         <line x1={plotLeft} x2={plotRight} y1={plotBottom} y2={plotBottom} className="damage-curve-axis-line" />
         {ticks.map((tick, index) => <g key={index}><line x1={tick.x} x2={tick.x} y1={plotBottom} y2={plotBottom + 3} className="damage-curve-axis-line" /><text x={tick.x} y={plotBottom + 14} textAnchor={index === 0 ? "start" : index === 4 ? "end" : "middle"} className="damage-curve-axis-label">{tick.value.toFixed(1)}%</text></g>)}
       </svg>
-      <p className="damage-histogram-note">Bars show the approximate probability distribution. The x-axis is defender maximum HP%; approximately 3% cumulative probability is trimmed from each tail when the discrete distribution permits it. {result.distributionNote || "Damage probabilities are based on the calculator's available rolls."}</p>
+      <p className="damage-histogram-note">Bars show the approximate probability distribution. The x-axis is defender maximum HP%; at least 3% cumulative probability is trimmed from each tail when the discrete distribution permits it. {result.distributionNote || "Damage probabilities are based on the calculator's available rolls."}</p>
     </> : null}
     {description ? <details className="damage-histogram-details" open><summary>Move and battle details</summary><pre>{description}</pre></details> : null}
   </div>;
