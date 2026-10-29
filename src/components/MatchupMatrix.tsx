@@ -209,7 +209,7 @@ const SPECIAL_DEFENSE_ITEMS = ["Eviolite", "Assault Vest"];
 function allItemNames() { return getItemList(); }
 
 export default function MatchupMatrix(props: Props) {
-  const [histogramHover, setHistogramHover] = useState<{ move: string; result: NonNullable<Matchup["best"]>; description: string; x: number; y: number } | null>(null);
+  const [histogramHover, setHistogramHover] = useState<{ move: string; result: NonNullable<Matchup["best"]>; description: string; attacker: PokemonSet; defender: PokemonSet; row: number; col: number; x: number; y: number } | null>(null);
   const histogramHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (histogramHoverTimer.current) clearTimeout(histogramHoverTimer.current); }, []);
   const [supportOpen, setSupportOpen] = useState(false);
@@ -241,14 +241,14 @@ export default function MatchupMatrix(props: Props) {
     cancelHistogramHoverHide();
     histogramHoverTimer.current = setTimeout(() => setHistogramHover(null), 140);
   };
-  const showHistogramHover = (event: MouseEvent<HTMLButtonElement>, move: string, result: NonNullable<Matchup["best"]>, description: string) => {
+  const showHistogramHover = (event: MouseEvent<HTMLButtonElement>, move: string, result: NonNullable<Matchup["best"]>, description: string, attacker: PokemonSet, defender: PokemonSet, row: number, col: number) => {
     cancelHistogramHoverHide();
     // Both single- and multi-hit moves use the same popup. The popup only draws
     // the probability histogram when hit-count variation makes it useful.
     const width = Math.min(390, window.innerWidth - 16);
     const height = Math.min(440, window.innerHeight - 16);
     const x = event.clientX + 12 + width > window.innerWidth - 8 ? event.clientX - width - 12 : event.clientX + 12;
-    setHistogramHover({ move, result, description, x: Math.max(8, Math.min(x, window.innerWidth - width - 8)), y: Math.max(8, Math.min(event.clientY + 12, window.innerHeight - height - 8)) });
+    setHistogramHover({ move, result, description, attacker, defender, row, col, x: Math.max(8, Math.min(x, window.innerWidth - width - 8)), y: Math.max(8, Math.min(event.clientY + 12, window.innerHeight - height - 8)) });
   };
   const [quickEditor, setQuickEditor] = useState<{ side: "left" | "right"; index: number } | null>(null);
   const [quickItem, setQuickItem] = useState("");
@@ -365,13 +365,13 @@ ${result.ko}
 ${result.description}` : move ? `${formatMoveTooltip(move, poke, fieldState)}
 
 No direct damage result for this move.` : "No move assigned";
-              return <td key={col} className={`${right[col]?.dead ? "fainted-cell" : ""} ${right[col]?.teraType ? "tera-defender-cell" : ""}`}><div className="matchup-cell-layout">{move && defenderFieldIndicators(right[col], move, fieldState, props.generation, poke).length > 0 && <div className="cell-field-indicators">{defenderFieldIndicators(right[col], move, fieldState, props.generation, poke).map(tag => <span className="move-field-indicator cell-field-indicator" key={tag} title={`Defender-side damage modifier: ${tag}`}>{tag}</span>)}</div>}<button title={!result ? title : undefined} aria-label={title} disabled={!move} className={`matrix-cell compact-cell ${result ? koClass(result.ko) : "ko-none"} ${active ? "active" : ""} ${poke.dead || right[col]?.dead ? "fainted-cell" : ""}`} onMouseEnter={event => { if (result) showHistogramHover(event, move, result, title); }} onMouseLeave={hideHistogramHover} onClick={() => { props.onSelect(row, col); if (move && details && ["Physical", "Special"].includes(details.category)) openMoveEditor(row, col, move); }}>{result ? <DamageRangeBar result={result} /> : <span>—</span>}</button>{move && <button type="button" className={`turn-order speed-arrow ${order}`} title={`Edit matchup Speed. ${orderLabel}. Effective Speed: ${attackerSpeed} vs ${defenderSpeed}.`} aria-label={`Edit Speed matchup: ${poke.name} versus ${right[col].name}`} onClick={() => openSpeedEditor(row, col)}>{order === "attacker" ? "←" : order === "defender" ? "↑" : "↔"}</button>}</div></td>;
+              return <td key={col} className={`${right[col]?.dead ? "fainted-cell" : ""} ${right[col]?.teraType ? "tera-defender-cell" : ""}`}><div className="matchup-cell-layout">{move && defenderFieldIndicators(right[col], move, fieldState, props.generation, poke).length > 0 && <div className="cell-field-indicators">{defenderFieldIndicators(right[col], move, fieldState, props.generation, poke).map(tag => <span className="move-field-indicator cell-field-indicator" key={tag} title={`Defender-side damage modifier: ${tag}`}>{tag}</span>)}</div>}<button title={!result ? title : undefined} aria-label={title} disabled={!move} className={`matrix-cell compact-cell ${result ? koClass(result.ko) : "ko-none"} ${active ? "active" : ""} ${poke.dead || right[col]?.dead ? "fainted-cell" : ""}`} onMouseEnter={event => { if (result) showHistogramHover(event, move, result, title, poke, right[col], row, col); }} onMouseLeave={hideHistogramHover} onClick={() => { props.onSelect(row, col); if (move && details && ["Physical", "Special"].includes(details.category)) openMoveEditor(row, col, move); }}>{result ? <DamageRangeBar result={result} /> : <span>—</span>}</button>{move && <button type="button" className={`turn-order speed-arrow ${order}`} title={`Edit matchup Speed. ${orderLabel}. Effective Speed: ${attackerSpeed} vs ${defenderSpeed}.`} aria-label={`Edit Speed matchup: ${poke.name} versus ${right[col].name}`} onClick={() => openSpeedEditor(row, col)}>{order === "attacker" ? "←" : order === "defender" ? "↑" : "↔"}</button>}</div></td>;
             })}
           </tr>;
         });
       })}</tbody>
     </table></div>
-    {histogramHover && <div className="matrix-histogram-overlay" style={{ left: histogramHover.x, top: histogramHover.y }} onMouseEnter={cancelHistogramHoverHide} onMouseLeave={hideHistogramHover}><DamageHistogramTooltip move={histogramHover.move} result={histogramHover.result} description={histogramHover.description} /></div>}
+    {histogramHover && <div className="matrix-histogram-overlay" style={{ left: histogramHover.x, top: histogramHover.y }} onMouseEnter={cancelHistogramHoverHide} onMouseLeave={hideHistogramHover}><DamageHistogramTooltip move={histogramHover.move} result={histogramHover.result} description={histogramHover.description} /><section className="matrix-reply-damage"><strong>{histogramHover.defender.name} moves against {histogramHover.attacker.name}</strong><ul>{histogramHover.defender.moves.filter(Boolean).slice(0, 4).map(replyMove => { const reply = calculateMove(histogramHover.defender, histogramHover.attacker, replyMove, fieldState, colStages[histogramHover.col] || { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 }, rowStages[histogramHover.row] || { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 }, props.critical, props.generation, false); const details = getMoveDetails(replyMove, props.generation); return <li key={replyMove}><b>{replyMove}</b>{details ? ` (${details.category.toLowerCase()})` : ""} — {reply ? `${reply.minPct.toFixed(1)}–${reply.maxPct.toFixed(1)}%` : "No direct damage"}</li>; })}</ul></section></div>}
     {moveEditor && (() => {
       const a = left[moveEditor.row], d = right[moveEditor.col], details = getMoveDetails(moveEditor.move, props.generation);
       if (!details || !["Physical", "Special"].includes(details.category)) return null;

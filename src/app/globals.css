@@ -1328,3 +1328,15 @@ select, select:focus, select option, datalist option {
 .draft-stab-summary-row td { text-align: center; color: var(--text, #f2f4f8); }
 
 .draft-stab-weakness-indicator { color: #ffb0a8; font-size: .7em; white-space: nowrap; }
+
+
+/* Draft matchup best-four hover panel and reverse damage in 1v1 matrix hovers. */
+.draft-best-four { position: relative; }
+.draft-best-four > button { cursor: pointer; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface, #202938); color: var(--text, #f2f4f8); font: inherit; }
+.draft-best-four-panel { position: absolute; z-index: 1200; left: 0; top: 28px; width: min(390px, calc(100vw - 32px)); max-height: min(440px, calc(100vh - 24px)); overflow: auto; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel, #171d28); box-shadow: 0 10px 28px rgba(0,0,0,.4); }
+.draft-best-four-panel ol, .draft-best-four-panel ul { margin: 5px 0 10px; padding-left: 18px; }
+.draft-best-four-panel li { margin: 4px 0; }
+.matrix-reply-damage { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; font-size: .72rem; }
+.matrix-reply-damage > strong { display: block; margin-bottom: 5px; }
+.matrix-reply-damage ul { margin: 0; padding-left: 18px; }
+.matrix-reply-damage li { margin: 4px 0; }
