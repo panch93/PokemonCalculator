@@ -64,11 +64,27 @@ export type MoveDetails = {
   description: string;
 };
 
+export type DamageHistogramEntry = { damage: number; probability: number };
+export type DamageHitCount = { hits: number; probability: number };
+
 export type DamageSummary = {
   move: string;
   min: number;
   max: number;
+  /** Defender maximum HP, used to express histograms in total-HP percentages. */
+  maxHp: number;
+  /** Probability-weighted median damage across the full move distribution. */
+  medianDamage?: number;
+  /** First successful hit damage range for multi-hit move labels, as a percentage of maximum HP. */
+  firstHitMinPct?: number;
+  firstHitMaxPct?: number;
   rolls?: number[];
+  /** Probability distribution for the complete move; includes a zero-damage miss outcome when relevant. */
+  histogram?: DamageHistogramEntry[];
+  hitCounts?: DamageHitCount[];
+  accuracy?: number;
+  distributionApproximate?: boolean;
+  distributionNote?: string;
   minPct: number;
   maxPct: number;
   /** Critical damage range computed by @smogon/calc for the same battle state. */

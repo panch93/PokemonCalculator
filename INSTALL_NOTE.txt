@@ -1,3 +1,6 @@
-This migration removes @pkmn/sim and regenerates package-lock.json. Install dependencies with `npm ci` in a network-enabled environment.
+Pokémon Team Lab v2.2.0
 
-Important: the official Showdown TeamValidator has not yet been ported to browser execution. The app therefore displays format legality as “Not validated” until the browser-compatible port is implemented and tested against official Showdown results.
+Install dependencies in a network-enabled environment with `npm ci`.
+Run `npm run typecheck`, `npm test`, and `npm run build` before deployment.
+
+The damage engine is based on @smogon/calc. Pokémon Champions Stat Points are mapped to equivalent level-50 stats, but Champions-exclusive damage mechanics are not fully simulated by the installed calculator.

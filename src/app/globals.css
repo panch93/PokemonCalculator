@@ -973,10 +973,10 @@ select, select:focus, select option, datalist option {
 }
 .draft-matchup-table-symmetric .draft-ability-toggle:hover { background: rgba(148, 163, 184, 0.15); }
 .draft-matchup-table-symmetric .draft-ability-toggle[aria-pressed="true"] {
-  border-color: #8bc9a4;
-  background: rgba(74, 160, 111, 0.18);
+  border-color: #8792a2;
+  background: rgba(148, 163, 184, 0.20);
   color: var(--text, #e6edf5);
-  box-shadow: inset 0 0 0 1px rgba(139, 201, 164, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.16);
 }
 
 /* The central divider is drawn once, on Team A's Speed edge. */
@@ -1155,6 +1155,11 @@ select, select:focus, select option, datalist option {
 }
 .draft-matchup-table-symmetric .draft-mon-entry.is-tera-captain { outline: 1px solid #65dba0; outline-offset: -2px; }
 .draft-matchup-table-symmetric .draft-name-line { display: flex; align-items: center; justify-content: center; gap: 3px; width: 100%; min-width: 0; }
+.draft-matchup-counts { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 2px; min-width: 0; max-width: 100%; white-space: nowrap; }
+.draft-matchup-count { border: 0; border-radius: 3px; background: transparent; color: var(--muted, #aab2c0); padding: 1px 2px; font: inherit; font-size: .76rem; font-weight: 400; line-height: 1.1; white-space: nowrap; cursor: pointer; }
+.draft-matchup-count b { color: var(--text, #f2f4f8); font-weight: 400; }
+.draft-matchup-count:hover, .draft-matchup-count.active, .draft-matchup-count:focus-visible { background: var(--border); color: var(--text, #f2f4f8); outline: none; }
+.draft-matchup-analysis-description { margin: 3px 0 8px; font-size: .68rem; color: var(--muted, #aab2c0); }
 .draft-matchup-table-symmetric .draft-name-line .draft-pokemon-name { flex: 1 1 auto; min-width: 0; }
 .draft-matchup-table-symmetric .draft-inline-tera-select { flex: 0 0 48px; width: 48px; min-width: 0; max-width: 48px; padding: 1px 0; border: 1px solid #65dba0; border-radius: 3px; background: var(--panel, #151d2a); color: var(--text, #e5e7eb); font-size: .52rem; line-height: 1.1; }
 .draft-matchup-table-symmetric tbody tr > .is-tera-captain {
@@ -1209,3 +1214,129 @@ select, select:focus, select option, datalist option {
 .matrix .defender-header .defender-identity .defender-sprite-crop { width: 90px; height: 90px; min-width: 90px; min-height: 90px; max-width: 90px; max-height: 90px; flex: 0 0 90px; }
 .matrix thead .defender-identity .defender-sprite-crop .matrix-sprite,
 .matrix .defender-header .defender-identity .defender-sprite-crop .matrix-sprite { width: 90px; height: 90px; min-width: 90px; min-height: 90px; max-width: 90px; max-height: 90px; }
+
+/* STAB availability summary at the top of the defensive matchup matrix. */
+.draft-stab-summary-row th, .draft-stab-summary-row td {
+  background: var(--panel-2);
+  border-top: 2px solid var(--border-strong, var(--border));
+  font-weight: 750;
+}
+.draft-stab-summary-row th { position: sticky; left: 0; z-index: 2; text-align: left; }
+.draft-stab-summary-row td { font-variant-numeric: tabular-nums; }
+
+/* Lazy damage-roll probability histogram shown when hovering a matrix cell. */
+.matrix-histogram-overlay {
+  position: fixed;
+  z-index: 1200;
+  width: min(390px, calc(100vw - 16px));
+  pointer-events: auto;
+}
+.damage-histogram-tooltip {
+  width: 100%;
+  max-height: min(440px, calc(100vh - 16px));
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel, #171d28);
+  color: var(--text, #f2f4f8);
+  box-shadow: 0 12px 32px rgba(0,0,0,.35);
+  font-size: .75rem;
+}
+.damage-histogram-heading, .damage-histogram-stats, .damage-histogram-axis {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.damage-histogram-heading { font-size: .85rem; }
+.damage-histogram-heading span, .damage-histogram-axis { color: var(--muted, #aab2c0); }
+.damage-histogram-stats { margin-top: 7px; font-size: .68rem; flex-wrap: wrap; }
+.damage-histogram-median { margin-top: 9px; font-size: .68rem; color: var(--muted, #aab2c0); }
+.damage-histogram-bars { display: block; width: 100%; height: auto; margin-top: 3px; overflow: visible; }
+.damage-curve-gridline { stroke: var(--border); stroke-width: .65; opacity: .7; }
+.damage-histogram-bar { fill: rgba(67, 136, 199, .72); stroke: rgba(67, 136, 199, .9); stroke-width: .15; }
+.damage-curve-median-line { stroke: var(--text, #f2f4f8); stroke-width: 1.2; stroke-dasharray: 3 3; opacity: .9; }
+.damage-curve-median-point { fill: #4388c7; stroke: var(--panel, #171d28); stroke-width: 1.2; }
+.damage-histogram-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 12px; }
+.damage-histogram-summary small { flex-basis: 100%; font-size: .62rem; opacity: .8; }
+.damage-histogram-mean-line { stroke: #e2b84b; stroke-width: 1.1; stroke-dasharray: 2 2; opacity: .95; }
+.damage-histogram-mean-point { fill: #e2b84b; stroke: var(--panel, #171d28); stroke-width: 1.1; }
+.damage-histogram-mode-line { stroke: #64c58b; stroke-width: 1.1; stroke-dasharray: 5 2; opacity: .95; }
+.damage-histogram-mode-point { fill: #64c58b; stroke: var(--panel, #171d28); stroke-width: 1.1; }
+.damage-curve-axis-line { stroke: var(--muted, #aab2c0); stroke-width: .7; }
+.damage-curve-axis-label { fill: var(--muted, #aab2c0); font-size: 8px; }
+
+/* Draft matchup hover analysis. */
+.draft-matchup-analysis-tooltip {
+  position: fixed;
+  z-index: 1150;
+  width: min(460px, calc(100vw - 16px));
+  max-height: min(520px, calc(100vh - 16px));
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel, #171d28);
+  color: var(--text, #f2f4f8);
+  box-shadow: 0 12px 32px rgba(0,0,0,.35);
+  font-size: .75rem;
+  pointer-events: auto;
+}
+.draft-matchup-analysis-title { display: block; margin-bottom: 8px; font-size: .88rem; }
+.draft-matchup-analysis-section { padding: 8px 0; border-top: 1px solid var(--border); }
+.draft-matchup-analysis-section > strong { display: block; font-size: .77rem; }
+.draft-matchup-analysis-section > strong span, .draft-matchup-analysis-section p, .draft-matchup-analysis-section small { color: var(--muted, #aab2c0); }
+.draft-matchup-analysis-section p { margin: 3px 0 6px; font-size: .67rem; }
+.draft-matchup-analysis-section ul { margin: 0; padding-left: 17px; }
+.draft-matchup-analysis-section li { margin: 4px 0; line-height: 1.35; }
+.draft-matchup-analysis-section li small { display: inline; font-size: .66rem; }
+.draft-matchup-analysis-note { margin: 8px 0 4px; color: var(--muted, #aab2c0); font-size: .66rem; line-height: 1.4; }
+.draft-matchup-analysis-tooltip > small { color: var(--muted, #aab2c0); font-size: .63rem; }
+.damage-histogram-hitcounts { margin-top: 6px; font-size: .66rem; line-height: 1.4; color: var(--muted, #aab2c0); }
+
+.damage-histogram-details { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; }
+.damage-histogram-details summary { cursor: pointer; color: var(--muted, #aab2c0); font-size: .66rem; }
+.damage-histogram-details pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0 0; font: inherit; font-size: .64rem; line-height: 1.4; }
+.draft-ev-input-with-max { display: flex; align-items: center; gap: 6px; }
+.draft-ev-input-with-max input { min-width: 0; flex: 1 1 auto; }
+.draft-ev-input-with-max button { flex: 0 0 auto; white-space: nowrap; }
+
+.matrix .damage-inline .damage-multihit-label { white-space: normal; line-height: 1.2; overflow-wrap: anywhere; font-size: .61rem; }
+
+/* Draft hover speed comparisons and per-stat reset controls. */
+.draft-speed-relation { display: inline-block; margin-left: 4px; font-size: .62rem; font-weight: 500; white-space: normal; }
+.draft-speed-relation.faster { color: #e7ae62; }
+.draft-speed-relation.slower { color: #67c68b; }
+.draft-speed-relation.tie, .draft-speed-relation.unknown { color: var(--muted, #aab2c0); }
+.draft-stat-modal-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+.draft-stat-modal-actions button { white-space: nowrap; }
+@media (max-width: 600px) { .draft-stat-modal-actions { justify-content: flex-start; } }
+
+/* Draft STAB summary is pinned immediately below the type headers. */
+.draft-stab-summary-row th,
+.draft-stab-summary-row td {
+  background-color: var(--panel-2);
+  background-image: none;
+  border-bottom: 2px solid var(--border-strong, var(--border));
+  font-weight: 800;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+.draft-stab-summary-row th { left: 0; z-index: 4; }
+.draft-stab-summary-row td { text-align: center; color: var(--text, #f2f4f8); }
+
+.draft-stab-weakness-indicator { color: #ffb0a8; font-size: .7em; white-space: nowrap; }
+
+
+/* Draft matchup best-four hover panel and reverse damage in 1v1 matrix hovers. */
+.draft-best-four { position: relative; }
+.draft-best-four > button { cursor: pointer; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface, #202938); color: var(--text, #f2f4f8); font: inherit; }
+.draft-best-four-panel { position: absolute; z-index: 1200; left: 0; top: 28px; width: min(390px, calc(100vw - 32px)); max-height: min(440px, calc(100vh - 24px)); overflow: auto; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel, #171d28); box-shadow: 0 10px 28px rgba(0,0,0,.4); }
+.draft-best-four-panel ol, .draft-best-four-panel ul { margin: 5px 0 10px; padding-left: 18px; }
+.draft-best-four-panel li { margin: 4px 0; }
+.matrix-reply-damage { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; font-size: .72rem; }
+.matrix-reply-damage > strong { display: block; margin-bottom: 5px; }
+.matrix-reply-damage ul { margin: 0; padding-left: 18px; }
+.matrix-reply-damage li { margin: 4px 0; }

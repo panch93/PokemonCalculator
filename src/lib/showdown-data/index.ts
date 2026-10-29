@@ -1,5 +1,6 @@
 import { resolveByName, toShowdownId } from "./ids";
 import historicalLearnsets from "./historical-learnsets.json";
+import Dex from "../showdown-official/sim/dex";
 import { getLoadedShowdownData, loadShowdownData, getSpeciesLearnsetMoves, clearShowdownDataCache } from "./client";
 import { getNature as getFallbackNature, getNatureList as getFallbackNatureList, getNatureEffectsByDisplayStat as getFallbackNatureEffects } from "./natures";
 import type { ShowdownDescribedEntry, ShowdownMove, ShowdownSpecies } from "./types";
@@ -58,6 +59,33 @@ export function getAbilityNamesForSpecies(species: ShowdownSpecies | undefined):
 }
 export function getSpeciesAbilities(name: string): string[] {
   return getAbilityNamesForSpecies(getSpecies(name));
+}
+
+/** Ability list resolved from the bundled official Pokémon Champions mod when generation 10 is selected. */
+export function getSpeciesAbilitiesForGeneration(name: string, generation = 9): string[] {
+  if (generation < 10) return getSpeciesAbilities(name);
+  try {
+    const species = Dex.mod("champions").species.get(name) as unknown as { exists?: boolean; abilities?: Record<string, string> };
+    if (!species?.exists || !species.abilities) return getSpeciesAbilities(name);
+    return [...new Set(Object.values(species.abilities).filter((ability): ability is string => typeof ability === "string" && Boolean(ability.trim())))];
+  } catch {
+    return getSpeciesAbilities(name);
+  }
+}
+
+/** Learnable moves from the official bundled Pokémon Champions mod, including inherited learnsets. */
+export function getChampionsSpeciesLearnset(name: string): Set<string> | null {
+  try {
+    const dex = Dex.mod("champions");
+    const species = dex.species.get(name) as unknown as { exists?: boolean; id?: string };
+    if (!species?.exists || !species.id) return null;
+    const entries = dex.species.getFullLearnset(species.id as Parameters<typeof dex.species.getFullLearnset>[0]) as Array<{ learnset?: Record<string, unknown> }>;
+    const moves = new Set<string>();
+    for (const entry of entries) for (const moveId of Object.keys(entry.learnset || {})) moves.add(moveId);
+    return moves.size ? moves : null;
+  } catch {
+    return null;
+  }
 }
 /**
  * Historical Everything! move pool assembled from official Showdown learnset tables

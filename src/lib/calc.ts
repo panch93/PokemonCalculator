@@ -1,7 +1,10 @@
 import { calculate, Generations, Move, Pokemon, Field, TYPE_CHART } from "@smogon/calc";
 import { getMove } from "./showdown-data";
+import Dex from "./showdown-official/sim/dex";
+import { Moves as OFFICIAL_SHOWDOWN_MOVES } from "./showdown-official/data/moves";
 import { getEffectiveMovePriority } from "./battle-order";
 import { DamageSummary, FieldState, MoveDetails, PokemonSet, StatStages } from "./types";
+import { buildDamageDistribution, medianDamageOutcome, scaleDamageOutcomes } from "./damage-distribution";
 
 /** Read canonical English move descriptions from the live official Pokémon Showdown data. */
 function getShowdownMoveDescription(name: string): string | undefined {
@@ -31,9 +34,16 @@ function getMoveDescription(
 
 const DEFAULT_GEN = 9;
 const getGen = (generation: number) => {
+  // The current @smogon/calc Champions mechanics are registered at gen.num === 0
+  // (see damage-calc/calc/src/calc.ts). The app's user-facing value is 10, so
+  // translate it to the library's dedicated Champions generation instead of
+  // clamping it to Gen 9. Upstream calculate() dispatches gen.num === 0 to
+  // calculateChampions.
+  if (generation >= 10) return Generations.get(0 as Parameters<typeof Generations.get>[0]);
   const generationNum = Math.max(1, Math.min(9, Math.round(generation || DEFAULT_GEN))) as Parameters<typeof Generations.get>[0];
   return Generations.get(generationNum);
 };
+
 
 const TYPE_NAMES = [
   "Normal", "Fighting", "Flying", "Poison", "Ground", "Rock", "Bug", "Ghost",
@@ -57,7 +67,12 @@ function resolveCalcType(value?: string): CalcType | undefined {
 }
 
 function makePokemon(set: PokemonSet, generation = DEFAULT_GEN, boosts: Partial<Record<"atk" | "def" | "spa" | "spd" | "spe", number>> = {}, fieldState?: FieldState) {
-  const gen = getGen(generation);
+  // @smogon/calc's Champions generation (num 0) is a mechanics adapter, not a
+  // usable species-stat dex: constructing Pokémon directly from it can produce
+  // zero stats and therefore zero damage. Build species/stats using the latest
+  // supported baseline generation, while calculate() still receives the
+  // dedicated Champions generation and its native damage dispatch.
+  const gen = getGen(generation >= 10 ? 9 : generation);
   const abilityName = normalize(set.ability);
   const proto = abilityName === "protosynthesis";
   const quark = abilityName === "quarkdrive" || abilityName === "quark drive";
@@ -217,6 +232,34 @@ function setCached(key: string, value: DamageSummary | null) {
   return value;
 }
 
+/**
+ * Reconcile the calculator Move with the bundled, official Showdown Champions
+ * move record. The @smogon/calc Champions adapter can return a *present but
+ * stale/incomplete* Move (for example Anchor Shot with zero power or its old
+ * power), so checking only for missing fields is insufficient. For Gen 10,
+ * the official Champions record is authoritative for move metadata; the
+ * native Champions calculate() implementation still performs the damage math.
+ */
+function applyChampionsMoveData(move: Move, moveName: string, generation: number): Move {
+  if (generation < 10) return move;
+  try {
+    const official = Dex.mod("champions").moves.get(moveName) as unknown as Record<string, unknown>;
+    if (!official || official.exists === false) return move;
+    const target = move as unknown as Record<string, unknown>;
+
+    // `bp` is the property consumed by @smogon/calc. Always overwrite it when
+    // the official record provides a number, not only when the old value is 0.
+    if (typeof official.basePower === "number") target.bp = official.basePower;
+    for (const key of ["type", "category", "accuracy", "priority", "target", "flags", "hits"] as const) {
+      const value = official[key];
+      if (value !== undefined) target[key] = value;
+    }
+  } catch {
+    // Preserve native behavior if the official metadata lookup is unavailable.
+  }
+  return move;
+}
+
 export function calculateMove(
   attacker: PokemonSet,
   defender: PokemonSet,
@@ -226,18 +269,22 @@ export function calculateMove(
   defenderStages: StatStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 },
   critical = false,
   generation = DEFAULT_GEN,
+  includeCriticalRange = true,
 ): DamageSummary | null {
   if (!moveName.trim()) return null;
 
-  const key = `${generation}|${cacheKey(attacker, defender, moveName, fieldState, attackerStages, defenderStages, critical)}`;
+  const key = `${generation}|${includeCriticalRange ? "crit-range" : "no-crit-range"}|${cacheKey(attacker, defender, moveName, fieldState, attackerStages, defenderStages, critical)}`;
   const cached = getCached(key);
   if (cached !== undefined) return cached;
 
   try {
+    // Generation 10 maps to the calculator's native Champions generation
+    // (gen.num === 0). Use its Move data and calculate() dispatch directly;
+    // do not adapt another generation's move data or substitute a Tackle shell.
     const gen = getGen(generation);
-    const attackerPokemon = makePokemon(attacker, generation, { atk: attackerStages.atk, spa: attackerStages.spa }, fieldState);
-    const defenderPokemon = makePokemon(defender, generation, { def: defenderStages.def, spd: defenderStages.spd }, fieldState);
-    const move = new Move(gen, moveName);
+    const attackerPokemon = makePokemon(attacker, generation, { atk: attackerStages.atk, spa: attackerStages.spa, def: attackerStages.def, spd: attackerStages.spd, spe: attackerStages.spe }, fieldState);
+    const defenderPokemon = makePokemon(defender, generation, { atk: defenderStages.atk, spa: defenderStages.spa, def: defenderStages.def, spd: defenderStages.spd, spe: defenderStages.spe }, fieldState);
+    const move = applyChampionsMoveData(new Move(gen, moveName), moveName, generation);
     if (critical) (move as unknown as { isCrit: boolean }).isCrit = true;
     const field = makeField(fieldState);
 
@@ -247,7 +294,7 @@ export function calculateMove(
     const moveCategory = String((move as unknown as { category?: string }).category || "");
     if (fieldState.protectSide === "defender" && !/feint|hyperspace|phantom force|shadow force|mighty cleave|breaking swipe/i.test(moveName)) {
       const maxHp = defenderPokemon.maxHP();
-      const blocked: DamageSummary = { move: moveName, min: 0, max: 0, minPct: 0, maxPct: 0, rawMinPct: 0, rawMaxPct: 0, effectiveHp: maxHp, entryHazardDamage: 0, entryHazardPct: 0, ko: "No damage", description: `${moveName} is blocked by Protect.` };
+      const blocked: DamageSummary = { move: moveName, min: 0, max: 0, maxHp, medianDamage: 0, minPct: 0, maxPct: 0, rawMinPct: 0, rawMaxPct: 0, effectiveHp: maxHp, entryHazardDamage: 0, entryHazardPct: 0, ko: "No damage", description: `${moveName} is blocked by Protect.` };
       return setCached(key, blocked);
     }
     if (fieldState.powerTrickSide) {
@@ -268,6 +315,8 @@ export function calculateMove(
         move: moveName,
         min: 0,
         max: 0,
+        maxHp: maxHp,
+        medianDamage: 0,
         minPct: 0,
         maxPct: 0,
         rawMinPct: 0,
@@ -283,12 +332,20 @@ export function calculateMove(
 
     const result = calculate(gen, attackerPokemon, defenderPokemon, move, field);
 
-    const range = damageRange((result as unknown as { damage?: unknown }).damage);
+    const rawDamage = (result as unknown as { damage?: unknown }).damage;
+    const distribution = buildDamageDistribution({ damage: rawDamage, moveName, accuracy: getMoveDetails(moveName, generation)?.accuracy ?? null, item: attacker.item, ability: attacker.ability, category: move.category, defenderAbility: defender.ability, weather: fieldState.weather, generation });
+    if (critical && distribution?.note) distribution.note = distribution.note.replace(/Critical hits are excluded\.?/i, "The histogram is conditional on critical damage and does not include critical-hit probability.");
+    let distributionOutcomes = distribution?.outcomes || [];
+    const successfulOutcomes = distributionOutcomes.filter(outcome => outcome.damage > 0);
+    const distributionRange = successfulOutcomes.length ? { min: Math.min(...successfulOutcomes.map(outcome => outcome.damage)), max: Math.max(...successfulOutcomes.map(outcome => outcome.damage)) } : null;
+    const range = distributionRange || damageRange(rawDamage);
     if (!range) {
       return setCached(key, {
         move: moveName,
         min: 0,
         max: 0,
+        maxHp: defenderPokemon.maxHP(),
+        medianDamage: 0,
         minPct: 0,
         maxPct: 0,
         rawMinPct: 0,
@@ -301,9 +358,7 @@ export function calculateMove(
       });
     }
 
-    const min = range.min;
-    const max = range.max;
-    const rawDamage = (result as unknown as { damage?: unknown }).damage;
+    const isMultiHitDistribution = Boolean(distribution?.isMultiHit);
     const rolls = Array.isArray(rawDamage) && rawDamage.every(value => typeof value === "number")
       ? [...new Set(rawDamage as number[])].sort((a, b) => a - b)
       : undefined;
@@ -315,13 +370,13 @@ export function calculateMove(
     // alter the result. When the main calculation is already critical, its range
     // is the critical range, so no duplicate run is needed.
     let criticalRange: { min: number; max: number } | null = null;
-    if (!critical) {
-      const criticalMove = new Move(gen, moveName);
+    if (!critical && includeCriticalRange) {
+      const criticalMove = applyChampionsMoveData(new Move(gen, moveName), moveName, generation);
       (criticalMove as unknown as { isCrit: boolean }).isCrit = true;
       const criticalResult = calculate(
         gen,
-        makePokemon(attacker, generation, { atk: attackerStages.atk, spa: attackerStages.spa }, fieldState),
-        makePokemon(defender, generation, { def: defenderStages.def, spd: defenderStages.spd }, fieldState),
+        makePokemon(attacker, generation, { atk: attackerStages.atk, spa: attackerStages.spa, def: attackerStages.def, spd: attackerStages.spd, spe: attackerStages.spe }, fieldState),
+        makePokemon(defender, generation, { atk: defenderStages.atk, spa: defenderStages.spa, def: defenderStages.def, spd: defenderStages.spd, spe: defenderStages.spe }, fieldState),
         criticalMove,
         makeField(fieldState),
       );
@@ -338,11 +393,24 @@ export function calculateMove(
     if (fieldState.friendGuardSide === "defender") conditionMultiplier *= 0.75;
     const applyModifier = (damage: number) => Math.max(0, Math.floor(damage * conditionMultiplier + 0.5));
     if (conditionMultiplier !== 1) {
+      if (distribution) {
+        distribution.outcomes = scaleDamageOutcomes(distribution.outcomes, applyModifier);
+        distributionOutcomes = distribution.outcomes;
+        if (distribution.firstHitMin !== undefined) distribution.firstHitMin = applyModifier(distribution.firstHitMin);
+        if (distribution.firstHitMax !== undefined) distribution.firstHitMax = applyModifier(distribution.firstHitMax);
+      }
       range.min = applyModifier(range.min);
       range.max = applyModifier(range.max);
       if (rolls) for (let i = 0; i < rolls.length; i++) rolls[i] = applyModifier(rolls[i]);
       if (criticalRange) { criticalRange.min = applyModifier(criticalRange.min); criticalRange.max = applyModifier(criticalRange.max); }
     }
+
+    // Derive displayed ranges and the median only after all deterministic field
+    // modifiers have been applied to the range and probability distribution.
+    const min = range.min;
+    const max = range.max;
+    const medianOutcomes = isMultiHitDistribution ? (distribution?.outcomes || []).filter(outcome => outcome.damage > 0) : distribution?.outcomes || [];
+    const medianDamage = medianOutcomes.length ? medianDamageOutcome(medianOutcomes) : Math.floor((min + max) / 2);
 
     const entryHazardDamage = defender.currentHp === undefined ? getEntryHazardDamage(defender, defenderPokemon, fieldState) : 0;
     const currentHp = Math.max(1, Math.min(maxHp, Math.floor(defender.currentHp ?? maxHp)));
@@ -373,20 +441,21 @@ export function calculateMove(
     const toxicDamage = defender.status === "tox" && !hasAbility(defender, "Magic Guard") && !hasAbility(defender, "Poison Heal")
       ? Math.max(1, Math.floor(maxHp / 16))
       : 0;
-    const damageRolls = rolls?.length ? rolls : null;
     const toxicKoNote = (() => {
       if (!toxicDamage) return "";
-      const directGuaranteed = min + entryHazardDamage >= maxHp;
       const directPossible = max + entryHazardDamage >= maxHp;
-      const toxicGuaranteed = min + entryHazardDamage + toxicDamage >= maxHp;
       const toxicPossible = max + entryHazardDamage + toxicDamage >= maxHp;
-      if (toxicGuaranteed && !directGuaranteed) return " (guaranteed OHKO after toxic damage)";
-      if (!directPossible && toxicPossible && !damageRolls) return " (possible OHKO after toxic damage; exact roll chance unavailable)";
-      if (damageRolls && !directGuaranteed) {
-        const directChance = damageRolls.filter(roll => roll + entryHazardDamage >= maxHp).length / damageRolls.length;
-        const afterChance = damageRolls.filter(roll => roll + entryHazardDamage + toxicDamage >= maxHp).length / damageRolls.length;
-        if (afterChance > directChance) return ` (${(afterChance * 100).toFixed(1)}% chance to OHKO after toxic damage)`;
+      if (!distributionOutcomes.length) {
+        const directGuaranteed = min + entryHazardDamage >= maxHp;
+        const toxicGuaranteed = min + entryHazardDamage + toxicDamage >= maxHp;
+        if (toxicGuaranteed && !directGuaranteed) return " (guaranteed OHKO after toxic damage)";
+        if (!directPossible && toxicPossible) return " (possible OHKO after toxic damage; exact roll chance unavailable)";
+        return "";
       }
+      const directChance = distributionOutcomes.reduce((sum, outcome) => sum + (outcome.damage + entryHazardDamage >= maxHp ? outcome.probability : 0), 0);
+      const afterChance = distributionOutcomes.reduce((sum, outcome) => sum + (outcome.damage + entryHazardDamage + toxicDamage >= maxHp ? outcome.probability : 0), 0);
+      if (afterChance >= 0.999999 && directChance < 0.999999) return " (guaranteed OHKO after toxic damage)";
+      if (afterChance > directChance) return ` (${(afterChance * 100).toFixed(1)}% chance to OHKO after toxic damage)`;
       return "";
     })();
     const baseDescription = safeDescription(result, moveName);
@@ -414,7 +483,10 @@ export function calculateMove(
       move: moveName,
       min,
       max,
+      maxHp,
+      medianDamage,
       rolls,
+      ...(distribution ? { histogram: distribution.outcomes, hitCounts: distribution.hitCounts, accuracy: distribution.accuracy, distributionApproximate: distribution.approximate, distributionNote: distribution.note, ...(distribution.firstHitMin !== undefined && maxHp > 0 ? { firstHitMinPct: distribution.firstHitMin / maxHp * 100 } : {}), ...(distribution.firstHitMax !== undefined && maxHp > 0 ? { firstHitMaxPct: distribution.firstHitMax / maxHp * 100 } : {}) } : {}),
       minPct,
       maxPct,
       ...(criticalRange ? {
@@ -427,7 +499,9 @@ export function calculateMove(
       entryHazardDamage,
       entryHazardPct,
       // KO estimates use the Pokémon's current HP, while the displayed damage percentages above remain max-HP based.
-      ko: koLabel((min / effectiveHp) * 100, (max / effectiveHp) * 100),
+      ko: isMultiHitDistribution
+        ? (() => { const medianKo = koLabel((medianDamage / effectiveHp) * 100, (medianDamage / effectiveHp) * 100); return medianKo === "No damage" ? medianKo : `Median ${medianKo}`; })()
+        : koLabel((min / effectiveHp) * 100, (max / effectiveHp) * 100),
       description: `${baseDescription}${appendedHazardText}${residualNotes ? ` ${residualNotes}` : ""}`,
     });
   } catch {
@@ -456,31 +530,72 @@ export function koLabel(minPct: number, maxPct: number) {
   return guaranteed <= 4 ? `${guaranteed}HKO` : "4HKO+";
 }
 
-/** Return generation-specific move metadata from the same data bundled with @smogon/calc. */
+/** Return generation-specific move metadata, preferring @smogon/calc's native data. */
 export function getMoveDetails(moveName: string, generation = DEFAULT_GEN): MoveDetails | null {
   try {
     const gen = getGen(generation);
-    const move = new Move(gen, moveName) as unknown as Record<string, unknown>;
     const moveTable = (gen as unknown as { moves?: { get?: (name: string) => unknown } }).moves;
     const raw = (moveTable?.get?.(moveName) || {}) as Record<string, unknown>;
     const text = (value: unknown) => typeof value === "string" ? value : "";
     const numeric = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : null;
+    // Showdown uses `accuracy: true` for moves that do not make a normal
+    // accuracy check. Represent that as 100 in this UI-facing numeric field.
+    const accuracyValue = (value: unknown) => value === true ? 100 : numeric(value);
+    const moveId = moveName.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const officialMoves = OFFICIAL_SHOWDOWN_MOVES as unknown as Record<string, Record<string, unknown> | undefined>;
+    const officialMove = officialMoves[moveId] || {};
+    const loadedMove = getMove(moveName) as unknown as Record<string, unknown> | undefined;
+    let championsMove: Record<string, unknown> = {};
+    if (generation >= 10) {
+      try {
+        championsMove = Dex.mod("champions").moves.get(moveName) as unknown as Record<string, unknown> || {};
+      } catch {
+        championsMove = {};
+      }
+    }
+
+    // Some calc data adapters expose a move through the generation's move
+    // table even if constructing a normalized Move object fails. For Gen 10,
+    // still return the native table's metadata; damage calculations themselves
+    // must construct the native Move and never substitute another move.
+    let move: Record<string, unknown> = {};
+    try {
+      move = new Move(gen, moveName) as unknown as Record<string, unknown>;
+    } catch (error) {
+      if (generation < 10) throw error;
+      if (!Object.keys(raw).length && !Object.keys(officialMove).length) throw error;
+    }
+
+    // Champions metadata from @smogon/calc takes priority. Older Showdown move
+    // data is a metadata-only fallback for missing display fields, never a
+    // source of damage formulas or a replacement for the native Champions Move.
+    const accuracy = generation >= 10
+      ? accuracyValue(championsMove.accuracy) ?? accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy) ?? accuracyValue(officialMove.accuracy) ?? accuracyValue(loadedMove?.accuracy)
+      : generation >= 9
+        ? accuracyValue(officialMove.accuracy) ?? accuracyValue(loadedMove?.accuracy) ?? accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy)
+        : accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy) ?? accuracyValue(loadedMove?.accuracy) ?? accuracyValue(officialMove.accuracy);
+    const resolvedName = text(move.name) || text(raw.name) || text(officialMove.name) || moveName;
+    const resolvedType = (generation >= 10 ? text(championsMove.type) : "") || text(move.type) || text(raw.type) || text(officialMove.type) || "Unknown";
+    const resolvedCategory = (generation >= 10 ? text(championsMove.category) : "") || text(move.category) || text(raw.category) || text(officialMove.category) || "Unknown";
+    const resolvedPower = generation >= 10
+      ? numeric(championsMove.basePower) ?? numeric(championsMove.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp) ?? numeric(move.bp) ?? numeric(officialMove.basePower) ?? numeric(officialMove.bp)
+      : numeric(move.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp) ?? numeric(officialMove.basePower) ?? numeric(officialMove.bp);
+    const resolvedPriority = typeof raw.priority === "number" ? raw.priority : typeof move.priority === "number" ? move.priority : typeof officialMove.priority === "number" ? officialMove.priority : 0;
     return {
-      name: text(move.name) || moveName,
-      type: text(move.type) || text(raw.type) || "Unknown",
-      category: text(move.category) || text(raw.category) || "Unknown",
-      power: numeric(move.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp),
-      accuracy: numeric(move.accuracy) ?? numeric(raw.accuracy),
-      pp: numeric(move.pp) ?? numeric(raw.pp),
-      priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0),
-      target: text(raw.target) || text((move as unknown as Record<string, unknown>).target),
-      description: getShowdownMoveDescription(moveName) || text(raw.desc) || text(raw.shortDesc) || text(move.desc) || getMoveDescription(moveName, { type: text(move.type) || text(raw.type), category: text(move.category) || text(raw.category), power: numeric(move.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp), accuracy: numeric(move.accuracy) ?? numeric(raw.accuracy), priority: typeof move.priority === "number" ? move.priority : (typeof raw.priority === "number" ? raw.priority : 0) }),
+      name: resolvedName,
+      type: resolvedType,
+      category: resolvedCategory,
+      power: resolvedPower,
+      accuracy,
+      pp: numeric(raw.pp) ?? numeric(move.pp) ?? numeric(officialMove.pp),
+      priority: resolvedPriority,
+      target: text(raw.target) || text(move.target) || text(officialMove.target),
+      description: getShowdownMoveDescription(moveName) || text(raw.desc) || text(raw.shortDesc) || text(move.desc) || text(officialMove.desc) || text(officialMove.shortDesc) || getMoveDescription(moveName, { type: resolvedType, category: resolvedCategory, power: resolvedPower, accuracy, priority: resolvedPriority }),
     };
   } catch {
     return null;
   }
 }
-
 
 /** Resolve the stat automatically selected by Protosynthesis / Quark Drive from the Pokémon's unboosted battle stats. */
 export function getAutoBoostedStat(set: PokemonSet, generation = DEFAULT_GEN): NonNullable<PokemonSet["boostedStat"]> {

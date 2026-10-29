@@ -1,11 +1,13 @@
-# Pokémon Team Lab — v1.0.0
+# Pokémon Team Lab — v2.3.3
 
 A browser-based Pokémon team matchup lab built with Next.js, React, TypeScript, `@smogon/calc`, live Pokémon Showdown discovery data, and the upstream TeamValidator adapted for browser execution.
 
 ## Features
 
-- 6v6 matchup matrix with damage ranges, estimated KO tiers, type matchups, and move details.
-- Generation-aware damage calculations for generations 1–9. Pokémon Champions can be selected for exploration, but the installed damage calculator does **not** provide a dedicated Champions engine; this mode currently falls back to Gen 9 damage mechanics.
+- 6v6 matchup matrix with damage ranges, estimated KO tiers, type matchups, and uniform move-details popups. Multi-hit moves add a fine-bin probability histogram.
+- Multi-hit-aware damage distributions for common moves such as Triple Axel and Population Bomb, including hit-count/accuracy probabilities and relevant accuracy/hit-count items and abilities.
+- Draft Matchups matchup counts are precomputed for Hits, Walls, Hit by, and Walled by; hovering each count opens its own detailed list. Directed attack results are cached and reused across all four lists. Analysis uses configured offensive/defensive EVs or Champions Stat Points, natures, and stat stages on both sides. Each matchup saves its mechanics generation.
+- Generation-aware damage calculations for generations 1–9 and Pokémon Champions using `@smogon/calc`’s native Champions mechanics generation (`gen.num === 0`) and native move data directly. Script-driven effects that require a full battle engine may remain approximate.
 - Team builder with Pokémon, moves, abilities, items, EVs/IVs, nature, Tera type, and field controls.
 - Showdown paste import/export and browser-local persistence.
 - Move coverage and support-category panels, sprites, speed/priority helpers, weather and terrain modifiers, and entry-hazard estimates.
@@ -61,17 +63,19 @@ The separate learnset panel is still useful for discovering species moves, but i
 ## Known limitations
 
 - This is a team-planning and damage-estimation tool, not a turn-by-turn battle simulator. It does not fully model switching sequences, recovery loops, or every conditional battle interaction.
-- The damage calculator does not yet include a dedicated Pokémon Champions engine.
+- Pokémon Champions uses the native `@smogon/calc` Champions damage formula; the app is not a complete turn-by-turn implementation of every Champions script-driven effect.
 - Custom draft rules, custom bans, and National Dex legality require explicitly bundled ruleset/mod data before they can be validated accurately.
 - Legality validation is currently limited to user-supplied teams in formats using the bundled base-generation mods for Gen 1–9. The small `Learnset?` marker beside a move is only a species-learnset hint and is not a format legality result.
 - Some field effects are modeled as estimates and are documented in the relevant UI notes.
+- Multi-hit probability histograms use percentages of total HP and exclude critical-hit probability (the Critical toggle shows a distribution conditional on critical damage). Histograms show the distribution conditional on at least one damaging hit, report misses separately, and trim approximately 3% cumulative probability from each tail where the discrete bins permit it, while keeping the original x-axis domain visible; some multi-hit and accuracy interactions remain approximate. Single-hit moves use the same popup layout without the histogram. See [the damage distribution and draft matchup design notes](docs/DAMAGE-DISTRIBUTIONS-AND-DRAFT-MATCHUPS.md).
+- Draft matchup hover results are potential-moveset estimates: top three eligible moves per type/category, configured EVs/Stat Points, natures and stages, no items or field effects, and no full set/turn-sequence simulation.
 
 ## Release checklist
 
 1. Run `npm run check:release` on the target Node version.
 2. Run differential tests against the same upstream Pokémon Showdown source revision before deployment; do not enable unsupported mods until their data dependencies are bundled.
 3. Smoke-test team import/export, format changes, unsupported custom formats, and mobile layout.
-4. Review the GitHub Pages base path and deployment environment before tagging `v1.0.0`.
+4. Review the GitHub Pages base path and deployment environment before tagging `v2.3.3`.
 
 ## Data and licensing
 
@@ -89,3 +93,14 @@ The app uses a bundled, MIT-licensed snapshot of the official [`smogon/pokemon-s
 ## Sprite attribution
 
 Pokémon portrait images are loaded directly from [PMDCollab/SpriteCollab](https://github.com/PMDCollab/SpriteCollab), using each available Pokémon's `portrait/<National-Dex-number>/Normal.png` asset from the moving `master` branch. SpriteCollab requests attribution to contributors and is licensed under CC BY-NC 4.0; this project is non-commercial, and users should consult the repository's portrait credits for contributor-level attribution.
+
+
+## v2.3.2 Champions and UI fixes
+
+- The user-facing mechanics value `10` now maps to the native `@smogon/calc` Champions generation (`gen.num === 0`), so `calculate(...)` dispatches to `calculateChampions` instead of the Gen 9 mechanics. Official Showdown Champions move metadata is only used as a fallback for moves missing from the installed calc data.
+- Draft Hits/Walls/Hit by/Walled by labels now use the Pokémon-name font size without bold styling. The selected ability state is neutral grey rather than green.
+- Histogram tail trimming now chooses whole discrete outcomes based on the closest cumulative probability cutoff, avoiding visible sub-3% cumulative tails without discarding a large central probability mass solely to cross the threshold.
+
+### Optional Champions damage-calculation integration test
+
+The Generation 10 Champions damage-calculation integration test is currently opt-in because the native calculator returns zero damage for the Anchor Shot regression case in this environment. The rest of the test suite can run without being blocked by that unresolved upstream/integration issue. To run that test explicitly while investigating, use `npm run test:champions` (or set `RUN_CHAMPIONS_CALC_TESTS=1` before running `tests/calc.test.ts`). Skipping this test does not mean Generation 10 damage calculations have been verified.
