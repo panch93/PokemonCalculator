@@ -228,11 +228,12 @@ function setCached(key: string, value: DamageSummary | null) {
 }
 
 /**
- * The calculator's Champions generation can have an incomplete normalized Move
- * entry even when the bundled official Showdown Champions mod has the move.
- * Keep the native Champions damage formula, but hydrate missing/zero move data
- * from the official Champions mod rather than letting the calculator treat a
- * damaging move as zero-power.
+ * Reconcile the calculator Move with the bundled, official Showdown Champions
+ * move record. The @smogon/calc Champions adapter can return a *present but
+ * stale/incomplete* Move (for example Anchor Shot with zero power or its old
+ * power), so checking only for missing fields is insufficient. For Gen 10,
+ * the official Champions record is authoritative for move metadata; the
+ * native Champions calculate() implementation still performs the damage math.
  */
 function applyChampionsMoveData(move: Move, moveName: string, generation: number): Move {
   if (generation < 10) return move;
@@ -240,16 +241,16 @@ function applyChampionsMoveData(move: Move, moveName: string, generation: number
     const official = Dex.mod("champions").moves.get(moveName) as unknown as Record<string, unknown>;
     if (!official || official.exists === false) return move;
     const target = move as unknown as Record<string, unknown>;
-    const basePower = typeof official.basePower === "number" ? official.basePower : undefined;
-    if (basePower !== undefined && (typeof target.bp !== "number" || target.bp <= 0)) target.bp = basePower;
+
+    // `bp` is the property consumed by @smogon/calc. Always overwrite it when
+    // the official record provides a number, not only when the old value is 0.
+    if (typeof official.basePower === "number") target.bp = official.basePower;
     for (const key of ["type", "category", "accuracy", "priority", "target", "flags", "hits"] as const) {
       const value = official[key];
-      const current = target[key];
-      const missing = current == null || current === "" || (key === "accuracy" && current === 0);
-      if (value !== undefined && missing) target[key] = value;
+      if (value !== undefined) target[key] = value;
     }
   } catch {
-    // Keep the calculator's native Move object if the bundled mod lookup fails.
+    // Preserve native behavior if the official metadata lookup is unavailable.
   }
   return move;
 }
@@ -539,6 +540,14 @@ export function getMoveDetails(moveName: string, generation = DEFAULT_GEN): Move
     const officialMoves = OFFICIAL_SHOWDOWN_MOVES as unknown as Record<string, Record<string, unknown> | undefined>;
     const officialMove = officialMoves[moveId] || {};
     const loadedMove = getMove(moveName) as unknown as Record<string, unknown> | undefined;
+    let championsMove: Record<string, unknown> = {};
+    if (generation >= 10) {
+      try {
+        championsMove = Dex.mod("champions").moves.get(moveName) as unknown as Record<string, unknown> || {};
+      } catch {
+        championsMove = {};
+      }
+    }
 
     // Some calc data adapters expose a move through the generation's move
     // table even if constructing a normalized Move object fails. For Gen 10,
@@ -556,15 +565,15 @@ export function getMoveDetails(moveName: string, generation = DEFAULT_GEN): Move
     // data is a metadata-only fallback for missing display fields, never a
     // source of damage formulas or a replacement for the native Champions Move.
     const accuracy = generation >= 10
-      ? accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy) ?? accuracyValue(officialMove.accuracy) ?? accuracyValue(loadedMove?.accuracy)
+      ? accuracyValue(championsMove.accuracy) ?? accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy) ?? accuracyValue(officialMove.accuracy) ?? accuracyValue(loadedMove?.accuracy)
       : generation >= 9
         ? accuracyValue(officialMove.accuracy) ?? accuracyValue(loadedMove?.accuracy) ?? accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy)
         : accuracyValue(raw.accuracy) ?? accuracyValue(move.accuracy) ?? accuracyValue(loadedMove?.accuracy) ?? accuracyValue(officialMove.accuracy);
     const resolvedName = text(move.name) || text(raw.name) || text(officialMove.name) || moveName;
-    const resolvedType = text(move.type) || text(raw.type) || text(officialMove.type) || "Unknown";
-    const resolvedCategory = text(move.category) || text(raw.category) || text(officialMove.category) || "Unknown";
+    const resolvedType = (generation >= 10 ? text(championsMove.type) : "") || text(move.type) || text(raw.type) || text(officialMove.type) || "Unknown";
+    const resolvedCategory = (generation >= 10 ? text(championsMove.category) : "") || text(move.category) || text(raw.category) || text(officialMove.category) || "Unknown";
     const resolvedPower = generation >= 10
-      ? numeric(raw.basePower) ?? numeric(raw.bp) ?? numeric(move.bp) ?? numeric(officialMove.basePower) ?? numeric(officialMove.bp)
+      ? numeric(championsMove.basePower) ?? numeric(championsMove.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp) ?? numeric(move.bp) ?? numeric(officialMove.basePower) ?? numeric(officialMove.bp)
       : numeric(move.bp) ?? numeric(raw.basePower) ?? numeric(raw.bp) ?? numeric(officialMove.basePower) ?? numeric(officialMove.bp);
     const resolvedPriority = typeof raw.priority === "number" ? raw.priority : typeof move.priority === "number" ? move.priority : typeof officialMove.priority === "number" ? officialMove.priority : 0;
     return {

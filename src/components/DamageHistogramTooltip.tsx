@@ -47,8 +47,8 @@ export default function DamageHistogramTooltip({ move, result, description }: Pr
     if (!best) return point;
     return Math.abs(point.damage - medianPct) < Math.abs(best.damage - medianPct) ? point : best;
   }, undefined);
-  // Show the probability mass of the nearest plotted bin so the marker label
-  // corresponds to the height of the histogram bar.
+  // This is the probability mass of the nearest plotted bin, not the probability
+  // that the median itself is a mode. A median commonly falls between peaks.
   const medianProbability = medianPlotPoint?.probability ?? medianOutcome?.probability ?? 0;
   const medianY = medianPlotPoint ? plotBottom - (medianPlotPoint.probability / peak) * (plotBottom - plotTop) : plotBottom;
   const ticks = Array.from({ length: 5 }, (_, index) => ({ x: plotLeft + ((plotRight - plotLeft) * index) / 4, value: xMin + (xSpan * index) / 4 }));
@@ -61,7 +61,7 @@ export default function DamageHistogramTooltip({ move, result, description }: Pr
     <div className="damage-histogram-stats"><span>KO chance: <b>{koChance.toFixed(1)}%</b></span><span>Miss/no damage: <b>{missChance.toFixed(1)}%</b></span><span>Accuracy: <b>{result.accuracy == null ? "—" : `${result.accuracy.toFixed(1)}%`}</b></span></div>
     {successfulHitCounts.length ? <div className="damage-histogram-hitcounts"><b>Hit count:</b> {successfulHitCounts.map(entry => `${entry.hits} ${entry.hits === 1 ? "hit" : "hits"} ${(entry.probability * 100).toFixed(1)}%`).join(" · ")}</div> : null}
     {isMultiHit && bars.length > 1 ? <>
-      <div className="damage-histogram-median">Median: <b>{medianPct.toFixed(1)}% HP</b> · <b>{(medianProbability * 100).toFixed(2)}% conditional probability at the marked bin</b></div>
+      <div className="damage-histogram-median">Median: <b>{medianPct.toFixed(1)}% HP</b> · <b>{(medianProbability * 100).toFixed(2)}% conditional probability in the nearest bin</b></div>
       <svg className="damage-histogram-bars" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label={`Fine-bin damage probability histogram for ${move}; dotted line marks median damage`}>
         {[0.25, 0.5, 0.75].map(fraction => <line key={fraction} x1={plotLeft} x2={plotRight} y1={plotBottom - fraction * (plotBottom - plotTop)} y2={plotBottom - fraction * (plotBottom - plotTop)} className="damage-curve-gridline" />)}
         {barRects.map(bar => <rect key={bar.index} x={bar.x} y={bar.y} width={Math.max(0.5, bar.width - 0.25)} height={Math.max(0, bar.height)} className="damage-histogram-bar"><title>{bar.damage.toFixed(1)}% HP · {(bar.probability * 100).toFixed(3)}% probability</title></rect>)}

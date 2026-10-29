@@ -86,6 +86,27 @@ describe("damage probability aggregation", () => {
     ]);
   });
 
+  it("does not confuse the weighted median with the most-probable damage outcome", () => {
+    const outcomes = [
+      { damage: 10, probability: 0.2 },
+      { damage: 20, probability: 0.1 },
+      { damage: 30, probability: 0.4 },
+      { damage: 40, probability: 0.3 },
+    ];
+    // The median is 30 because the cumulative probability first reaches 50%
+    // there; the mode is also 30 here. A separate valley case proves the
+    // median does not need to coincide with the highest-probability outcome.
+    expect(medianDamageOutcome(outcomes)).toBe(30);
+    const valley = [
+      { damage: 10, probability: 0.3 },
+      { damage: 20, probability: 0.1 },
+      { damage: 30, probability: 0.1 },
+      { damage: 40, probability: 0.5 },
+    ];
+    expect(medianDamageOutcome(valley)).toBe(30);
+    expect(valley.reduce((best, entry) => entry.probability > best.probability ? entry : best).damage).toBe(40);
+  });
+
   it("calculates weighted median damage and successful hit count", () => {
     expect(medianDamageOutcome([
       { damage: 0, probability: 0.1 },

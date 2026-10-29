@@ -120,6 +120,8 @@ describe("damage calculator wrappers", () => {
     );
     expect(result).not.toBeNull();
     expect(result?.max).toBeGreaterThan(0);
+    expect(result?.min).toBeGreaterThan(0);
+    expect(result?.max).toBeGreaterThanOrEqual(result?.min ?? Infinity);
   });
 
   it("exposes spread target metadata for matrix indicators", () => {
