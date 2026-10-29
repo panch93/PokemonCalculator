@@ -1215,7 +1215,7 @@ select, select:focus, select option, datalist option {
 .matrix thead .defender-identity .defender-sprite-crop .matrix-sprite,
 .matrix .defender-header .defender-identity .defender-sprite-crop .matrix-sprite { width: 90px; height: 90px; min-width: 90px; min-height: 90px; max-width: 90px; max-height: 90px; }
 
-/* STAB availability summary at the bottom of the defensive matchup matrix. */
+/* STAB availability summary at the top of the defensive matchup matrix. */
 .draft-stab-summary-row th, .draft-stab-summary-row td {
   background: var(--panel-2);
   border-top: 2px solid var(--border-strong, var(--border));
@@ -1312,3 +1312,19 @@ select, select:focus, select option, datalist option {
 .draft-stat-modal-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
 .draft-stat-modal-actions button { white-space: nowrap; }
 @media (max-width: 600px) { .draft-stat-modal-actions { justify-content: flex-start; } }
+
+/* Draft STAB summary is pinned immediately below the type headers. */
+.draft-stab-summary-row th,
+.draft-stab-summary-row td {
+  background-color: var(--panel-2);
+  background-image: none;
+  border-bottom: 2px solid var(--border-strong, var(--border));
+  font-weight: 800;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+.draft-stab-summary-row th { left: 0; z-index: 4; }
+.draft-stab-summary-row td { text-align: center; color: var(--text, #f2f4f8); }
+
+.draft-stab-weakness-indicator { color: #ffb0a8; font-size: .7em; white-space: nowrap; }
