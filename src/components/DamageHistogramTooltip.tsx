@@ -14,7 +14,7 @@ export default function DamageHistogramTooltip({ move, result, description }: Pr
   const maxHp = result.maxHp || (result.maxPct > 0 ? result.max / (result.maxPct / 100) : result.effectiveHp);
   const percentOutcomes = outcomes.map(outcome => ({ damage: percent(outcome.damage, maxHp), probability: outcome.probability }));
   const successfulPercentOutcomes = percentOutcomes.filter(outcome => outcome.damage > 0 && outcome.probability > 0);
-  const bars = isMultiHit ? prepareDamageHistogram(percentOutcomes, 180, 0.03) : [];
+  const bars = isMultiHit ? prepareDamageHistogram(percentOutcomes, 180) : [];
   const peak = Math.max(...bars.map(outcome => outcome.probability), 0.0001);
   const chartWidth = 340;
   const chartHeight = 126;
@@ -70,7 +70,6 @@ export default function DamageHistogramTooltip({ move, result, description }: Pr
         <line x1={plotLeft} x2={plotRight} y1={plotBottom} y2={plotBottom} className="damage-curve-axis-line" />
         {ticks.map((tick, index) => <g key={index}><line x1={tick.x} x2={tick.x} y1={plotBottom} y2={plotBottom + 3} className="damage-curve-axis-line" /><text x={tick.x} y={plotBottom + 14} textAnchor={index === 0 ? "start" : index === 4 ? "end" : "middle"} className="damage-curve-axis-label">{tick.value.toFixed(1)}%</text></g>)}
       </svg>
-      <p className="damage-histogram-note">Bars show the distribution conditional on at least one damaging hit; the miss/no-damage chance is listed separately above. The x-axis is defender maximum HP%, with the original damage range retained so the omitted tails appear as blank margins. Approximately 3% cumulative probability is trimmed from each tail where the discrete bins permit it. {result.distributionNote || "Damage probabilities are based on the calculator's available rolls."}</p>
     </> : null}
     {description ? <details className="damage-histogram-details" open><summary>Move and battle details</summary><pre>{description}</pre></details> : null}
   </div>;

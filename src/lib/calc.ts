@@ -1,5 +1,6 @@
 import { calculate, Generations, Move, Pokemon, Field, TYPE_CHART } from "@smogon/calc";
 import { getMove } from "./showdown-data";
+import Dex from "./showdown-official/sim/dex";
 import { Moves as OFFICIAL_SHOWDOWN_MOVES } from "./showdown-official/data/moves";
 import { getEffectiveMovePriority } from "./battle-order";
 import { DamageSummary, FieldState, MoveDetails, PokemonSet, StatStages } from "./types";
@@ -226,6 +227,33 @@ function setCached(key: string, value: DamageSummary | null) {
   return value;
 }
 
+/**
+ * The calculator's Champions generation can have an incomplete normalized Move
+ * entry even when the bundled official Showdown Champions mod has the move.
+ * Keep the native Champions damage formula, but hydrate missing/zero move data
+ * from the official Champions mod rather than letting the calculator treat a
+ * damaging move as zero-power.
+ */
+function applyChampionsMoveData(move: Move, moveName: string, generation: number): Move {
+  if (generation < 10) return move;
+  try {
+    const official = Dex.mod("champions").moves.get(moveName) as unknown as Record<string, unknown>;
+    if (!official || official.exists === false) return move;
+    const target = move as unknown as Record<string, unknown>;
+    const basePower = typeof official.basePower === "number" ? official.basePower : undefined;
+    if (basePower !== undefined && (typeof target.bp !== "number" || target.bp <= 0)) target.bp = basePower;
+    for (const key of ["type", "category", "accuracy", "priority", "target", "flags", "hits"] as const) {
+      const value = official[key];
+      const current = target[key];
+      const missing = current == null || current === "" || (key === "accuracy" && current === 0);
+      if (value !== undefined && missing) target[key] = value;
+    }
+  } catch {
+    // Keep the calculator's native Move object if the bundled mod lookup fails.
+  }
+  return move;
+}
+
 export function calculateMove(
   attacker: PokemonSet,
   defender: PokemonSet,
@@ -250,7 +278,7 @@ export function calculateMove(
     const gen = getGen(generation);
     const attackerPokemon = makePokemon(attacker, generation, { atk: attackerStages.atk, spa: attackerStages.spa, def: attackerStages.def, spd: attackerStages.spd, spe: attackerStages.spe }, fieldState);
     const defenderPokemon = makePokemon(defender, generation, { atk: defenderStages.atk, spa: defenderStages.spa, def: defenderStages.def, spd: defenderStages.spd, spe: defenderStages.spe }, fieldState);
-    const move = new Move(gen, moveName);
+    const move = applyChampionsMoveData(new Move(gen, moveName), moveName, generation);
     if (critical) (move as unknown as { isCrit: boolean }).isCrit = true;
     const field = makeField(fieldState);
 
@@ -337,7 +365,7 @@ export function calculateMove(
     // is the critical range, so no duplicate run is needed.
     let criticalRange: { min: number; max: number } | null = null;
     if (!critical && includeCriticalRange) {
-      const criticalMove = new Move(gen, moveName);
+      const criticalMove = applyChampionsMoveData(new Move(gen, moveName), moveName, generation);
       (criticalMove as unknown as { isCrit: boolean }).isCrit = true;
       const criticalResult = calculate(
         gen,

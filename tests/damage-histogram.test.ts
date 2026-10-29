@@ -31,15 +31,15 @@ describe("damage histogram preparation", () => {
     expect(outcomes.slice(outcomes.indexOf(trimmed[trimmed.length - 1]) + 1).reduce((sum, item) => sum + item.probability, 0)).toBeGreaterThanOrEqual(0.03);
   });
 
-  it("plots successful-hit damage conditionally and trims the visible histogram edges", () => {
+  it("plots successful-hit damage conditionally and retains rare histogram edges", () => {
     const outcomes = [
       { damage: 0, probability: 0.1 },
       ...Array.from({ length: 20 }, (_, index) => ({ damage: index + 1, probability: 0.045 })),
     ];
     const histogram = prepareDamageHistogram(outcomes, 20, 0.03);
-    expect(histogram.length).toBeLessThan(20);
-    expect(histogram[0]?.damage).toBeGreaterThan(1);
-    expect(histogram[histogram.length - 1]?.damage).toBeLessThan(20);
+    expect(histogram.length).toBe(20);
+    expect(histogram[0]?.damage).toBe(1);
+    expect(histogram[histogram.length - 1]?.damage).toBe(20);
     expect(histogram.every(outcome => outcome.damage > 0)).toBe(true);
   });
 
@@ -47,6 +47,6 @@ describe("damage histogram preparation", () => {
     const outcomes = Array.from({ length: 200 }, (_, damage) => ({ damage, probability: 1 / 200 }));
     const histogram = prepareDamageHistogram(outcomes, 32);
     expect(histogram.length).toBeLessThanOrEqual(32);
-    expect(histogram.reduce((sum, outcome) => sum + outcome.probability, 0)).toBeCloseTo(0.95, 1);
+    expect(histogram.reduce((sum, outcome) => sum + outcome.probability, 0)).toBeCloseTo(1, 10);
   });
 });

@@ -54,6 +54,9 @@ describe("damage probability aggregation", () => {
     expect(result!.outcomes.find(outcome => outcome.damage === 10)?.probability).toBeCloseTo(0.045);
     expect(result!.outcomes.find(outcome => outcome.damage === 11)?.probability).toBeCloseTo(0.045);
     expect(result!.outcomes.reduce((sum, outcome) => sum + outcome.probability, 0)).toBeCloseTo(1);
+    // The plotted median is conditional on at least one hit, not the midpoint
+    // of the damage range. With these test rolls the weighted median is 74.
+    expect(medianDamageOutcome(result!.outcomes.filter(outcome => outcome.damage > 0))).toBe(74);
   });
 
   it("applies accuracy-boosting items and accuracy-bypassing abilities", () => {

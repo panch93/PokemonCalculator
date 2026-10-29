@@ -1250,7 +1250,7 @@ select, select:focus, select option, datalist option {
   gap: 8px;
 }
 .damage-histogram-heading { font-size: .85rem; }
-.damage-histogram-heading span, .damage-histogram-axis, .damage-histogram-note { color: var(--muted, #aab2c0); }
+.damage-histogram-heading span, .damage-histogram-axis { color: var(--muted, #aab2c0); }
 .damage-histogram-stats { margin-top: 7px; font-size: .68rem; flex-wrap: wrap; }
 .damage-histogram-median { margin-top: 9px; font-size: .68rem; color: var(--muted, #aab2c0); }
 .damage-histogram-bars { display: block; width: 100%; height: auto; margin-top: 3px; overflow: visible; }
@@ -1260,7 +1260,6 @@ select, select:focus, select option, datalist option {
 .damage-curve-median-point { fill: #4388c7; stroke: var(--panel, #171d28); stroke-width: 1.2; }
 .damage-curve-axis-line { stroke: var(--muted, #aab2c0); stroke-width: .7; }
 .damage-curve-axis-label { fill: var(--muted, #aab2c0); font-size: 8px; }
-.damage-histogram-note { margin: 5px 0 0; font-size: .64rem; line-height: 1.35; }
 
 /* Draft matchup hover analysis. */
 .draft-matchup-analysis-tooltip {

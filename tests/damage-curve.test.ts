@@ -35,6 +35,6 @@ describe("damage probability curve preparation", () => {
     const outcomes = Array.from({ length: 200 }, (_, damage) => ({ damage, probability: 1 / 200 }));
     const curve = prepareDamageCurve(outcomes, 32);
     expect(curve.length).toBeLessThanOrEqual(32);
-    expect(curve.reduce((sum, outcome) => sum + outcome.probability, 0)).toBeCloseTo(0.95, 1);
+    expect(curve.reduce((sum, outcome) => sum + outcome.probability, 0)).toBeCloseTo(1, 10);
   });
 });

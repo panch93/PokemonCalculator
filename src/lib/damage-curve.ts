@@ -30,7 +30,7 @@ export function trimDistributionTails(outcomes: DamageOutcome[], tailProbability
   return sorted.slice(left, right + 1);
 }
 
-/** Return a fine-bin histogram after removing at least 3% cumulative probability from each tail when possible. */
+/** Return a fine-bin histogram while preserving the full damage range. */
 export function prepareDamageCurve(outcomes: DamageOutcome[], maxPoints = 180): DamageOutcome[] {
-  return binDamageDistribution(trimDistributionTails(outcomes, 0.03), maxPoints);
+  return binDamageDistribution(outcomes, maxPoints);
 }

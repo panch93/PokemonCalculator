@@ -31,19 +31,18 @@ export function trimDistributionTails(outcomes: DamageOutcome[], tailProbability
 }
 
 /**
- * Prepare the plotted distribution conditional on doing damage.
- * Miss/no-damage probability is displayed separately in the tooltip. Bin first,
- * then trim 3% cumulative probability from each side so the cutoff aligns with
- * the visible bins instead of being lost when the chart rescales its data.
+ * Prepare the plotted distribution conditional on doing damage. Keep the full
+ * damage range, including rare low- and high-damage outcomes. Miss/no-damage
+ * probability is displayed separately by the tooltip.
  */
 export function prepareDamageHistogram(
   outcomes: DamageOutcome[],
   maxBins = 180,
-  tailProbability = 0.03,
+  _tailProbability = 0,
 ): DamageOutcome[] {
   const successful = outcomes.filter(outcome => outcome.damage > 0 && outcome.probability > 0);
   const total = successful.reduce((sum, outcome) => sum + outcome.probability, 0);
   if (!total) return [];
   const conditional = successful.map(outcome => ({ ...outcome, probability: outcome.probability / total }));
-  return trimDistributionTails(binDamageDistribution(conditional, maxBins), tailProbability);
+  return binDamageDistribution(conditional, maxBins);
 }
