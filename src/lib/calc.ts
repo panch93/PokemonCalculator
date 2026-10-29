@@ -67,7 +67,12 @@ function resolveCalcType(value?: string): CalcType | undefined {
 }
 
 function makePokemon(set: PokemonSet, generation = DEFAULT_GEN, boosts: Partial<Record<"atk" | "def" | "spa" | "spd" | "spe", number>> = {}, fieldState?: FieldState) {
-  const gen = getGen(generation);
+  // @smogon/calc's Champions generation (num 0) is a mechanics adapter, not a
+  // usable species-stat dex: constructing Pokémon directly from it can produce
+  // zero stats and therefore zero damage. Build species/stats using the latest
+  // supported baseline generation, while calculate() still receives the
+  // dedicated Champions generation and its native damage dispatch.
+  const gen = getGen(generation >= 10 ? 9 : generation);
   const abilityName = normalize(set.ability);
   const proto = abilityName === "protosynthesis";
   const quark = abilityName === "quarkdrive" || abilityName === "quark drive";

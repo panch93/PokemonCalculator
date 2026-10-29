@@ -119,6 +119,10 @@ describe("damage calculator wrappers", () => {
       false,
     );
     expect(result).not.toBeNull();
+    // Gen 10's calc generation is a mechanics adapter (num 0), not a usable
+    // species-stat generation. Ensure Pokémon stats are built from the supported
+    // baseline while the actual damage call still dispatches to Champions.
+    expect(result?.maxHp).toBeGreaterThan(0);
     expect(result?.max).toBeGreaterThan(0);
     expect(result?.min).toBeGreaterThan(0);
     expect(result?.max).toBeGreaterThanOrEqual(result?.min ?? Infinity);

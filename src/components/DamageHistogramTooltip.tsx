@@ -36,21 +36,27 @@ export default function DamageHistogramTooltip({ move, result, description }: Pr
     const height = (outcome.probability / peak) * (plotBottom - plotTop);
     return { x: x - barWidth / 2, y: plotBottom - height, width: barWidth, height, damage: outcome.damage, probability: outcome.probability, index };
   });
+  // Summary statistics all use the same distribution as the plotted bars:
+  // successful damage only, renormalized conditional on doing damage.
+  const successfulTotal = successfulPercentOutcomes.reduce((sum, outcome) => sum + outcome.probability, 0);
+  const meanPct = successfulTotal > 0
+    ? successfulPercentOutcomes.reduce((sum, outcome) => sum + outcome.damage * outcome.probability, 0) / successfulTotal
+    : 0;
   const medianDamage = result.medianDamage ?? (result.min + result.max) / 2;
   const medianPct = percent(medianDamage, maxHp);
-  const medianOutcome = outcomes.reduce<DamageHistogramEntry | undefined>((best, outcome) => {
-    if (!best) return outcome;
-    return Math.abs(outcome.damage - medianDamage) < Math.abs(best.damage - medianDamage) ? outcome : best;
-  }, undefined);
   const medianX = clamp(plotLeft + ((medianPct - xMin) / xSpan) * (plotRight - plotLeft), plotLeft, plotRight);
   const medianPlotPoint = bars.reduce<DamageHistogramEntry | undefined>((best, point) => {
     if (!best) return point;
     return Math.abs(point.damage - medianPct) < Math.abs(best.damage - medianPct) ? point : best;
   }, undefined);
-  // This is the probability mass of the nearest plotted bin, not the probability
-  // that the median itself is a mode. A median commonly falls between peaks.
-  const medianProbability = medianPlotPoint?.probability ?? medianOutcome?.probability ?? 0;
   const medianY = medianPlotPoint ? plotBottom - (medianPlotPoint.probability / peak) * (plotBottom - plotTop) : plotBottom;
+  const modePoint = bars.reduce<DamageHistogramEntry | undefined>((best, point) => !best || point.probability > best.probability ? point : best, undefined);
+  const modePct = modePoint?.damage ?? 0;
+  const meanX = clamp(plotLeft + ((meanPct - xMin) / xSpan) * (plotRight - plotLeft), plotLeft, plotRight);
+  const modeX = clamp(plotLeft + ((modePct - xMin) / xSpan) * (plotRight - plotLeft), plotLeft, plotRight);
+  const meanPoint = bars.reduce<DamageHistogramEntry | undefined>((best, point) => !best || Math.abs(point.damage - meanPct) < Math.abs(best.damage - meanPct) ? point : best, undefined);
+  const meanY = meanPoint ? plotBottom - (meanPoint.probability / peak) * (plotBottom - plotTop) : plotBottom;
+  const modeY = modePoint ? plotBottom - (modePoint.probability / peak) * (plotBottom - plotTop) : plotBottom;
   const ticks = Array.from({ length: 5 }, (_, index) => ({ x: plotLeft + ((plotRight - plotLeft) * index) / 4, value: xMin + (xSpan * index) / 4 }));
   const koChance = outcomes.reduce((sum, outcome) => sum + (outcome.damage >= result.effectiveHp ? outcome.probability : 0), 0) * 100;
   const missChance = (outcomes.find(outcome => outcome.damage === 0)?.probability || 0) * 100;
@@ -61,12 +67,21 @@ export default function DamageHistogramTooltip({ move, result, description }: Pr
     <div className="damage-histogram-stats"><span>KO chance: <b>{koChance.toFixed(1)}%</b></span><span>Miss/no damage: <b>{missChance.toFixed(1)}%</b></span><span>Accuracy: <b>{result.accuracy == null ? "—" : `${result.accuracy.toFixed(1)}%`}</b></span></div>
     {successfulHitCounts.length ? <div className="damage-histogram-hitcounts"><b>Hit count:</b> {successfulHitCounts.map(entry => `${entry.hits} ${entry.hits === 1 ? "hit" : "hits"} ${(entry.probability * 100).toFixed(1)}%`).join(" · ")}</div> : null}
     {isMultiHit && bars.length > 1 ? <>
-      <div className="damage-histogram-median">Median: <b>{medianPct.toFixed(1)}% HP</b> · <b>{(medianProbability * 100).toFixed(2)}% conditional probability in the nearest bin</b></div>
+      <div className="damage-histogram-median damage-histogram-summary">
+        <span>Mean: <b>{meanPct.toFixed(1)}% HP</b></span>
+        <span>Median: <b>{medianPct.toFixed(1)}% HP</b></span>
+        <span>Mode: <b>{modePct.toFixed(1)}% HP</b></span>
+        <small>Statistics are conditional on dealing damage.</small>
+      </div>
       <svg className="damage-histogram-bars" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label={`Fine-bin damage probability histogram for ${move}; dotted line marks median damage`}>
         {[0.25, 0.5, 0.75].map(fraction => <line key={fraction} x1={plotLeft} x2={plotRight} y1={plotBottom - fraction * (plotBottom - plotTop)} y2={plotBottom - fraction * (plotBottom - plotTop)} className="damage-curve-gridline" />)}
         {barRects.map(bar => <rect key={bar.index} x={bar.x} y={bar.y} width={Math.max(0.5, bar.width - 0.25)} height={Math.max(0, bar.height)} className="damage-histogram-bar"><title>{bar.damage.toFixed(1)}% HP · {(bar.probability * 100).toFixed(3)}% probability</title></rect>)}
+        <line x1={meanX} x2={meanX} y1={plotTop} y2={plotBottom} className="damage-histogram-mean-line" />
+        <circle cx={meanX} cy={meanY} r="3" className="damage-histogram-mean-point"><title>Mean {meanPct.toFixed(1)}% HP</title></circle>
         <line x1={medianX} x2={medianX} y1={plotTop} y2={plotBottom} className="damage-curve-median-line" />
-        <circle cx={medianX} cy={medianY} r="3.5" className="damage-curve-median-point"><title>Median {medianPct.toFixed(1)}% HP · {(medianProbability * 100).toFixed(2)}% probability at the nearest outcome</title></circle>
+        <circle cx={medianX} cy={medianY} r="3.5" className="damage-curve-median-point"><title>Median {medianPct.toFixed(1)}% HP</title></circle>
+        <line x1={modeX} x2={modeX} y1={plotTop} y2={plotBottom} className="damage-histogram-mode-line" />
+        <circle cx={modeX} cy={modeY} r="3" className="damage-histogram-mode-point"><title>Mode {modePct.toFixed(1)}% HP</title></circle>
         <line x1={plotLeft} x2={plotRight} y1={plotBottom} y2={plotBottom} className="damage-curve-axis-line" />
         {ticks.map((tick, index) => <g key={index}><line x1={tick.x} x2={tick.x} y1={plotBottom} y2={plotBottom + 3} className="damage-curve-axis-line" /><text x={tick.x} y={plotBottom + 14} textAnchor={index === 0 ? "start" : index === 4 ? "end" : "middle"} className="damage-curve-axis-label">{tick.value.toFixed(1)}%</text></g>)}
       </svg>

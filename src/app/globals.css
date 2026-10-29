@@ -1258,6 +1258,12 @@ select, select:focus, select option, datalist option {
 .damage-histogram-bar { fill: rgba(67, 136, 199, .72); stroke: rgba(67, 136, 199, .9); stroke-width: .15; }
 .damage-curve-median-line { stroke: var(--text, #f2f4f8); stroke-width: 1.2; stroke-dasharray: 3 3; opacity: .9; }
 .damage-curve-median-point { fill: #4388c7; stroke: var(--panel, #171d28); stroke-width: 1.2; }
+.damage-histogram-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 12px; }
+.damage-histogram-summary small { flex-basis: 100%; font-size: .62rem; opacity: .8; }
+.damage-histogram-mean-line { stroke: #e2b84b; stroke-width: 1.1; stroke-dasharray: 2 2; opacity: .95; }
+.damage-histogram-mean-point { fill: #e2b84b; stroke: var(--panel, #171d28); stroke-width: 1.1; }
+.damage-histogram-mode-line { stroke: #64c58b; stroke-width: 1.1; stroke-dasharray: 5 2; opacity: .95; }
+.damage-histogram-mode-point { fill: #64c58b; stroke: var(--panel, #171d28); stroke-width: 1.1; }
 .damage-curve-axis-line { stroke: var(--muted, #aab2c0); stroke-width: .7; }
 .damage-curve-axis-label { fill: var(--muted, #aab2c0); font-size: 8px; }
 
