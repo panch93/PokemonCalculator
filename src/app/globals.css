@@ -1459,3 +1459,18 @@ select, select:focus, select option, datalist option {
 .matrix-condition-icon.sleep { color: #93c5fd; background: rgba(59,130,246,.12); }
 .matrix-condition-icon.freeze { color: #67e8f9; background: rgba(6,182,212,.12); }
 .matrix-condition-icon.fainted { color: #9ca3af; background: rgba(107,114,128,.12); }
+
+
+/* Draft matchup import: explicit list rows prevent inherited flex/grid rules from stacking letters. */
+.draft-team-import-modal { width: min(760px, calc(100vw - 28px)); max-width: 760px; }
+.draft-team-import-modal .draft-import-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; width: 100%; }
+.draft-team-import-modal .draft-import-side { min-width: 0; overflow: hidden; }
+.draft-team-import-modal .draft-import-options { display: flex; flex-direction: column; gap: 5px; list-style: none; margin: 0; padding: 0; width: 100%; min-width: 0; }
+.draft-team-import-modal .draft-import-options > li { display: block; width: 100%; min-width: 0; margin: 0; padding: 0; }
+.draft-team-import-modal .draft-import-option { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center; column-gap: 8px; width: 100%; min-width: 0; min-height: 34px; padding: 5px 8px; box-sizing: border-box; writing-mode: horizontal-tb; }
+.draft-team-import-modal .draft-import-option input { width: 15px; height: 15px; justify-self: center; }
+.draft-team-import-modal .draft-import-pokemon-name { display: block; width: 100%; min-width: 0; max-width: 100%; writing-mode: horizontal-tb; text-orientation: mixed; white-space: nowrap; word-break: normal; overflow-wrap: normal; text-overflow: ellipsis; overflow: hidden; line-height: 1.3; text-align: left; }
+.condition-stat-warning { color: #f59e0b !important; }
+.condition-stat-warning select { border-color: #d97706; }
+.matrix-condition-icon.drop { color: #f59e0b; }
+@media (max-width: 540px) { .draft-team-import-modal { width: calc(100vw - 16px); } .draft-team-import-modal .draft-import-grid { gap: 7px; } .draft-team-import-modal .draft-import-side { padding: 6px; } .draft-team-import-modal .draft-import-option { grid-template-columns: 16px minmax(0, 1fr); column-gap: 5px; padding: 5px 4px; font-size: .72rem; } }
