@@ -1400,11 +1400,11 @@ select, select:focus, select option, datalist option {
 .draft-import-side { min-width: 0; border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: var(--panel, rgba(127,127,127,.04)); }
 .draft-import-side h3 { margin: 0 0 8px; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
 .draft-import-side h3 small { color: var(--muted); font-weight: 500; white-space: nowrap; }
-.draft-import-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 8px; min-width: 0; }
+.draft-import-options { display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; min-width: 0; }
 .draft-import-options label { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface, rgba(127,127,127,.06)); color: var(--text, inherit); font-size: .82rem; line-height: 1.25; cursor: pointer; }
 .draft-import-options label:has(input:checked) { border-color: var(--accent, #4b91d1); background: rgba(65,135,205,.12); }
 .draft-import-options input { flex: 0 0 auto; margin: 0; }
-.draft-import-pokemon-name { display: block; min-width: 0; color: inherit; overflow-wrap: anywhere; }
+.draft-import-pokemon-name { display: block; flex: 1 1 auto; min-width: 0; color: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 700px) { .draft-import-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; } .draft-import-options { grid-template-columns: minmax(0, 1fr); } .draft-import-side { padding: 7px; } .draft-import-options label { font-size: .76rem; } }
 .draft-ability-extra { display: inline-flex; align-items: center; gap: 4px; margin: 3px 4px; font-size: .72rem; color: var(--muted); }
 .draft-ability-extra select { width: 48px; padding: 2px; }
@@ -1448,3 +1448,14 @@ select, select:focus, select option, datalist option {
   text-align: left;
   line-height: 1.25;
 }
+
+/* Compact condition marks: text glyphs are used because this project has no bundled condition-logo artwork. */
+.matrix-condition-indicators { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 3px; margin: 2px 0; vertical-align: middle; }
+.matrix-condition-icon { display: inline-flex; align-items: center; justify-content: center; min-width: 17px; height: 17px; padding: 0 3px; border: 1px solid currentColor; border-radius: 4px; font-size: 11px; font-weight: 800; line-height: 1; }
+.matrix-condition-icon.boost { color: #4ade80; background: rgba(34,197,94,.12); }
+.matrix-condition-icon.paralysis { color: #facc15; background: rgba(234,179,8,.12); }
+.matrix-condition-icon.poison { color: #c084fc; background: rgba(168,85,247,.12); }
+.matrix-condition-icon.burn { color: #fb923c; background: rgba(249,115,22,.12); }
+.matrix-condition-icon.sleep { color: #93c5fd; background: rgba(59,130,246,.12); }
+.matrix-condition-icon.freeze { color: #67e8f9; background: rgba(6,182,212,.12); }
+.matrix-condition-icon.fainted { color: #9ca3af; background: rgba(107,114,128,.12); }

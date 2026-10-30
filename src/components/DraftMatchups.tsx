@@ -394,11 +394,11 @@ export default function DraftMatchups() {
   const abilitiesFor = (name: string) => getSpeciesAbilitiesForGeneration(name, mechanicsGeneration);
   const automaticBoostLabel = (side: "A" | "B", name: string, ability: string) => {
     const id = ability.toLowerCase();
-    const definition = (abilityStatBoosts as Record<string, { stat: string; multiplier: string; weather?: string; terrain?: string; condition: string }>)[id];
+    const definition = (abilityStatBoosts as Record<string, { stat: string; multiplier: string; weather?: string; terrain?: string; condition: string; requiresStatus?: boolean | string | string[]; requiresLowHp?: boolean; effect?: string; requiresActivation?: boolean }>)[id];
     const labels: string[] = [];
     if (definition) {
       const active = (!definition.weather || draftWeather === definition.weather) && (!definition.terrain || draftTerrain === definition.terrain);
-      if (active && definition.condition !== "Status" && definition.condition !== "At or below 50% HP" && definition.condition !== "First 5 turns") labels.push(`${definition.stat} ${definition.multiplier}`);
+      if (active && !definition.requiresStatus && !definition.requiresLowHp && !definition.requiresActivation && definition.effect !== "movePower" && definition.condition !== "First 5 turns") labels.push(`${definition.stat} ${definition.multiplier}`);
     }
     if ((id === "protosynthesis" && draftWeather === "Sun") || (id === "quark drive" && draftTerrain === "Electric")) {
       const stats = baseStats(name);

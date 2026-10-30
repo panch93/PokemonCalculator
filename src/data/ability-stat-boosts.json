@@ -1,0 +1,219 @@
+{
+  "solar power": {
+    "stat": "SpA",
+    "multiplier": "×1.5",
+    "condition": "Sun",
+    "weather": "Sun",
+    "category": "Special"
+  },
+  "orichalcum pulse": {
+    "stat": "Atk",
+    "multiplier": "×1.33",
+    "condition": "Sun",
+    "weather": "Sun",
+    "category": "Physical"
+  },
+  "hadron engine": {
+    "stat": "SpA",
+    "multiplier": "×1.33",
+    "condition": "Electric Terrain",
+    "terrain": "Electric",
+    "category": "Special"
+  },
+  "huge power": {
+    "stat": "Atk",
+    "multiplier": "×2",
+    "condition": "Always"
+  },
+  "pure power": {
+    "stat": "Atk",
+    "multiplier": "×2",
+    "condition": "Always"
+  },
+  "guts": {
+    "stat": "Atk",
+    "multiplier": "×1.5",
+    "condition": "Status",
+    "requiresStatus": true,
+    "category": "Physical"
+  },
+  "hustle": {
+    "stat": "Atk",
+    "multiplier": "×1.5",
+    "condition": "Always",
+    "category": "Physical"
+  },
+  "gorilla tactics": {
+    "stat": "Atk",
+    "multiplier": "×1.5",
+    "condition": "Always",
+    "category": "Physical"
+  },
+  "slow start": {
+    "stat": "Atk",
+    "multiplier": "×0.5",
+    "condition": "First 5 turns",
+    "category": "Physical"
+  },
+  "defeatist": {
+    "stat": "Atk/SpA",
+    "multiplier": "×0.5",
+    "condition": "At or below 50% HP",
+    "requiresLowHp": true
+  },
+  "flower gift": {
+    "stat": "Atk",
+    "multiplier": "×1.5",
+    "condition": "Sun",
+    "weather": "Sun",
+    "category": "Physical",
+    "allyEffect": true
+  },
+  "chlorophyll": {
+    "stat": "Spe",
+    "multiplier": "×2",
+    "condition": "Sun",
+    "weather": "Sun"
+  },
+  "swift swim": {
+    "stat": "Spe",
+    "multiplier": "×2",
+    "condition": "Rain",
+    "weather": "Rain"
+  },
+  "sand rush": {
+    "stat": "Spe",
+    "multiplier": "×2",
+    "condition": "Sand",
+    "weather": "Sand"
+  },
+  "slush rush": {
+    "stat": "Spe",
+    "multiplier": "×2",
+    "condition": "Snow",
+    "weather": "Snow"
+  },
+  "surge surfer": {
+    "stat": "Spe",
+    "multiplier": "×2",
+    "condition": "Electric Terrain",
+    "terrain": "Electric"
+  },
+  "blaze": {
+    "stat": "Fire moves",
+    "multiplier": "×1.5",
+    "condition": "At or below ⅓ HP",
+    "requiresLowHp": true,
+    "hpThreshold": 0.3333333333333333,
+    "moveType": "Fire",
+    "effect": "movePower"
+  },
+  "torrent": {
+    "stat": "Water moves",
+    "multiplier": "×1.5",
+    "condition": "At or below ⅓ HP",
+    "requiresLowHp": true,
+    "hpThreshold": 0.3333333333333333,
+    "moveType": "Water",
+    "effect": "movePower"
+  },
+  "overgrow": {
+    "stat": "Grass moves",
+    "multiplier": "×1.5",
+    "condition": "At or below ⅓ HP",
+    "requiresLowHp": true,
+    "hpThreshold": 0.3333333333333333,
+    "moveType": "Grass",
+    "effect": "movePower"
+  },
+  "swarm": {
+    "stat": "Bug moves",
+    "multiplier": "×1.5",
+    "condition": "At or below ⅓ HP",
+    "requiresLowHp": true,
+    "hpThreshold": 0.3333333333333333,
+    "moveType": "Bug",
+    "effect": "movePower"
+  },
+  "flare boost": {
+    "stat": "Special moves",
+    "multiplier": "×1.5",
+    "condition": "While burned",
+    "requiresStatus": "brn",
+    "category": "Special",
+    "effect": "movePower"
+  },
+  "toxic boost": {
+    "stat": "Physical moves",
+    "multiplier": "×1.5",
+    "condition": "While poisoned or badly poisoned",
+    "requiresStatus": [
+      "psn",
+      "tox"
+    ],
+    "category": "Physical",
+    "effect": "movePower"
+  },
+  "sand force": {
+    "stat": "Rock/Ground/Steel moves",
+    "multiplier": "×1.3",
+    "condition": "Sandstorm",
+    "weather": "Sand",
+    "moveTypes": [
+      "Rock",
+      "Ground",
+      "Steel"
+    ],
+    "effect": "movePower"
+  },
+  "water bubble": {
+    "stat": "Water moves",
+    "multiplier": "×2",
+    "condition": "Always",
+    "moveType": "Water",
+    "effect": "movePower"
+  },
+  "steelworker": {
+    "stat": "Steel moves",
+    "multiplier": "×1.5",
+    "condition": "Always",
+    "moveType": "Steel",
+    "effect": "movePower"
+  },
+  "steely spirit": {
+    "stat": "Steel moves",
+    "multiplier": "×1.5",
+    "condition": "Always",
+    "moveType": "Steel",
+    "effect": "movePower",
+    "allyEffect": true
+  },
+  "dragon's maw": {
+    "stat": "Dragon moves",
+    "multiplier": "×1.5",
+    "condition": "Always",
+    "moveType": "Dragon",
+    "effect": "movePower"
+  },
+  "transistor": {
+    "stat": "Electric moves",
+    "multiplier": "×1.3",
+    "condition": "Generation 9",
+    "moveType": "Electric",
+    "effect": "movePower"
+  },
+  "rocky payload": {
+    "stat": "Rock moves",
+    "multiplier": "×1.5",
+    "condition": "Always",
+    "moveType": "Rock",
+    "effect": "movePower"
+  },
+  "fire mane": {
+    "stat": "Fire moves",
+    "multiplier": "×1.5",
+    "condition": "Always",
+    "moveType": "Fire",
+    "effect": "movePower"
+  }
+}
