@@ -1,10 +1,13 @@
 import { calculateMove, getMoveDetails, getPokemonHp } from "./calc";
 import { getChampionsSpeciesLearnset, getHistoricalSpeciesLearnset, getSpecies } from "./showdown-data";
 import type { DamageSummary, FieldState, MoveDetails, PokemonSet, StatId, Stats } from "./types";
-import { DRAFT_STRONG_HIT_THRESHOLD, DRAFT_WALL_THRESHOLD, isEligibleDraftMove } from "./draft-matchup-rules";
+import { DRAFT_STRONG_HIT_THRESHOLD, DRAFT_WALL_THRESHOLD, isEligibleDraftMove, passesDraftMoveFilters } from "./draft-matchup-rules";
 
 export { DRAFT_STRONG_HIT_THRESHOLD, DRAFT_WALL_THRESHOLD } from "./draft-matchup-rules";
 const MAX_MOVES_PER_TYPE_CATEGORY = 3;
+export type DraftMoveFilter = { minAccuracy: number; minPriority: number; whitelist: string[]; blacklist: string[] };
+export const DEFAULT_DRAFT_MOVE_FILTER: DraftMoveFilter = { minAccuracy: 75, minPriority: 0, whitelist: [], blacklist: [] };
+const moveId = (value: string) => normalize(value);
 const CHUNK_SIZE = 16;
 
 export type DraftStatConfig = { ev: number; nature: "boost" | "neutral" | "hinder"; stage: number };
@@ -17,6 +20,7 @@ export type DraftPokemonProfile = {
   stats?: Partial<Record<StatId, DraftStatConfig>>;
   championsMode?: boolean;
   level?: number;
+  alliesFainted?: number;
 };
 export type DraftMoveThreat = {
   move: string;
@@ -61,32 +65,38 @@ const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "
 const candidatePowerScore = (move: MoveDetails) => move.power != null && move.power > 0 ? move.power : 60;
 
 /** Keep the strongest few options per type/category to bound hover latency. */
-export function selectDraftCandidateMoves(moveNames: Iterable<string>, generation = 9): MoveDetails[] {
+export function selectDraftCandidateMoves(moveNames: Iterable<string>, generation = 9, filter: DraftMoveFilter = DEFAULT_DRAFT_MOVE_FILTER): MoveDetails[] {
   const groups = new Map<string, MoveDetails[]>();
   for (const name of moveNames) {
     const details = getMoveDetails(name, generation);
     if (!isEligibleDraftMove(details)) continue;
+    if (!passesDraftMoveFilters(details, filter)) continue;
     const key = `${details.type}|${details.category}`;
     const group = groups.get(key) || [];
     group.push(details);
     groups.set(key, group);
   }
   return [...groups.values()]
-    .flatMap(group => group.sort((a, b) => (candidatePowerScore(b) * (b.accuracy ?? 100)) - (candidatePowerScore(a) * (a.accuracy ?? 100))).slice(0, MAX_MOVES_PER_TYPE_CATEGORY))
+    .flatMap(group => {
+      const ordered = group.sort((a, b) => (candidatePowerScore(b) * (b.accuracy ?? 100)) - (candidatePowerScore(a) * (a.accuracy ?? 100)));
+      const forced = ordered.filter(move => filter.whitelist.some(name => moveId(name) === moveId(move.name)));
+      const ordinary = ordered.filter(move => !forced.includes(move)).slice(0, MAX_MOVES_PER_TYPE_CATEGORY);
+      return [...forced, ...ordinary];
+    })
     .sort((a, b) => candidatePowerScore(b) - candidatePowerScore(a));
 }
 
 const moveCache = new Map<string, MoveDetails[]>();
 const analysisCache = new Map<string, DraftMatchupAnalysis>();
 const bestAttackCache = new Map<string, { best?: DraftMoveThreat; bestStab?: DraftMoveThreat }>();
-function candidateMoves(species: string, generation: number): MoveDetails[] {
-  const key = `${generation}:${normalize(species)}`;
+function candidateMoves(species: string, generation: number, filter: DraftMoveFilter): MoveDetails[] {
+  const key = `${generation}:${normalize(species)}:${JSON.stringify(filter)}`;
   const cached = moveCache.get(key);
   if (cached) return cached;
   const learnset = generation >= 10
     ? (getChampionsSpeciesLearnset(species) || getHistoricalSpeciesLearnset(species))
     : getHistoricalSpeciesLearnset(species);
-  const moves = selectDraftCandidateMoves(learnset || [], generation);
+  const moves = selectDraftCandidateMoves(learnset || [], generation, filter);
   moveCache.set(key, moves);
   return moves;
 }
@@ -132,6 +142,7 @@ function stagesFor(profile: DraftPokemonProfile) {
     spa: configFor(profile, "spa").stage,
     spd: configFor(profile, "spd").stage,
     spe: configFor(profile, "spe").stage,
+    acc: 0, eva: 0,
   };
 }
 
@@ -144,6 +155,7 @@ function makeDraftSet(profile: DraftPokemonProfile, move: MoveDetails, role: "at
     species: profile.species,
     item: "",
     ability: profile.ability || "",
+    alliesFainted: Math.max(0, Math.min(5, profile.alliesFainted || 0)),
     nature: natureForStat(relevantStat, relevantConfig.nature),
     level: profile.level || (profile.championsMode ? 50 : 100),
     teraType: profile.teraType || "",
@@ -185,11 +197,13 @@ async function bestAttack(
   generation: number,
   counters: { evaluated: number },
   isCancelled: () => boolean,
+  filter: DraftMoveFilter,
+  fieldState: FieldState,
 ): Promise<{ best?: DraftMoveThreat; bestStab?: DraftMoveThreat }> {
-  const cacheKey = JSON.stringify([generation, attackerProfile, defenderProfile]);
+  const cacheKey = JSON.stringify([generation, attackerProfile, defenderProfile, filter, fieldState]);
   const cached = bestAttackCache.get(cacheKey);
   if (cached) return cached;
-  const moves = candidateMoves(attackerProfile.species, generation);
+  const moves = candidateMoves(attackerProfile.species, generation, filter);
   let best: DraftMoveThreat | undefined;
   let bestStab: DraftMoveThreat | undefined;
   for (let index = 0; index < moves.length; index++) {
@@ -197,7 +211,7 @@ async function bestAttack(
     const move = moves[index];
     const attacker = makeDraftSet(attackerProfile, move, "attacker");
     const defender = makeDraftSet(defenderProfile, move, "defender");
-    const result = calculateMove(attacker, defender, move.name, blankField, stagesFor(attackerProfile), stagesFor(defenderProfile), false, generation, false);
+    const result = calculateMove(attacker, defender, move.name, fieldState, stagesFor(attackerProfile), stagesFor(defenderProfile), false, generation, false);
     counters.evaluated++;
     if (result) {
       const candidate = summarizeMove(move, result, attackerProfile, defender, generation);
@@ -222,8 +236,10 @@ export async function analyzeDraftPokemon(
   opponents: DraftPokemonProfile[],
   generation = 9,
   isCancelled: () => boolean = () => false,
+  filter: DraftMoveFilter = DEFAULT_DRAFT_MOVE_FILTER,
+  fieldState: FieldState = blankField,
 ): Promise<DraftMatchupAnalysis> {
-  const cacheKey = JSON.stringify([generation, attacker, opponents]);
+  const cacheKey = JSON.stringify([generation, attacker, opponents, filter, fieldState]);
   const cached = analysisCache.get(cacheKey);
   if (cached) return cached;
   const counters = { evaluated: 0 };
@@ -231,8 +247,8 @@ export async function analyzeDraftPokemon(
   for (const opponent of opponents) {
     if (isCancelled()) break;
     const [outgoing, reply] = await Promise.all([
-      bestAttack(attacker, opponent, generation, counters, isCancelled),
-      bestAttack(opponent, attacker, generation, counters, isCancelled),
+      bestAttack(attacker, opponent, generation, counters, isCancelled, filter, fieldState),
+      bestAttack(opponent, attacker, generation, counters, isCancelled, filter, fieldState),
     ]);
     if (isCancelled()) break;
     const bestDamage = outgoing.best?.maxPct ?? 0;
@@ -258,7 +274,7 @@ export async function analyzeDraftPokemon(
     opponents: results,
     movesEvaluated: counters.evaluated,
     approximate: true,
-    note: "Potential matchups only: top three eligible moves per type/category, configured EVs/Stat Points, natures, and stat stages on both sides; no items or field effects. Damage and multi-hit probabilities inherit the calculator's supported mechanics; this is not a guaranteed set or battle prediction.",
+    note: `Potential matchups only: top three eligible moves per type/category after ${filter.minAccuracy}% accuracy and whitelist/blacklist filters, configured EVs/Stat Points, natures, and stat stages on both sides; no held items; selected weather and terrain are applied. Damage and multi-hit probabilities inherit the calculator's supported mechanics; this is not a guaranteed set or battle prediction.`,
   };
   if (!isCancelled()) {
     analysisCache.set(cacheKey, analysis);

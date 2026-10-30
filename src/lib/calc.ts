@@ -260,13 +260,22 @@ function applyChampionsMoveData(move: Move, moveName: string, generation: number
   return move;
 }
 
+export function accuracyStageMultiplier(stage: number): number {
+  const value = Math.max(-6, Math.min(6, Math.trunc(stage || 0)));
+  return value >= 0 ? (3 + value) / 3 : 3 / (3 + Math.abs(value));
+}
+function adjustedAccuracy(accuracy: number | null, accStage: number, evaStage: number): number | null {
+  if (accuracy == null) return null;
+  return Math.max(0, Math.min(100, accuracy * accuracyStageMultiplier(accStage - evaStage)));
+}
+
 export function calculateMove(
   attacker: PokemonSet,
   defender: PokemonSet,
   moveName: string,
   fieldState: FieldState,
-  attackerStages: StatStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 },
-  defenderStages: StatStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 },
+  attackerStages: StatStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0, acc: 0, eva: 0 },
+  defenderStages: StatStages = { atk: 0, spa: 0, def: 0, spd: 0, spe: 0, acc: 0, eva: 0 },
   critical = false,
   generation = DEFAULT_GEN,
   includeCriticalRange = true,
@@ -333,7 +342,7 @@ export function calculateMove(
     const result = calculate(gen, attackerPokemon, defenderPokemon, move, field);
 
     const rawDamage = (result as unknown as { damage?: unknown }).damage;
-    const distribution = buildDamageDistribution({ damage: rawDamage, moveName, accuracy: getMoveDetails(moveName, generation)?.accuracy ?? null, item: attacker.item, ability: attacker.ability, category: move.category, defenderAbility: defender.ability, weather: fieldState.weather, generation });
+    const distribution = buildDamageDistribution({ damage: rawDamage, moveName, accuracy: adjustedAccuracy(getMoveDetails(moveName, generation)?.accuracy ?? null, attackerStages.acc, defenderStages.eva), item: attacker.item, ability: attacker.ability, category: move.category, defenderAbility: defender.ability, weather: fieldState.weather, generation });
     if (critical && distribution?.note) distribution.note = distribution.note.replace(/Critical hits are excluded\.?/i, "The histogram is conditional on critical damage and does not include critical-hit probability.");
     let distributionOutcomes = distribution?.outcomes || [];
     const successfulOutcomes = distributionOutcomes.filter(outcome => outcome.damage > 0);

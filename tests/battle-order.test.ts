@@ -9,7 +9,7 @@ vi.mock("../src/lib/showdown-data", () => ({
     ? { name: "Grassy Glide", priority: 0, category: "Physical", type: "Grass", flags: {} }
     : undefined,
 }));
-import { getEffectiveMovePriority, getEffectiveSpeed } from "../src/lib/battle-order";
+import { getEffectiveMovePriority, getEffectiveSpeed, getWeatherSpeedAbilityMultiplier } from "../src/lib/battle-order";
 import type { FieldState, PokemonSet } from "../src/lib/types";
 
 const field: FieldState = {
@@ -28,6 +28,13 @@ describe("battle order helpers", () => {
     const normal = getEffectiveSpeed(base, field, "attacker");
     const tailwind = getEffectiveSpeed(base, { ...field, tailwindSide: "attacker" }, "attacker");
     expect(tailwind).toBe(normal * 2);
+  });
+
+  it("applies Chlorophyll and other weather/terrain speed abilities", () => {
+    expect(getWeatherSpeedAbilityMultiplier("Chlorophyll", { weather: "Sun", terrain: "" })).toBe(2);
+    expect(getWeatherSpeedAbilityMultiplier("Chlorophyll", { weather: "Rain", terrain: "" })).toBe(1);
+    expect(getWeatherSpeedAbilityMultiplier("Swift Swim", { weather: "Rain", terrain: "" })).toBe(2);
+    expect(getWeatherSpeedAbilityMultiplier("Surge Surfer", { weather: "", terrain: "Electric" })).toBe(2);
   });
 
   it("applies Grassy Glide's terrain priority boost", () => {

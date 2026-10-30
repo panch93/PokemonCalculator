@@ -10,6 +10,17 @@ const clean = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]/g
 const ability = (p: PokemonSet, name: string) => clean(p.ability) === clean(name);
 const item = (p: PokemonSet, name: string) => clean(p.item) === clean(name);
 
+/** Weather/terrain speed ability multiplier shared by matchup speed displays and EV benchmarks. */
+export function getWeatherSpeedAbilityMultiplier(abilityName: string, field: Pick<FieldState, "weather" | "terrain">): number {
+  const selected = clean(abilityName);
+  if ((selected === "chlorophyll" && field.weather === "Sun") ||
+      (selected === "swiftswim" && field.weather === "Rain") ||
+      (selected === "sandrush" && field.weather === "Sand") ||
+      (selected === "slushrush" && field.weather === "Snow") ||
+      (selected === "surgesurfer" && field.terrain === "Electric")) return 2;
+  return 1;
+}
+
 /** Gen 9 estimated effective Speed using the live Pokémon Showdown data adapter. */
 export function getEffectiveSpeed(p: PokemonSet, field: FieldState, side: "attacker" | "defender" = "attacker", speedStage = 0): number {
   const species = getSpecies(p.species || p.name) as DexEntry;
@@ -35,11 +46,7 @@ export function getEffectiveSpeed(p: PokemonSet, field: FieldState, side: "attac
   if (ability(p, "Unburden") && !p.item.trim()) speed *= 2;
   if (item(p, "Choice Scarf")) speed = Math.floor(speed * 1.5);
   if (item(p, "Iron Ball") || item(p, "Macho Brace") || ["Power Anklet", "Power Band", "Power Belt", "Power Bracer", "Power Lens", "Power Weight"].some(x => item(p, x))) speed = Math.floor(speed * 0.5);
-  if (ability(p, "Swift Swim") && field.weather === "Rain") speed *= 2;
-  if (ability(p, "Chlorophyll") && field.weather === "Sun") speed *= 2;
-  if (ability(p, "Sand Rush") && field.weather === "Sand") speed *= 2;
-  if (ability(p, "Slush Rush") && field.weather === "Snow") speed *= 2;
-  if (ability(p, "Surge Surfer") && field.terrain === "Electric") speed *= 2;
+  speed *= getWeatherSpeedAbilityMultiplier(p.ability, field);
   if (field.tailwindSide === side) speed *= 2;
   return Math.max(1, Math.floor(speed));
 }
