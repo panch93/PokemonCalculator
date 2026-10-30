@@ -18,7 +18,7 @@ const DEFAULT_FIELD: FieldState = {
   defenderLightScreen: false, defenderAuroraVeil: false, defenderLeechSeed: false, defenderSaltCure: false,
   trickRoom: false, tailwindSide: "", protectSide: "", nightmareSide: "", foresightSide: "", chargeSide: "", helpingHandSide: "", flowerGiftSide: "", powerTrickSide: "", steelySpiritSide: "", friendGuardSide: "", batterySide: "", powerSpotSide: "", switchingOutSide: "",
 };
-const ZERO_STAGES = (): StatStages[] => Array.from({ length: 6 }, () => ({ atk: 0, spa: 0, def: 0, spd: 0, spe: 0 }));
+const ZERO_STAGES = (): StatStages[] => Array.from({ length: 6 }, () => ({ atk: 0, spa: 0, def: 0, spd: 0, spe: 0, acc: 0, eva: 0 }));
 const initialMoves = (team: Team) => team.map(p => p.moves.find(Boolean) || "");
 const STORAGE_KEY = "pokemon-team-lab-v0.3.0";
 
@@ -37,6 +37,11 @@ export default function TeamLab() {
   const [stagesB, setStagesB] = useState<StatStages[]>(ZERO_STAGES);
   const [storageReady, setStorageReady] = useState(false);
   const [teamsOpen, setTeamsOpen] = useState(false);
+  const [draftPickerOpen, setDraftPickerOpen] = useState(false);
+  const [draftOptions, setDraftOptions] = useState<Array<{ id: string; name: string; teamA: string[]; teamB: string[] }>>([]);
+  const [draftChoice, setDraftChoice] = useState("0");
+  const [draftSelectedA, setDraftSelectedA] = useState<string[]>([]);
+  const [draftSelectedB, setDraftSelectedB] = useState<string[]>([]);
   const [format, setFormat] = useState("Everything!");
   const [mechanics, setMechanics] = useState({ tera: true });
   const [generation, setGeneration] = useState(9);
@@ -176,16 +181,19 @@ export default function TeamLab() {
           onRowStageChange={(index, stat, value) => updateStage(index, stat, value, swapped ? "right" : "left")}
           onColStageChange={(index, stat, value) => updateStage(index, stat, value, swapped ? "left" : "right")}
           onResetStages={() => { setStagesA(ZERO_STAGES()); setStagesB(ZERO_STAGES()); setLeft(previous => previous.map(p => ({ ...p, currentHp: undefined }))); setRight(previous => previous.map(p => ({ ...p, currentHp: undefined }))); }}
-          onResetRowStages={index => (swapped ? setStagesB : setStagesA)(prev => prev.map((stage, i) => i === index ? { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 } : stage))}
-          onResetColStages={index => (swapped ? setStagesA : setStagesB)(prev => prev.map((stage, i) => i === index ? { atk: 0, spa: 0, def: 0, spd: 0, spe: 0 } : stage))}
+          onResetRowStages={index => (swapped ? setStagesB : setStagesA)(prev => prev.map((stage, i) => i === index ? { atk: 0, spa: 0, def: 0, spd: 0, spe: 0, acc: 0, eva: 0 } : stage))}
+          onResetColStages={index => (swapped ? setStagesA : setStagesB)(prev => prev.map((stage, i) => i === index ? { atk: 0, spa: 0, def: 0, spd: 0, spe: 0, acc: 0, eva: 0 } : stage))}
           onRowPokemonChange={(index, patch) => updatePokemon(swapped ? "right" : "left", index, patch)}
           onColPokemonChange={(index, patch) => updatePokemon(swapped ? "left" : "right", index, patch)}
         />
       </div>
-      <TeamPastePanel left={left} right={right} format={format} open={teamsOpen} onClose={() => setTeamsOpen(false)} onImport={importTeam} onEditTeam={(side, team) => { if (side === "left") { setLeft(team); setMovesA(previous => reconcileMoves(team, previous)); } else { setRight(team); setMovesB(previous => reconcileMoves(team, previous)); } }} />
+      {draftPickerOpen && <div className="teams-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDraftPickerOpen(false); }}><section className="panel teams-modal draft-team-import-modal" role="dialog" aria-modal="true" aria-labelledby="draft-team-import-title"><div className="panel-title-row"><div><h2 id="draft-team-import-title">Select Pokémon from Draft Matchup</h2><p>Select up to six Pokémon from each side. A side with no selections will remain unchanged.</p></div><button type="button" onClick={() => setDraftPickerOpen(false)}>Close ×</button></div>{draftOptions.length ? <><label>Draft matchup <select value={draftChoice} onChange={event => { setDraftChoice(event.target.value); setDraftSelectedA([]); setDraftSelectedB([]); }}><option value="">Choose matchup…</option>{draftOptions.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select></label>{(() => { const option = draftOptions.find(item => item.id === draftChoice); if (!option) return <p>Select a saved draft matchup.</p>; const pickList = (side: "A" | "B", names: string[], selected: string[], setter: (next: string[]) => void) => <div className="draft-import-side"><h3>Team {side} <small>{selected.length}/6 selected</small></h3><div className="draft-import-options">{names.map(name => <label key={`${side}-${name}`}><input type="checkbox" checked={selected.includes(name)} disabled={!selected.includes(name) && selected.length >= 6} onChange={event => setter(event.target.checked ? [...selected, name] : selected.filter(value => value !== name))} />{name}</label>)}</div></div>; return <><div className="draft-import-grid">{pickList("A", option.teamA, draftSelectedA, setDraftSelectedA)}{pickList("B", option.teamB, draftSelectedB, setDraftSelectedB)}</div><div className="button-row"><button type="button" disabled={!draftSelectedA.length && !draftSelectedB.length} onClick={() => { if (draftSelectedA.length) importTeam("left", draftSelectedA.map(makeDraftImportPokemon)); if (draftSelectedB.length) importTeam("right", draftSelectedB.map(makeDraftImportPokemon)); setDraftPickerOpen(false); }}>Import selected Pokémon</button></div></>; })()}</> : <p>No saved draft matchups found. Save a matchup in Draft Matchups first.</p>}</section></div>}
+      <TeamPastePanel left={left} right={right} format={format} onSelectDraft={() => { setTeamsOpen(false); try { const saved = JSON.parse(localStorage.getItem("pokemon-team-lab-draft-matchups-v2") || "{}"); const entries = Object.entries(saved.matchups || {}).map(([id, value]: [string, any]) => ({ id, name: value.matchupName || `Matchup ${Number(id) + 1}`, teamA: Array.isArray(value.teamA) ? value.teamA.filter(Boolean) : [], teamB: Array.isArray(value.teamB) ? value.teamB.filter(Boolean) : [] })); setDraftOptions(entries); setDraftChoice(String(saved.currentIndex ?? entries[0]?.id ?? "0")); setDraftSelectedA([]); setDraftSelectedB([]); setDraftPickerOpen(true); } catch { setDraftOptions([]); setDraftPickerOpen(true); } }} open={teamsOpen} onClose={() => setTeamsOpen(false)} onImport={importTeam} onEditTeam={(side, team) => { if (side === "left") { setLeft(team); setMovesA(previous => reconcileMoves(team, previous)); } else { setRight(team); setMovesB(previous => reconcileMoves(team, previous)); } }} />
     </main>
   );
 }
+
+function makeDraftImportPokemon(species: string): Team[number] { return { name: species, species, item: "", ability: "", nature: "Hardy", level: 100, teraType: "", importedTeraType: "", evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: ["", "", "", ""] }; }
 
 function normalizeTeam(value: unknown, resetTera = false): Team | null {
   if (!Array.isArray(value) || value.length !== 6) return null;
@@ -203,7 +211,7 @@ function reconcileMoves(team: Team, previous: string[]) {
 
 function normalizeStages(stages: StatStages[]): StatStages[] {
   return Array.from({ length: 6 }, (_, i) => ({
-    atk: clampStage(stages[i]?.atk ?? 0), spa: clampStage(stages[i]?.spa ?? 0), def: clampStage(stages[i]?.def ?? 0), spd: clampStage(stages[i]?.spd ?? 0), spe: clampStage(stages[i]?.spe ?? 0),
+    atk: clampStage(stages[i]?.atk ?? 0), spa: clampStage(stages[i]?.spa ?? 0), def: clampStage(stages[i]?.def ?? 0), spd: clampStage(stages[i]?.spd ?? 0), spe: clampStage(stages[i]?.spe ?? 0), acc: clampStage(stages[i]?.acc ?? 0), eva: clampStage(stages[i]?.eva ?? 0),
   }));
 }
 function clampStage(value: number) { return Math.max(-6, Math.min(6, Math.round(Number(value) || 0))); }

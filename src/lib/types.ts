@@ -50,7 +50,7 @@ export type FieldState = {
   switchingOutSide?: "" | "attacker" | "defender";
 };
 
-export type StatStages = { atk: number; spa: number; def: number; spd: number; spe: number };
+export type StatStages = { atk: number; spa: number; def: number; spd: number; spe: number; acc: number; eva: number };
 
 export type MoveDetails = {
   name: string;

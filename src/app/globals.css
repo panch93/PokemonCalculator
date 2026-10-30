@@ -341,12 +341,14 @@ button.primary { background: var(--accent); color: #07130f; border-color: var(--
 /* Stage controls sit below the identity text in a tidy two-row grid. */
 .matrix .stat-stage-row {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: stretch;
   justify-content: stretch;
   gap: 4px 5px;
   width: 100%;
   margin: 6px auto 1px;
+  position: relative;
+  padding-right: 18px;
 }
 .matrix .stat-stage-row label {
   display: grid;
@@ -1383,3 +1385,65 @@ select, select:focus, select option, datalist option {
 .draft-matchup-analysis-tooltip { background:#171d28 !important; opacity:1; }
 
 .coverage-search-hint { margin: 14px 0; padding: 10px; border: 1px dashed var(--border); border-radius: 8px; color: var(--muted); }
+
+/* Reverse damage is an independent companion hover, positioned beside the roll panel. */
+.matrix-reply-overlay {
+  width: min(290px, calc(100vw - 16px));
+  background: #202a39;
+  color: #f2f4f8;
+  padding: 12px;
+  font-size: .76rem;
+}
+.matrix-reply-overlay > strong { display: block; margin-bottom: 8px; }
+.matrix-reply-overlay ul { margin: 0; padding-left: 18px; }
+.matrix-reply-overlay li { margin: 6px 0; }
+.draft-import-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 14px 0; }
+.draft-import-side { min-width: 0; border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
+.draft-import-side h3 { margin: 0 0 8px; }
+.draft-import-side h3 small { color: var(--muted); font-weight: 500; }
+.draft-import-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; max-height: 280px; overflow: auto; }
+.draft-import-options label { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: .85rem; }
+.draft-import-options input { flex: 0 0 auto; }
+@media (max-width: 700px) { .draft-import-grid { grid-template-columns: 1fr; } }
+.draft-ability-extra { display: inline-flex; align-items: center; gap: 4px; margin: 3px 4px; font-size: .72rem; color: var(--muted); }
+.draft-ability-extra select { width: 48px; padding: 2px; }
+
+.matrix .stat-stage-row .reset-one-stage-button { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
+.draft-ability-entry { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 3px; }
+
+
+/* Keep draft matchup ability names readable inside narrow Pokémon cells. */
+.draft-matchup-table-symmetric .draft-abilities {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 3px 5px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+}
+.draft-matchup-table-symmetric .draft-ability-entry {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: flex-start;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+}
+.draft-matchup-table-symmetric .draft-ability-toggle {
+  display: inline-flex;
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 4px;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  text-overflow: clip;
+  text-align: left;
+  line-height: 1.25;
+}

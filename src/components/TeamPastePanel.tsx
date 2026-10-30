@@ -13,7 +13,7 @@ type Side = "left" | "right";
 type Props = {
   left: Team; right: Team; format: string; open: boolean; onClose: () => void;
   onImport: (side: Side, team: Team) => void;
-  onEditTeam: (side: Side, team: Team) => void;
+  onEditTeam: (side: Side, team: Team) => void; onSelectDraft: () => void;
 };
 type RawSet = Record<string, unknown>;
 type SetDatabase = Record<string, Record<string, RawSet>>;
@@ -67,7 +67,7 @@ function applyPreset(pokemon: PokemonSet, preset: RawSet): PokemonSet {
   };
 }
 
-export default function TeamPastePanel({ left, right, format, open, onClose, onImport, onEditTeam }: Props) {
+export default function TeamPastePanel({ left, right, format, open, onClose, onImport, onEditTeam, onSelectDraft }: Props) {
   const [mode, setMode] = useState<"builder" | "paste">("builder");
   const [textA, setTextA] = useState("");
   const [textB, setTextB] = useState("");
@@ -261,7 +261,7 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
 
   return <div className="teams-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="teams-modal panel" role="dialog" aria-modal="true" aria-labelledby="teams-modal-title">
-      <div className="panel-title-row"><div><h2 id="teams-modal-title">Teams · Teambuilder / Paste</h2><p>Format: {format}. Moves are checked against the species learnset; custom-format bans may require additional rules data.</p></div><button onClick={onClose} aria-label="Close teams">Close ×</button></div>
+      <div className="panel-title-row"><div><h2 id="teams-modal-title">Teams · Teambuilder / Paste</h2><p>Format: {format}. Moves are checked against the species learnset; custom-format bans may require additional rules data.</p></div><div className="button-row"><button type="button" onClick={onSelectDraft}>Import from Draft Matchup</button><button onClick={onClose} aria-label="Close teams">Close ×</button></div></div>
       <div className="builder-toolbar"><div className="mode-toggle" role="group" aria-label="Team editing mode"><button className={mode === "builder" ? "active" : ""} onClick={() => setMode("builder")}>Teambuilder</button><button className={mode === "paste" ? "active" : ""} onClick={() => setMode("paste")}>Paste</button></div><small className="preset-status">{mode === "builder" ? setStatus === "loading" ? "Loading Smogon sets…" : setStatus === "error" ? "Smogon set data unavailable; manual editing still works." : "Presets from Smogon usage sets" : "Standard Showdown team paste format"}</small></div>
       {pasteError && <p role="alert" className="paste-error">{pasteError}</p>}
       {mode === "builder" ? <><div className="teams-two-column">{renderBuilderTeam("left", builderA)}{renderBuilderTeam("right", builderB)}</div></> : <div className="teams-two-column">
