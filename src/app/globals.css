@@ -1386,22 +1386,21 @@ select, select:focus, select option, datalist option {
 
 .coverage-search-hint { margin: 14px 0; padding: 10px; border: 1px dashed var(--border); border-radius: 8px; color: var(--muted); }
 
-/* Reverse damage is an independent companion hover, positioned beside the roll panel. */
-.matrix-reply-overlay {
-  width: min(290px, calc(100vw - 16px));
-  background: #202a39;
-  color: #f2f4f8;
-  padding: 12px;
-  font-size: .76rem;
-}
+/* Damage and return-damage stay together so neither hover panel can be clipped off-screen. */
+.matrix-hover-combined { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(220px, .9fr); gap: 10px; width: min(680px, calc(100vw - 16px)); }
+.matrix-hover-primary { min-width: 0; }
+.matrix-hover-primary .damage-histogram-tooltip { max-height: none; }
+.matrix-reply-overlay { min-width: 0; max-height: min(420px, calc(100vh - 40px)); overflow: auto; background: #202a39; color: #f2f4f8; padding: 10px; font-size: .76rem; }
 .matrix-reply-overlay > strong { display: block; margin-bottom: 8px; }
 .matrix-reply-overlay ul { margin: 0; padding-left: 18px; }
 .matrix-reply-overlay li { margin: 6px 0; }
-.draft-import-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 14px 0; }
+.reply-damage-detail { display: block; margin-top: 3px; color: #c2ccda; font-size: .68rem; }
+@media (max-width: 620px) { .matrix-hover-combined { grid-template-columns: minmax(0, 1fr); } }
+.draft-import-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 14px 0; min-width: 0; }
 .draft-import-side { min-width: 0; border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
 .draft-import-side h3 { margin: 0 0 8px; }
 .draft-import-side h3 small { color: var(--muted); font-weight: 500; }
-.draft-import-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; max-height: 280px; overflow: auto; }
+.draft-import-options { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; max-height: 280px; overflow-y: auto; overflow-x: hidden; }
 .draft-import-options label { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: .85rem; }
 .draft-import-options input { flex: 0 0 auto; }
 @media (max-width: 700px) { .draft-import-grid { grid-template-columns: 1fr; } }
