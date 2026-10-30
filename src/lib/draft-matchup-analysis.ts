@@ -1,12 +1,12 @@
 import { calculateMove, getMoveDetails, getPokemonHp } from "./calc";
 import { getChampionsSpeciesLearnset, getHistoricalSpeciesLearnset, getSpecies } from "./showdown-data";
 import type { DamageSummary, FieldState, MoveDetails, PokemonSet, StatId, Stats } from "./types";
-import { DRAFT_STRONG_HIT_THRESHOLD, DRAFT_WALL_THRESHOLD, isEligibleDraftMove } from "./draft-matchup-rules";
+import { DRAFT_STRONG_HIT_THRESHOLD, DRAFT_WALL_THRESHOLD, isEligibleDraftMove, passesDraftMoveFilters } from "./draft-matchup-rules";
 
 export { DRAFT_STRONG_HIT_THRESHOLD, DRAFT_WALL_THRESHOLD } from "./draft-matchup-rules";
 const MAX_MOVES_PER_TYPE_CATEGORY = 3;
-export type DraftMoveFilter = { minAccuracy: number; whitelist: string[]; blacklist: string[] };
-export const DEFAULT_DRAFT_MOVE_FILTER: DraftMoveFilter = { minAccuracy: 75, whitelist: [], blacklist: [] };
+export type DraftMoveFilter = { minAccuracy: number; minPriority: number; whitelist: string[]; blacklist: string[] };
+export const DEFAULT_DRAFT_MOVE_FILTER: DraftMoveFilter = { minAccuracy: 75, minPriority: 0, whitelist: [], blacklist: [] };
 const moveId = (value: string) => normalize(value);
 const CHUNK_SIZE = 16;
 
@@ -69,17 +69,19 @@ export function selectDraftCandidateMoves(moveNames: Iterable<string>, generatio
   for (const name of moveNames) {
     const details = getMoveDetails(name, generation);
     if (!isEligibleDraftMove(details)) continue;
-    if ((details.accuracy ?? 100) < filter.minAccuracy) continue;
-    const id = moveId(details.name);
-    if (filter.blacklist.some(name => moveId(name) === id)) continue;
-    if (filter.whitelist.length && !filter.whitelist.some(name => moveId(name) === id)) continue;
+    if (!passesDraftMoveFilters(details, filter)) continue;
     const key = `${details.type}|${details.category}`;
     const group = groups.get(key) || [];
     group.push(details);
     groups.set(key, group);
   }
   return [...groups.values()]
-    .flatMap(group => group.sort((a, b) => (candidatePowerScore(b) * (b.accuracy ?? 100)) - (candidatePowerScore(a) * (a.accuracy ?? 100))).slice(0, MAX_MOVES_PER_TYPE_CATEGORY))
+    .flatMap(group => {
+      const ordered = group.sort((a, b) => (candidatePowerScore(b) * (b.accuracy ?? 100)) - (candidatePowerScore(a) * (a.accuracy ?? 100)));
+      const forced = ordered.filter(move => filter.whitelist.some(name => moveId(name) === moveId(move.name)));
+      const ordinary = ordered.filter(move => !forced.includes(move)).slice(0, MAX_MOVES_PER_TYPE_CATEGORY);
+      return [...forced, ...ordinary];
+    })
     .sort((a, b) => candidatePowerScore(b) - candidatePowerScore(a));
 }
 
