@@ -1229,6 +1229,14 @@ select, select:focus, select option, datalist option {
   position: fixed;
   z-index: 1200;
   width: min(390px, calc(100vw - 16px));
+  max-height: min(440px, calc(100vh - 16px));
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--border, #354153);
+  border-radius: 12px;
+  background: #171d28;
+  color: #f2f4f8;
+  box-shadow: 0 12px 32px rgba(0,0,0,.48);
   pointer-events: auto;
 }
 .damage-histogram-tooltip {
@@ -1336,7 +1344,7 @@ select, select:focus, select option, datalist option {
 .draft-best-four-panel { position: absolute; z-index: 1200; left: 0; top: 28px; width: min(390px, calc(100vw - 32px)); max-height: min(440px, calc(100vh - 24px)); overflow: auto; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel, #171d28); box-shadow: 0 10px 28px rgba(0,0,0,.4); }
 .draft-best-four-panel ol, .draft-best-four-panel ul { margin: 5px 0 10px; padding-left: 18px; }
 .draft-best-four-panel li { margin: 4px 0; }
-.matrix-reply-damage { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; font-size: .72rem; }
+.matrix-reply-damage { border-top: 1px solid var(--border); margin-top: 8px; padding: 8px 4px 4px; font-size: .72rem; background: #171d28; color: #f2f4f8; }
 .matrix-reply-damage > strong { display: block; margin-bottom: 5px; }
 .matrix-reply-damage ul { margin: 0; padding-left: 18px; }
 .matrix-reply-damage li { margin: 4px 0; }
@@ -1373,3 +1381,5 @@ select, select:focus, select option, datalist option {
 .coverage-move-search { display:flex; align-items:center; gap:8px; }
 .coverage-move-search input { min-width:170px; width:min(260px,42vw); }
 .draft-matchup-analysis-tooltip { background:#171d28 !important; opacity:1; }
+
+.coverage-search-hint { margin: 14px 0; padding: 10px; border: 1px dashed var(--border); border-radius: 8px; color: var(--muted); }

@@ -247,8 +247,16 @@ export default function MatchupMatrix(props: Props) {
     // the probability histogram when hit-count variation makes it useful.
     const width = Math.min(390, window.innerWidth - 16);
     const height = Math.min(440, window.innerHeight - 16);
-    const x = event.clientX + 12 + width > window.innerWidth - 8 ? event.clientX - width - 12 : event.clientX + 12;
-    setHistogramHover({ move, result, description, attacker, defender, row, col, x: Math.max(8, Math.min(x, window.innerWidth - width - 8)), y: Math.max(8, Math.min(event.clientY + 12, window.innerHeight - height - 8)) });
+    const gap = 12;
+    const below = window.innerHeight - event.clientY - gap;
+    const above = event.clientY - gap;
+    // Prefer below when there is room; otherwise place the full panel above the
+    // hovered cell instead of clamping it over the bottom edge.
+    const y = below >= height || below >= above
+      ? Math.min(event.clientY + gap, window.innerHeight - height - 8)
+      : Math.max(8, event.clientY - height - gap);
+    const x = event.clientX + gap + width > window.innerWidth - 8 ? event.clientX - width - gap : event.clientX + gap;
+    setHistogramHover({ move, result, description, attacker, defender, row, col, x: Math.max(8, Math.min(x, window.innerWidth - width - 8)), y: Math.max(8, y) });
   };
   const [quickEditor, setQuickEditor] = useState<{ side: "left" | "right"; index: number } | null>(null);
   const [quickItem, setQuickItem] = useState("");
