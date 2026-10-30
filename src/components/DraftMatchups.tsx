@@ -14,6 +14,7 @@ import { abilityDefenseDescription, abilityDefenseMultiplier, getAbilityDefenseE
 import { analyzeDraftPokemon, DEFAULT_DRAFT_MOVE_FILTER, type DraftMoveFilter, type DraftMatchupAnalysis, type DraftPokemonProfile, type DraftOpponentResult } from "../lib/draft-matchup-analysis";
 import type { Team } from "../lib/types";
 import { getWeatherSpeedAbilityMultiplier } from "../lib/battle-order";
+import abilityStatBoosts from "../data/ability-stat-boosts.json";
 
 type Preset = { label: string; teamA: string[]; teamB: string[] };
 const blankDraftField = { weather: "" as const, terrain: "" as const, defenderStealthRock: false, defenderSpikes: 0, defenderReflect: false, defenderLightScreen: false, defenderAuroraVeil: false, defenderLeechSeed: false, defenderSaltCure: false, trickRoom: false, tailwindSide: "" as const };
@@ -393,17 +394,21 @@ export default function DraftMatchups() {
   const abilitiesFor = (name: string) => getSpeciesAbilitiesForGeneration(name, mechanicsGeneration);
   const automaticBoostLabel = (side: "A" | "B", name: string, ability: string) => {
     const id = ability.toLowerCase();
-    const active = id === "protosynthesis" ? draftWeather === "Sun" : id === "quark drive" ? draftTerrain === "Electric" : false;
-    if (!active) {
-      const speedAbilities: Record<string, string> = { chlorophyll: "Sun", "swift swim": "Rain", "sand rush": "Sand", "slush rush": "Snow", "surge surfer": "Electric terrain" };
-      const condition = speedAbilities[id];
-      const isActive = condition === "Sun" ? draftWeather === "Sun" : condition === "Rain" ? draftWeather === "Rain" : condition === "Sand" ? draftWeather === "Sand" : condition === "Snow" ? draftWeather === "Snow" : condition === "Electric terrain" ? draftTerrain === "Electric" : false;
-      return isActive ? " · Speed ×2" : "";
+    const definition = (abilityStatBoosts as Record<string, { stat: string; multiplier: string; weather?: string; terrain?: string; condition: string }>)[id];
+    const labels: string[] = [];
+    if (definition) {
+      const active = (!definition.weather || draftWeather === definition.weather) && (!definition.terrain || draftTerrain === definition.terrain);
+      if (active && definition.condition !== "Status" && definition.condition !== "At or below 50% HP" && definition.condition !== "First 5 turns") labels.push(`${definition.stat} ${definition.multiplier}`);
     }
-    const stats = baseStats(name); if (!stats) return "";
-    const values = (["atk", "def", "spa", "spd", "spe"] as const).map(stat => { const cfg = configForStat(side, name, stat); const raw = stats[stat] * 2 + cfg.ev / 4; const nature = cfg.nature === "boost" ? 1.1 : cfg.nature === "hinder" ? .9 : 1; return { stat, value: raw * nature }; });
-    const highest = [...values].sort((a, b) => b.value - a.value)[0]?.stat;
-    return highest ? ` · ${highest === "atk" ? "Atk" : highest === "def" ? "Def" : highest === "spa" ? "SpA" : highest === "spd" ? "SpD" : "Spe"} boosted` : "";
+    if ((id === "protosynthesis" && draftWeather === "Sun") || (id === "quark drive" && draftTerrain === "Electric")) {
+      const stats = baseStats(name);
+      if (stats) {
+        const values = (["atk", "def", "spa", "spd", "spe"] as const).map(stat => { const cfg = configForStat(side, name, stat); const raw = stats[stat] * 2 + cfg.ev / 4; const nature = cfg.nature === "boost" ? 1.1 : cfg.nature === "hinder" ? .9 : 1; return { stat, value: raw * nature }; });
+        const highest = [...values].sort((a, b) => b.value - a.value)[0]?.stat;
+        if (highest) labels.push(`${highest === "atk" ? "Atk" : highest === "def" ? "Def" : highest === "spa" ? "SpA" : highest === "spd" ? "SpD" : "Spe"} boosted`);
+      }
+    }
+    return labels.length ? ` · ${labels.join(" · ")}` : "";
   };
   const enabledAbility = (side: "A" | "B", name: string) => {
     const key = `${side}:${name}`;

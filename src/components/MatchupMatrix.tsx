@@ -15,6 +15,7 @@ import SupportCategoryPanel from "./SupportCategoryPanel";
 import CoveragePanel from "./CoveragePanel";
 import DamageRangeBar from "./DamageRangeBar";
 import DamageHistogramTooltip from "./DamageHistogramTooltip";
+import abilityStatBoosts from "../data/ability-stat-boosts.json";
 
 type Props = {
   left: PokemonSet[]; right: PokemonSet[]; generation: number; format: string; matchups: (Matchup | null)[][]; fieldState: FieldState;
@@ -125,16 +126,13 @@ function moveFieldIndicators(pokemon: PokemonSet, move: string, field: FieldStat
   if ((type === "Fire" && item === "charcoal") || (type === "Water" && item === "mystic water") || (type === "Electric" && item === "magnet") || (type === "Grass" && item === "miracle seed") || (type === "Ice" && item === "never-melt ice") || (type === "Psychic" && item === "twisted spoon") || (type === "Dragon" && item === "dragon fang") || (type === "Dark" && item === "black glasses") || (type === "Fairy" && item === "pixie plate") || (type === "Steel" && item === "metal coat") || (type === "Fighting" && item === "black belt") || (type === "Ground" && item === "soft sand") || (type === "Rock" && item === "hard stone") || (type === "Bug" && item === "silver powder") || (type === "Ghost" && item === "spell tag") || (type === "Flying" && item === "sharp beak") || (type === "Poison" && item === "poison barb")) tags.push(`${pokemon.item} type boost`);
   if (ability === "technician" && details.power !== null && details.power <= 60) tags.push("Technician ×1.5");
   if (ability === "sharpness" && /slicing/i.test(details.description)) tags.push("Sharpness ×1.5");
-  if (ability === "huge power" || ability === "pure power") tags.push(`${pokemon.ability} doubles Attack`);
-  if (ability === "guts" && pokemon.status && details.category === "Physical") tags.push("Guts ×1.5 Attack");
-  if (ability === "solar power" && field.weather === "Sun" && details.category === "Special") tags.push("Solar Power ×1.5 SpA (Sun)");
-  if (ability === "orichalcum pulse" && field.weather === "Sun" && details.category === "Physical") tags.push("Orichalcum Pulse ×1.33 Atk (Sun)");
-  if (ability === "hadron engine" && field.terrain === "Electric" && details.category === "Special") tags.push("Hadron Engine ×1.33 SpA (Electric Terrain)");
-  if (ability === "defeatist" && typeof pokemon.currentHp === "number" && pokemon.currentHp <= getPokemonHp(pokemon).max / 2) tags.push("Defeatist ×0.5 Atk/SpA (below half HP)");
-  if (ability === "slow start" && details.category === "Physical") tags.push("Slow Start ×0.5 Attack (first 5 turns)");
-  if (ability === "hustle" && details.category === "Physical") tags.push("Hustle ×1.5 Attack (accuracy ×0.8)");
-  if (ability === "gorilla tactics" && details.category === "Physical") tags.push("Gorilla Tactics ×1.5 Attack");
-  if (ability === "flower gift" && field.weather === "Sun" && details.category === "Physical") tags.push("Flower Gift ×1.5 Attack (Sun; ally effect)");
+  const statBoost = (abilityStatBoosts as Record<string, { stat: string; multiplier: string; weather?: string; terrain?: string; category?: string; requiresStatus?: boolean; requiresLowHp?: boolean; allyEffect?: boolean }>)[ability];
+  if (statBoost && (!statBoost.weather || field.weather === statBoost.weather) && (!statBoost.terrain || field.terrain === statBoost.terrain) && (!statBoost.category || details.category === statBoost.category)) {
+    const statusActive = !statBoost.requiresStatus || Boolean(pokemon.status);
+    const hpActive = !statBoost.requiresLowHp || (typeof pokemon.currentHp === "number" && pokemon.currentHp <= getPokemonHp(pokemon).max / 2);
+    if (statusActive && hpActive && statBoost.stat !== "Spe") tags.push(`${pokemon.ability} ${statBoost.multiplier} ${statBoost.stat}${statBoost.weather ? ` (${statBoost.weather})` : ""}${statBoost.allyEffect ? " (ally effect)" : ""}`);
+  }
+  if (ability === "hustle" && details.category === "Physical") tags.push("Hustle accuracy ×0.8");
   if (ability === "plus" || ability === "minus") { if (details.category === "Special") tags.push(`${pokemon.ability}: Special Attack boost when paired with Plus/Minus ally`); }
   if (ability === "adaptability" && getPokemonTypes(pokemon).includes(type)) tags.push("Adaptability STAB");
   if (ability === "iron fist" && /punch/i.test(details.name)) tags.push("Iron Fist ×1.2");

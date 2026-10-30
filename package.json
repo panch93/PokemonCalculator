@@ -1,8 +1,8 @@
 {
   "name": "pokemon-team-lab",
-  "version": "2.4.8",
+  "version": "2.4.9",
   "private": true,
-  "description": "Pok\u00e9mon team matchup analysis with Showdown team import/export and format-aware legality validation.",
+  "description": "Pokémon team matchup analysis with Showdown team import/export and format-aware legality validation.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
