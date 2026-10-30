@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import { getAbility, getHistoricalSpeciesLearnset, getMove, getSpecies, getSpeciesAbilities, getSpeciesAbilitiesForGeneration, getSpeciesList } from "../lib/showdown-data";
+import { getAbility, getHistoricalSpeciesLearnset, getMove, getSpecies, getSpeciesAbilities, getSpeciesAbilitiesForGeneration, getSpeciesList, getMoveList } from "../lib/showdown-data";
 import { POKEMON_TYPES } from "../lib/pokemon-visuals";
 import { TypeChart } from "../lib/showdown-official/data/typechart";
 import AutocompleteInput from "./AutocompleteInput";
@@ -11,7 +11,7 @@ import SupportCategoryPanel from "./SupportCategoryPanel";
 import FormatSelector from "./FormatSelector";
 import PokemonSprite from "./PokemonSprite";
 import { abilityDefenseDescription, abilityDefenseMultiplier, getAbilityDefenseEffect } from "../lib/ability-defenses";
-import { analyzeDraftPokemon, type DraftMatchupAnalysis, type DraftPokemonProfile, type DraftOpponentResult } from "../lib/draft-matchup-analysis";
+import { analyzeDraftPokemon, DEFAULT_DRAFT_MOVE_FILTER, type DraftMoveFilter, type DraftMatchupAnalysis, type DraftPokemonProfile, type DraftOpponentResult } from "../lib/draft-matchup-analysis";
 import type { Team } from "../lib/types";
 
 type Preset = { label: string; teamA: string[]; teamB: string[] };
@@ -107,6 +107,11 @@ export default function DraftMatchups() {
   const [matchupAnalyses, setMatchupAnalyses] = useState<Record<string, DraftMatchupAnalysis>>({});
   const [matchupAnalysisLoading, setMatchupAnalysisLoading] = useState(false);
   const [bestFourOpen, setBestFourOpen] = useState(false);
+  const [moveFilterOpen, setMoveFilterOpen] = useState(false);
+  const [moveFilter, setMoveFilter] = useState<DraftMoveFilter>(DEFAULT_DRAFT_MOVE_FILTER);
+  const [moveFilterDraft, setMoveFilterDraft] = useState<DraftMoveFilter>(DEFAULT_DRAFT_MOVE_FILTER);
+  const [movePicker, setMovePicker] = useState("");
+  const moveNames = useMemo(() => getMoveList(), []);
   const matchupHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   type SpeedConfig = { ev: number; nature: "boost" | "neutral" | "hinder"; stage: number };
   type StatConfig = { ev: number; nature: "boost" | "neutral" | "hinder"; stage: number };
@@ -174,6 +179,7 @@ export default function DraftMatchups() {
           entry.opponents.map(name => profileFor(entry.side === "A" ? "B" : "A", name)),
           mechanicsGeneration,
           () => cancelled,
+          moveFilter,
         );
         if (cancelled) return;
         next[`${entry.side}:${entry.name}`] = result;
@@ -183,7 +189,7 @@ export default function DraftMatchups() {
     };
     run().catch(() => { if (!cancelled) setMatchupAnalysisLoading(false); });
     return () => { cancelled = true; };
-  }, [teamA, teamB, abilityOverrides, teraCaptains, teraTypes, speedConfigs, statConfigs, format, mechanicsGeneration]);
+  }, [teamA, teamB, abilityOverrides, teraCaptains, teraTypes, speedConfigs, statConfigs, format, mechanicsGeneration, moveFilter]);
   useEffect(() => () => { if (matchupHoverTimer.current) clearTimeout(matchupHoverTimer.current); }, []);
 
   const storageKey = "pokemon-team-lab-draft-matchups-v2";
@@ -191,7 +197,7 @@ export default function DraftMatchups() {
     try {
       const raw = localStorage.getItem(storageKey);
       if (raw) {
-        const saved = JSON.parse(raw) as { currentIndex?: number; matchups?: Record<string, { matchupName?: string; teamA?: string[]; teamB?: string[]; format?: string; mechanicsGeneration?: number; speedConfigs?: Record<string, SpeedConfig>; statConfigs?: Record<string, StatConfig>; abilityOverrides?: Record<string, string>; pokemonPoints?: Record<string, number>; teraCaptains?: Record<string, boolean>; teraTypes?: Record<string, string> }> };
+        const saved = JSON.parse(raw) as { currentIndex?: number; matchups?: Record<string, { matchupName?: string; teamA?: string[]; teamB?: string[]; format?: string; mechanicsGeneration?: number; speedConfigs?: Record<string, SpeedConfig>; statConfigs?: Record<string, StatConfig>; abilityOverrides?: Record<string, string>; pokemonPoints?: Record<string, number>; teraCaptains?: Record<string, boolean>; teraTypes?: Record<string, string>; moveFilter?: DraftMoveFilter }> };
         const index = Number.isInteger(saved.currentIndex) && saved.currentIndex! >= 0 && saved.currentIndex! < PRESETS.length ? saved.currentIndex! : 0;
         setPresetIndex(index);
         const active = saved.matchups?.[String(index)];
@@ -207,9 +213,10 @@ export default function DraftMatchups() {
           if (active.pokemonPoints && typeof active.pokemonPoints === "object") setPokemonPoints(active.pokemonPoints);
           if (active.teraCaptains && typeof active.teraCaptains === "object") setTeraCaptains(active.teraCaptains);
           if (active.teraTypes && typeof active.teraTypes === "object") setTeraTypes(active.teraTypes);
+          if (active.moveFilter && typeof active.moveFilter === "object") setMoveFilter({ ...DEFAULT_DRAFT_MOVE_FILTER, ...active.moveFilter });
         } else {
           setTeamA(normalizeTeam(PRESETS[index].teamA)); setTeamB(normalizeTeam(PRESETS[index].teamB));
-          setMatchupName(PRESETS[index].label); setDraftMatchupName(PRESETS[index].label); setFormat("Everything!"); setMechanicsGeneration(9); setSpeedConfigs({}); setStatConfigs({}); setAbilityOverrides({}); setPokemonPoints({}); setTeraCaptains({}); setTeraTypes({});
+          setMoveFilter(DEFAULT_DRAFT_MOVE_FILTER); setMatchupName(PRESETS[index].label); setDraftMatchupName(PRESETS[index].label); setFormat("Everything!"); setMechanicsGeneration(9); setMoveFilter(DEFAULT_DRAFT_MOVE_FILTER); setSpeedConfigs({}); setStatConfigs({}); setAbilityOverrides({}); setPokemonPoints({}); setTeraCaptains({}); setTeraTypes({}); setMoveFilter(DEFAULT_DRAFT_MOVE_FILTER);
         }
       } else {
         // Migrate the previous single-matchup save into its corresponding preset slot.
@@ -229,6 +236,7 @@ export default function DraftMatchups() {
           if (legacy.pokemonPoints && typeof legacy.pokemonPoints === "object") setPokemonPoints(legacy.pokemonPoints);
           if (legacy.teraCaptains && typeof legacy.teraCaptains === "object") setTeraCaptains(legacy.teraCaptains);
           if (legacy.teraTypes && typeof legacy.teraTypes === "object") setTeraTypes(legacy.teraTypes);
+          if (legacy.moveFilter && typeof legacy.moveFilter === "object") setMoveFilter({ ...DEFAULT_DRAFT_MOVE_FILTER, ...legacy.moveFilter });
         }
       }
     } catch {} finally { setHydrated(true); }
@@ -239,13 +247,16 @@ export default function DraftMatchups() {
       const raw = localStorage.getItem(storageKey);
       const saved = raw ? JSON.parse(raw) : {};
       const matchups = saved.matchups && typeof saved.matchups === "object" ? saved.matchups : {};
-      matchups[String(presetIndex)] = { matchupName, teamA, teamB, format, mechanicsGeneration, speedConfigs, statConfigs, abilityOverrides, pokemonPoints, teraCaptains, teraTypes };
+      matchups[String(presetIndex)] = { matchupName, teamA, teamB, format, mechanicsGeneration, speedConfigs, statConfigs, abilityOverrides, pokemonPoints, teraCaptains, teraTypes, moveFilter };
       localStorage.setItem(storageKey, JSON.stringify({ currentIndex: presetIndex, matchups }));
     } catch {}
-  }, [hydrated, matchupName, teamA, teamB, format, mechanicsGeneration, presetIndex, speedConfigs, statConfigs, abilityOverrides, pokemonPoints, teraCaptains, teraTypes]);
+  }, [hydrated, matchupName, teamA, teamB, format, mechanicsGeneration, presetIndex, speedConfigs, statConfigs, abilityOverrides, pokemonPoints, teraCaptains, teraTypes, moveFilter]);
   const [editorOpen, setEditorOpen] = useState(false);
   const [draftA, setDraftA] = useState<string[]>(teamA);
   const [draftB, setDraftB] = useState<string[]>(teamB);
+  const [bulkA, setBulkA] = useState("");
+  const [bulkB, setBulkB] = useState("");
+  const [bulkError, setBulkError] = useState("");
 
   const setPreset = (index: number) => {
     // Persist the outgoing matchup synchronously before changing the active slot.
@@ -253,7 +264,7 @@ export default function DraftMatchups() {
       const raw = localStorage.getItem(storageKey);
       const saved = raw ? JSON.parse(raw) : {};
       const matchups = saved.matchups && typeof saved.matchups === "object" ? saved.matchups : {};
-      matchups[String(presetIndex)] = { matchupName, teamA, teamB, format, mechanicsGeneration, speedConfigs, statConfigs, abilityOverrides, pokemonPoints, teraCaptains, teraTypes };
+      matchups[String(presetIndex)] = { matchupName, teamA, teamB, format, mechanicsGeneration, speedConfigs, statConfigs, abilityOverrides, pokemonPoints, teraCaptains, teraTypes, moveFilter };
       const next = matchups[String(index)];
       localStorage.setItem(storageKey, JSON.stringify({ currentIndex: index, matchups }));
       setPresetIndex(index);
@@ -270,21 +281,38 @@ export default function DraftMatchups() {
         setPokemonPoints(next.pokemonPoints && typeof next.pokemonPoints === "object" ? next.pokemonPoints : {});
         setTeraCaptains(next.teraCaptains && typeof next.teraCaptains === "object" ? next.teraCaptains : {});
         setTeraTypes(next.teraTypes && typeof next.teraTypes === "object" ? next.teraTypes : {});
+        setMoveFilter(next.moveFilter && typeof next.moveFilter === "object" ? { ...DEFAULT_DRAFT_MOVE_FILTER, ...next.moveFilter } : DEFAULT_DRAFT_MOVE_FILTER);
       } else {
-        setMatchupName(PRESETS[index].label); setDraftMatchupName(PRESETS[index].label);
+        setMoveFilter(DEFAULT_DRAFT_MOVE_FILTER); setMatchupName(PRESETS[index].label); setDraftMatchupName(PRESETS[index].label);
         setTeamA(normalizeTeam(PRESETS[index].teamA)); setTeamB(normalizeTeam(PRESETS[index].teamB));
-        setFormat("Everything!"); setMechanicsGeneration(9); setSpeedConfigs({}); setStatConfigs({}); setAbilityOverrides({}); setPokemonPoints({}); setTeraCaptains({}); setTeraTypes({});
+        setFormat("Everything!"); setMechanicsGeneration(9); setMoveFilter(DEFAULT_DRAFT_MOVE_FILTER); setSpeedConfigs({}); setStatConfigs({}); setAbilityOverrides({}); setPokemonPoints({}); setTeraCaptains({}); setTeraTypes({}); setMoveFilter(DEFAULT_DRAFT_MOVE_FILTER);
       }
     } catch {
       setPresetIndex(index); setMatchupName(PRESETS[index].label); setDraftMatchupName(PRESETS[index].label); setMechanicsGeneration(9);
-      setTeamA(normalizeTeam(PRESETS[index].teamA)); setTeamB(normalizeTeam(PRESETS[index].teamB)); setSpeedConfigs({}); setStatConfigs({}); setAbilityOverrides({}); setPokemonPoints({}); setTeraCaptains({}); setTeraTypes({});
+      setTeamA(normalizeTeam(PRESETS[index].teamA)); setTeamB(normalizeTeam(PRESETS[index].teamB)); setSpeedConfigs({}); setStatConfigs({}); setAbilityOverrides({}); setPokemonPoints({}); setTeraCaptains({}); setTeraTypes({}); setMoveFilter(DEFAULT_DRAFT_MOVE_FILTER);
     }
   };
   const openEditor = () => {
     setDraftA([...teamA]);
     setDraftB([...teamB]);
     setDraftMatchupName(matchupName);
+    setBulkA(teamA.filter(Boolean).join("\n"));
+    setBulkB(teamB.filter(Boolean).join("\n"));
+    setBulkError("");
     setEditorOpen(true);
+  };
+  const parseBulkRoster = (text: string) => text.split(/[\r\n,]+/).map(value => value.trim()).filter(Boolean).map(value => species.find(name => name.toLowerCase() === value.toLowerCase()) || species.find(name => name.toLowerCase().includes(value.toLowerCase())) || value).slice(0, 12);
+  const applyBulkRoster = (side: "A" | "B") => {
+    const parsed = parseBulkRoster(side === "A" ? bulkA : bulkB);
+    const unknown = parsed.filter(name => !species.some(option => option.toLowerCase() === name.toLowerCase()));
+    if (unknown.length) { setBulkError(`Unrecognised Pokémon: ${unknown.join(", ")}`); return; }
+    const padded = normalizeTeam(parsed);
+    if (side === "A") setDraftA(padded); else setDraftB(padded);
+    setBulkError("");
+  };
+  const copyRoster = async (side: "A" | "B") => {
+    const text = (side === "A" ? draftA : draftB).filter(Boolean).join("\n");
+    try { await navigator.clipboard.writeText(text); } catch { setBulkError("Clipboard access was blocked by the browser."); }
   };
   const closeEditor = () => {
     const name = draftMatchupName.trim() || PRESETS[presetIndex].label;
@@ -476,6 +504,7 @@ export default function DraftMatchups() {
     <section className="panel draft-controls">
       <div className="draft-preset-control"><label htmlFor="draft-preset">Matchup preset</label><select id="draft-preset" value={presetIndex} onChange={event => setPreset(Number(event.target.value))}>{PRESETS.map((preset, index) => <option key={preset.label} value={index}>{index + 1}. {index === presetIndex ? matchupName : preset.label}</option>)}</select></div>
       <button type="button" className="primary" onClick={() => setSupportOpen(true)}>Support moves</button>
+      <button type="button" onClick={() => { setMoveFilterDraft({ ...moveFilter }); setMovePicker(""); setMoveFilterOpen(true); }}>Move filters · {moveFilter.minAccuracy}%</button>
       <div className="draft-team-counts"><span>Team A: <strong>{activeA.length}/12</strong> · <strong>{totalPoints("A", activeA)} pts</strong></span><span>Team B: <strong>{activeB.length}/12</strong> · <strong>{totalPoints("B", activeB)} pts</strong></span></div>
       <button className="primary" type="button" onClick={openEditor}>Edit matchup</button>
     </section>
@@ -579,10 +608,15 @@ export default function DraftMatchups() {
 
     {speedEdit && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSpeedEdit(null); }}><section className="draft-modal draft-speed-modal" role="dialog" aria-modal="true" aria-label={`${speedEdit.name} ${STAT_LABELS[speedEdit.stat]} settings`}><div className="panel-title-row"><div><h2>{speedEdit.name} · {STAT_LABELS[speedEdit.stat]} settings</h2><p>Base stats remain displayed in the table; these settings are saved for matchup planning and stat calculations. {isChampionsFormat(format) ? "Champions uses Stat Points (0–32 per stat)." : "Standard formats use EVs (0–252 per stat)."}</p></div><div className="draft-stat-modal-actions"><button type="button" title="Reset this stat's EVs or Stat Points, nature, and stage." onClick={() => updateStatConfig(speedEdit.side, speedEdit.name, speedEdit.stat, { ev: 0, nature: "neutral", stage: 0 })}>Reset this stat</button><button type="button" onClick={() => setSpeedEdit(null)}>Close ×</button></div></div>{(() => { const cfg = configForStat(speedEdit.side, speedEdit.name, speedEdit.stat); const isHp = speedEdit.stat === "hp"; return <div className="draft-speed-fields"><label>{STAT_LABELS[speedEdit.stat]} {statValueLabel(format)} <span className="draft-ev-input-with-max"><input type="number" min="0" max={maxStatValue(format)} step={isChampionsFormat(format) ? 1 : 4} value={cfg.ev} onChange={e => updateStatConfig(speedEdit.side, speedEdit.name, speedEdit.stat, { ev: clampDraftStat(Number(e.target.value), format) })} /><button type="button" onClick={() => updateStatConfig(speedEdit.side, speedEdit.name, speedEdit.stat, { ev: maxStatValue(format) })}>Max {maxStatValue(format)}</button></span></label>{!isHp && <label>Nature<select value={cfg.nature} onChange={e => updateStatConfig(speedEdit.side, speedEdit.name, speedEdit.stat, { nature: e.target.value as StatConfig["nature"] })}><option value="boost">Boosting (+{STAT_LABELS[speedEdit.stat]})</option><option value="neutral">Neutral</option><option value="hinder">Hindering (−{STAT_LABELS[speedEdit.stat]})</option></select></label>}{!isHp && <label>{STAT_LABELS[speedEdit.stat]} stage<select value={cfg.stage} onChange={e => updateStatConfig(speedEdit.side, speedEdit.name, speedEdit.stat, { stage: Number(e.target.value) })}>{Array.from({length: 13}, (_, i) => i - 6).map(stage => <option key={stage} value={stage}>{stage > 0 ? `+${stage}` : stage}</option>)}</select></label>}</div>; })()}</section></div>}
 
+    {moveFilterOpen && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setMoveFilterOpen(false); }}><section className="draft-modal draft-move-filter-modal" role="dialog" aria-modal="true" aria-labelledby="draft-move-filter-title"><div className="panel-title-row"><div><h2 id="draft-move-filter-title">Move filters · {matchupName}</h2><p>Filters apply to both attacking directions in this matchup and are saved separately for each matchup.</p></div><button type="button" onClick={() => setMoveFilterOpen(false)}>Close ×</button></div><label>Minimum move accuracy: <strong>{moveFilterDraft.minAccuracy}%</strong><input type="range" min="0" max="100" step="5" value={moveFilterDraft.minAccuracy} onChange={event => setMoveFilterDraft(current => ({ ...current, minAccuracy: Number(event.target.value) }))} /><small>Moves with accuracy below this value are excluded. Moves with unspecified accuracy count as 100%.</small></label><datalist id="draft-move-options">{moveNames.map(move => <option key={move} value={move} />)}</datalist><div className="draft-move-filter-picker"><label htmlFor="draft-move-picker">Add a move</label><input id="draft-move-picker" list="draft-move-options" value={movePicker} onChange={event => setMovePicker(event.target.value)} placeholder="Search moves…" /><button type="button" onClick={() => { const found = moveNames.find(name => name.toLowerCase() === movePicker.trim().toLowerCase()); if (!found) return; setMoveFilterDraft(current => ({ ...current, whitelist: current.whitelist.includes(found) ? current.whitelist : [...current.whitelist, found] })); setMovePicker(""); }}>Add to whitelist</button><button type="button" onClick={() => { const found = moveNames.find(name => name.toLowerCase() === movePicker.trim().toLowerCase()); if (!found) return; setMoveFilterDraft(current => ({ ...current, blacklist: current.blacklist.includes(found) ? current.blacklist : [...current.blacklist, found] })); setMovePicker(""); }}>Add to blacklist</button></div><div className="draft-move-filter-lists"><label>Whitelist · only these moves are considered when non-empty<textarea rows={Math.max(3, Math.min(12, moveFilterDraft.whitelist.length || 3))} value={moveFilterDraft.whitelist.join("\n")} onChange={event => setMoveFilterDraft(current => ({ ...current, whitelist: event.target.value.split(/[\n,]+/).map(value => value.trim()).filter(Boolean) }))} placeholder="Leave empty to allow all moves" /></label><label>Blacklist · always excluded<textarea rows={Math.max(3, Math.min(12, moveFilterDraft.blacklist.length || 3))} value={moveFilterDraft.blacklist.join("\n")} onChange={event => setMoveFilterDraft(current => ({ ...current, blacklist: event.target.value.split(/[\n,]+/).map(value => value.trim()).filter(Boolean) }))} placeholder="No excluded moves" /></label></div><div className="button-row draft-editor-actions"><button type="button" onClick={() => setMoveFilterDraft(DEFAULT_DRAFT_MOVE_FILTER)}>Reset defaults</button><button type="button" onClick={() => { setMoveFilter(moveFilterDraft); setMoveFilterOpen(false); }}>Apply filters</button></div></section></div>}
+
     {editorOpen && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeEditor(); }}>
       <section className="draft-modal" role="dialog" aria-modal="true" aria-labelledby="draft-editor-title">
         <div className="panel-title-row"><div><h2 id="draft-editor-title">Edit matchup Pokémon</h2><p>Use an empty slot to reduce either roster below 12 Pokémon.</p></div><button type="button" onClick={closeEditor} aria-label="Close editor">×</button></div>
-        <label className="draft-matchup-name">Matchup name<input value={draftMatchupName} onChange={event => setDraftMatchupName(event.target.value)} onBlur={() => { /* committed when the editor closes */ }} /></label><label className="draft-format-label">Matchup format<FormatSelector value={format} onChange={setFormat} /></label><div className="draft-editor-teams">
+        <label className="draft-matchup-name">Matchup name<input value={draftMatchupName} onChange={event => setDraftMatchupName(event.target.value)} onBlur={() => { /* committed when the editor closes */ }} /></label><label className="draft-format-label">Matchup format<FormatSelector value={format} onChange={setFormat} /></label><div className="draft-bulk-rosters">
+          {[{ label: "Team A", side: "A" as const, value: bulkA, setValue: setBulkA }, { label: "Team B", side: "B" as const, value: bulkB, setValue: setBulkB }].map(team => <section key={team.side}><label>{team.label} · one Pokémon per line<textarea rows={Math.max(3, Math.min(12, team.value.split(/\r?\n/).length))} value={team.value} onChange={event => team.setValue(event.target.value)} placeholder={"Garchomp\nRotom-Wash\nCorviknight"} /></label><div className="button-row"><button type="button" onClick={() => applyBulkRoster(team.side)}>Apply list</button><button type="button" onClick={() => copyRoster(team.side)}>Copy team</button></div></section>)}
+        <div className="button-row draft-copy-both"><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(`Team A\n${draftA.filter(Boolean).join("\n")}\n\nTeam B\n${draftB.filter(Boolean).join("\n")}`); } catch { setBulkError("Clipboard access was blocked by the browser."); } }}>Copy both teams</button></div></div>{bulkError && <p role="alert" className="draft-bulk-error">{bulkError}</p>}
+        <div className="draft-editor-teams">
           {[{ label: "Team A", side: "A" as const, roster: draftA }, { label: "Team B", side: "B" as const, roster: draftB }].map(({ label, side, roster }) => <div className="draft-editor-team" key={side}>
             <h3>{label} · {totalPoints(side, roster.filter(Boolean))} points</h3>
             {roster.map((pokemon, index) => <div className="draft-editor-slot" key={`${side}-${index}`}>

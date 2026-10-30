@@ -1340,3 +1340,24 @@ select, select:focus, select option, datalist option {
 .matrix-reply-damage > strong { display: block; margin-bottom: 5px; }
 .matrix-reply-damage ul { margin: 0; padding-left: 18px; }
 .matrix-reply-damage li { margin: 4px 0; }
+.draft-bulk-rosters { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:14px 0 18px; }
+.draft-bulk-rosters section { min-width:0; }
+.draft-bulk-rosters label { display:grid; gap:7px; color:var(--muted); font-size:.8rem; }
+.draft-bulk-rosters textarea { width:100%; min-height:78px; resize:vertical; padding:9px 11px; color:var(--text); background:var(--panel-2); border:1px solid var(--border); border-radius:8px; font:inherit; }
+.draft-bulk-rosters .button-row { margin-top:7px; }
+.draft-bulk-error { color:#fca5a5; }
+@media(max-width:700px){.draft-bulk-rosters{grid-template-columns:1fr}}
+
+
+/* Draft matchup move-filter dialog */
+.draft-move-filter-modal { width: min(760px, calc(100vw - 28px)); max-height: min(88vh, 820px); overflow-y: auto; }
+.draft-move-filter-modal > label { display: grid; gap: 7px; margin: 18px 0; }
+.draft-move-filter-modal input[type="range"] { width: 100%; accent-color: var(--accent, #60a5fa); }
+.draft-move-filter-modal small { color: var(--muted); }
+.draft-move-filter-picker { display: grid; grid-template-columns: minmax(150px, 1fr) auto auto; gap: 8px; align-items: end; margin: 18px 0; }
+.draft-move-filter-picker label { grid-column: 1 / -1; }
+.draft-move-filter-picker input { min-width: 0; width: 100%; }
+.draft-move-filter-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.draft-move-filter-lists label { display: grid; gap: 7px; min-width: 0; }
+.draft-move-filter-lists textarea { width: 100%; min-height: 90px; resize: vertical; }
+@media (max-width: 620px) { .draft-move-filter-picker { grid-template-columns: 1fr 1fr; } .draft-move-filter-picker input { grid-column: 1 / -1; } .draft-move-filter-lists { grid-template-columns: 1fr; } }

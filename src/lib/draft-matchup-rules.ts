@@ -9,7 +9,6 @@ export function isEligibleDraftMove(move: MoveDetails | null | undefined): move 
     move &&
     ["Physical", "Special"].includes(move.category) &&
     (move.power == null || move.power >= 0) &&
-    move.priority >= 0 &&
-    (move.accuracy == null || move.accuracy >= 70),
+    move.priority >= 0,
   );
 }

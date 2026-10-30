@@ -5,6 +5,9 @@ import { DRAFT_STRONG_HIT_THRESHOLD, DRAFT_WALL_THRESHOLD, isEligibleDraftMove }
 
 export { DRAFT_STRONG_HIT_THRESHOLD, DRAFT_WALL_THRESHOLD } from "./draft-matchup-rules";
 const MAX_MOVES_PER_TYPE_CATEGORY = 3;
+export type DraftMoveFilter = { minAccuracy: number; whitelist: string[]; blacklist: string[] };
+export const DEFAULT_DRAFT_MOVE_FILTER: DraftMoveFilter = { minAccuracy: 75, whitelist: [], blacklist: [] };
+const moveId = (value: string) => normalize(value);
 const CHUNK_SIZE = 16;
 
 export type DraftStatConfig = { ev: number; nature: "boost" | "neutral" | "hinder"; stage: number };
@@ -61,11 +64,15 @@ const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "
 const candidatePowerScore = (move: MoveDetails) => move.power != null && move.power > 0 ? move.power : 60;
 
 /** Keep the strongest few options per type/category to bound hover latency. */
-export function selectDraftCandidateMoves(moveNames: Iterable<string>, generation = 9): MoveDetails[] {
+export function selectDraftCandidateMoves(moveNames: Iterable<string>, generation = 9, filter: DraftMoveFilter = DEFAULT_DRAFT_MOVE_FILTER): MoveDetails[] {
   const groups = new Map<string, MoveDetails[]>();
   for (const name of moveNames) {
     const details = getMoveDetails(name, generation);
     if (!isEligibleDraftMove(details)) continue;
+    if ((details.accuracy ?? 100) < filter.minAccuracy) continue;
+    const id = moveId(details.name);
+    if (filter.blacklist.some(name => moveId(name) === id)) continue;
+    if (filter.whitelist.length && !filter.whitelist.some(name => moveId(name) === id)) continue;
     const key = `${details.type}|${details.category}`;
     const group = groups.get(key) || [];
     group.push(details);
@@ -79,14 +86,14 @@ export function selectDraftCandidateMoves(moveNames: Iterable<string>, generatio
 const moveCache = new Map<string, MoveDetails[]>();
 const analysisCache = new Map<string, DraftMatchupAnalysis>();
 const bestAttackCache = new Map<string, { best?: DraftMoveThreat; bestStab?: DraftMoveThreat }>();
-function candidateMoves(species: string, generation: number): MoveDetails[] {
-  const key = `${generation}:${normalize(species)}`;
+function candidateMoves(species: string, generation: number, filter: DraftMoveFilter): MoveDetails[] {
+  const key = `${generation}:${normalize(species)}:${JSON.stringify(filter)}`;
   const cached = moveCache.get(key);
   if (cached) return cached;
   const learnset = generation >= 10
     ? (getChampionsSpeciesLearnset(species) || getHistoricalSpeciesLearnset(species))
     : getHistoricalSpeciesLearnset(species);
-  const moves = selectDraftCandidateMoves(learnset || [], generation);
+  const moves = selectDraftCandidateMoves(learnset || [], generation, filter);
   moveCache.set(key, moves);
   return moves;
 }
@@ -185,11 +192,12 @@ async function bestAttack(
   generation: number,
   counters: { evaluated: number },
   isCancelled: () => boolean,
+  filter: DraftMoveFilter,
 ): Promise<{ best?: DraftMoveThreat; bestStab?: DraftMoveThreat }> {
-  const cacheKey = JSON.stringify([generation, attackerProfile, defenderProfile]);
+  const cacheKey = JSON.stringify([generation, attackerProfile, defenderProfile, filter]);
   const cached = bestAttackCache.get(cacheKey);
   if (cached) return cached;
-  const moves = candidateMoves(attackerProfile.species, generation);
+  const moves = candidateMoves(attackerProfile.species, generation, filter);
   let best: DraftMoveThreat | undefined;
   let bestStab: DraftMoveThreat | undefined;
   for (let index = 0; index < moves.length; index++) {
@@ -222,8 +230,9 @@ export async function analyzeDraftPokemon(
   opponents: DraftPokemonProfile[],
   generation = 9,
   isCancelled: () => boolean = () => false,
+  filter: DraftMoveFilter = DEFAULT_DRAFT_MOVE_FILTER,
 ): Promise<DraftMatchupAnalysis> {
-  const cacheKey = JSON.stringify([generation, attacker, opponents]);
+  const cacheKey = JSON.stringify([generation, attacker, opponents, filter]);
   const cached = analysisCache.get(cacheKey);
   if (cached) return cached;
   const counters = { evaluated: 0 };
@@ -231,8 +240,8 @@ export async function analyzeDraftPokemon(
   for (const opponent of opponents) {
     if (isCancelled()) break;
     const [outgoing, reply] = await Promise.all([
-      bestAttack(attacker, opponent, generation, counters, isCancelled),
-      bestAttack(opponent, attacker, generation, counters, isCancelled),
+      bestAttack(attacker, opponent, generation, counters, isCancelled, filter),
+      bestAttack(opponent, attacker, generation, counters, isCancelled, filter),
     ]);
     if (isCancelled()) break;
     const bestDamage = outgoing.best?.maxPct ?? 0;
@@ -258,7 +267,7 @@ export async function analyzeDraftPokemon(
     opponents: results,
     movesEvaluated: counters.evaluated,
     approximate: true,
-    note: "Potential matchups only: top three eligible moves per type/category, configured EVs/Stat Points, natures, and stat stages on both sides; no items or field effects. Damage and multi-hit probabilities inherit the calculator's supported mechanics; this is not a guaranteed set or battle prediction.",
+    note: `Potential matchups only: top three eligible moves per type/category after ${filter.minAccuracy}% accuracy and whitelist/blacklist filters, configured EVs/Stat Points, natures, and stat stages on both sides; no items or field effects. Damage and multi-hit probabilities inherit the calculator's supported mechanics; this is not a guaranteed set or battle prediction.`,
   };
   if (!isCancelled()) {
     analysisCache.set(cacheKey, analysis);
