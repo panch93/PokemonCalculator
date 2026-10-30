@@ -98,6 +98,7 @@ export default function DraftMatchups() {
   const [presetIndex, setPresetIndex] = useState(0);
   const [matchupName, setMatchupName] = useState(PRESETS[0].label);
   const [draftMatchupName, setDraftMatchupName] = useState(PRESETS[0].label);
+  const [savedMatchupNames, setSavedMatchupNames] = useState<Record<string, string>>({});
   const [typeTeam, setTypeTeam] = useState<"A" | "B" | null>(null);
   const [supportOpen, setSupportOpen] = useState(false);
   const [speedEdit, setSpeedEdit] = useState<{ side: "A" | "B"; name: string; stat: Exclude<StatKey, "bst"> } | null>(null);
@@ -198,6 +199,7 @@ export default function DraftMatchups() {
       const raw = localStorage.getItem(storageKey);
       if (raw) {
         const saved = JSON.parse(raw) as { currentIndex?: number; matchups?: Record<string, { matchupName?: string; teamA?: string[]; teamB?: string[]; format?: string; mechanicsGeneration?: number; speedConfigs?: Record<string, SpeedConfig>; statConfigs?: Record<string, StatConfig>; abilityOverrides?: Record<string, string>; pokemonPoints?: Record<string, number>; teraCaptains?: Record<string, boolean>; teraTypes?: Record<string, string>; moveFilter?: DraftMoveFilter }> };
+        if (saved.matchups && typeof saved.matchups === "object") setSavedMatchupNames(Object.fromEntries(Object.entries(saved.matchups).map(([key, value]) => [key, value?.matchupName || PRESETS[Number(key)]?.label || ""])));
         const index = Number.isInteger(saved.currentIndex) && saved.currentIndex! >= 0 && saved.currentIndex! < PRESETS.length ? saved.currentIndex! : 0;
         setPresetIndex(index);
         const active = saved.matchups?.[String(index)];
@@ -248,6 +250,7 @@ export default function DraftMatchups() {
       const saved = raw ? JSON.parse(raw) : {};
       const matchups = saved.matchups && typeof saved.matchups === "object" ? saved.matchups : {};
       matchups[String(presetIndex)] = { matchupName, teamA, teamB, format, mechanicsGeneration, speedConfigs, statConfigs, abilityOverrides, pokemonPoints, teraCaptains, teraTypes, moveFilter };
+      setSavedMatchupNames(current => ({ ...current, [String(presetIndex)]: matchupName }));
       localStorage.setItem(storageKey, JSON.stringify({ currentIndex: presetIndex, matchups }));
     } catch {}
   }, [hydrated, matchupName, teamA, teamB, format, mechanicsGeneration, presetIndex, speedConfigs, statConfigs, abilityOverrides, pokemonPoints, teraCaptains, teraTypes, moveFilter]);
@@ -265,6 +268,7 @@ export default function DraftMatchups() {
       const saved = raw ? JSON.parse(raw) : {};
       const matchups = saved.matchups && typeof saved.matchups === "object" ? saved.matchups : {};
       matchups[String(presetIndex)] = { matchupName, teamA, teamB, format, mechanicsGeneration, speedConfigs, statConfigs, abilityOverrides, pokemonPoints, teraCaptains, teraTypes, moveFilter };
+      setSavedMatchupNames(current => ({ ...current, [String(presetIndex)]: matchupName }));
       const next = matchups[String(index)];
       localStorage.setItem(storageKey, JSON.stringify({ currentIndex: index, matchups }));
       setPresetIndex(index);
@@ -476,7 +480,9 @@ export default function DraftMatchups() {
     const width = Math.min(460, window.innerWidth - 16);
     const height = Math.min(520, window.innerHeight - 16);
     const x = event.clientX + 14 + width > window.innerWidth - 8 ? event.clientX - width - 14 : event.clientX + 14;
-    setMatchupHover({ side, name, kind, x: Math.max(8, Math.min(x, window.innerWidth - width - 8)), y: Math.max(8, Math.min(event.clientY + 14, window.innerHeight - height - 8)) });
+    const belowY = event.clientY + 14;
+    const y = belowY + height <= window.innerHeight - 8 ? belowY : Math.max(8, event.clientY - height - 14);
+    setMatchupHover({ side, name, kind, x: Math.max(8, Math.min(x, window.innerWidth - width - 8)), y: Math.max(8, Math.min(y, window.innerHeight - height - 8)) });
   };
   const analysisFor = (side: "A" | "B", name: string) => matchupAnalyses[`${side}:${name}`];
   const matchupRowsFor = (side: "A" | "B", name: string, kind: MatchupHoverKind): DraftOpponentResult[] => {
@@ -505,14 +511,14 @@ export default function DraftMatchups() {
     </header>
 
     <section className="panel draft-controls">
-      <div className="draft-preset-control"><label htmlFor="draft-preset">Matchup preset</label><select id="draft-preset" value={presetIndex} onChange={event => setPreset(Number(event.target.value))}>{PRESETS.map((preset, index) => <option key={preset.label} value={index}>{index + 1}. {index === presetIndex ? matchupName : preset.label}</option>)}</select></div>
+      <div className="draft-preset-control"><label htmlFor="draft-preset">Matchup preset</label><select id="draft-preset" value={presetIndex} onChange={event => setPreset(Number(event.target.value))}>{PRESETS.map((preset, index) => <option key={preset.label} value={index}>{index + 1}. {savedMatchupNames[String(index)] || (index === presetIndex ? matchupName : preset.label)}</option>)}</select></div>
       <button type="button" className="primary" onClick={() => setSupportOpen(true)}>Support moves</button>
       <div className="draft-team-counts"><span>Team A: <strong>{activeA.length}/12</strong> · <strong>{totalPoints("A", activeA)} pts</strong></span><span>Team B: <strong>{activeB.length}/12</strong> · <strong>{totalPoints("B", activeB)} pts</strong></span></div>
       <button className="primary" type="button" onClick={openEditor}>Edit matchup</button>
     </section>
 
     <section className="panel">
-      <div className="panel-title-row"><div><h2>{matchupName}</h2><p>Hover over a Speed value for EV / Stat Point calculations.</p></div><div className="draft-team-formats"><label>Mechanics Gen <select aria-label="Draft matchup battle mechanics generation" value={mechanicsGeneration} onChange={event => setMechanicsGeneration(Number(event.target.value))}>{Array.from({ length: 9 }, (_, i) => i + 1).map(gen => <option key={gen} value={gen}>Gen {gen}{gen === 1 ? " · RBY" : gen === 2 ? " · GSC" : gen === 3 ? " · ADV" : gen === 4 ? " · DPP" : gen === 5 ? " · BW" : gen === 6 ? " · XY" : gen === 7 ? " · SM" : gen === 8 ? " · SS" : " · SV"}</option>)}<option value={10}>Pokémon Champions</option></select></label><button type="button" title={`Current move filters: minimum accuracy ${moveFilter.minAccuracy}%; minimum priority ${moveFilter.minPriority}; whitelist ${moveFilter.whitelist.length ? moveFilter.whitelist.join(", ") : "none"}; blacklist ${moveFilter.blacklist.length ? moveFilter.blacklist.join(", ") : "none"}.`} onClick={() => { setMoveFilterDraft({ ...moveFilter }); setMovePicker(""); setMoveFilterOpen(true); }}>Move filters · {moveFilter.minAccuracy}% · priority ≥ {moveFilter.minPriority}</button><label>Matchup format<FormatSelector value={format} onChange={setFormat} /></label></div></div>
+      <div className="panel-title-row"><div><h2>{matchupName}</h2><p>Hover over a Speed value for EV / Stat Point calculations.</p></div><div className="draft-team-formats"><label>Mechanics Gen <select aria-label="Draft matchup battle mechanics generation" value={mechanicsGeneration} onChange={event => setMechanicsGeneration(Number(event.target.value))}>{Array.from({ length: 9 }, (_, i) => i + 1).map(gen => <option key={gen} value={gen}>Gen {gen}{gen === 1 ? " · RBY" : gen === 2 ? " · GSC" : gen === 3 ? " · ADV" : gen === 4 ? " · DPP" : gen === 5 ? " · BW" : gen === 6 ? " · XY" : gen === 7 ? " · SM" : gen === 8 ? " · SS" : " · SV"}</option>)}<option value={10}>Pokémon Champions</option></select></label><label className="draft-matchup-format-control">Matchup format<span><FormatSelector value={format} onChange={setFormat} /><button type="button" className="draft-filter-icon" aria-label="Move filters" title={`Current move filters: minimum accuracy ${moveFilter.minAccuracy}%; minimum priority ${moveFilter.minPriority}; whitelist ${moveFilter.whitelist.length ? moveFilter.whitelist.join(", ") : "none"}; blacklist ${moveFilter.blacklist.length ? moveFilter.blacklist.join(", ") : "none"}.`} onClick={() => { setMoveFilterDraft({ ...moveFilter }); setMovePicker(""); setMoveFilterOpen(true); }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10m-7 6h4" /></svg></button></span></label></div></div>
       <div className="matrix-scroll draft-table-scroll"><table className="draft-matchup-table draft-matchup-table-symmetric">
         <thead><tr><th className="draft-sprite-heading" aria-label="Team A portrait"></th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("A")}>Team A</button></th>{(["bst", "spd", "spa", "def", "atk", "hp", "spe"] as StatKey[]).map(key => statHeading(key, "A"))}{(["spe", "hp", "atk", "def", "spa", "spd", "bst"] as StatKey[]).map(key => statHeading(key, "B"))}<th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("B")}>Team B</button></th><th className="draft-sprite-heading" aria-label="Team B portrait"></th></tr></thead>
         <tbody>{Array.from({ length: Math.max(0, lastRow + 1) }, (_, index) => {
@@ -555,9 +561,9 @@ export default function DraftMatchups() {
           const result = row[moveKey];
           return result ? `${result.move} (${result.category.toLowerCase()} · ${result.stab ? "STAB" : "coverage"} · ${result.type}) · ${result.minPct.toFixed(0)}–${result.maxPct.toFixed(0)}%` : "No eligible move found";
         };
-        const description = kind === "hits" ? "Opposing Pokémon this Pokémon can threaten (best move reaches at least 70% damage). The Damages section below lists targets taking 35–70%."
+        const description = kind === "hits" ? "Opposing Pokémon this Pokémon can threaten (best move reaches at least 70% of the target’s HP. This damage threshold is fixed and is not changed by the move-accuracy filter. The Damages section below lists targets taking 35–70%."
           : kind === "walls" ? "Opposing Pokémon whose best eligible reply deals 35% damage or less to this Pokémon."
-          : kind === "hitBy" ? "Opposing Pokémon whose best eligible move can deal at least 70% damage to this Pokémon."
+          : kind === "hitBy" ? "Opposing Pokémon whose best eligible move can deal at least 70% of this Pokémon’s HP. This damage threshold is fixed and is not changed by the move-accuracy filter."
           : "Opposing Pokémon this Pokémon struggles to threaten (its best eligible move tops out at 35% damage or less).";
         return <>
           <p className="draft-matchup-analysis-description">{description}</p>

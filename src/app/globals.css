@@ -1361,3 +1361,15 @@ select, select:focus, select option, datalist option {
 .draft-move-filter-lists label { display: grid; gap: 7px; min-width: 0; }
 .draft-move-filter-lists textarea { width: 100%; min-height: 90px; resize: vertical; }
 @media (max-width: 620px) { .draft-move-filter-picker { grid-template-columns: 1fr 1fr; } .draft-move-filter-picker input { grid-column: 1 / -1; } .draft-move-filter-lists { grid-template-columns: 1fr; } }
+
+
+/* Draft matchup filter control and coverage move search. */
+.draft-matchup-format-control { display:flex; flex-direction:column; gap:5px; min-width:190px; font-size:.75rem; color:var(--muted); }
+.draft-matchup-format-control > span { display:flex; align-items:center; gap:6px; }
+.draft-matchup-format-control .format-selector { flex:1 1 auto; min-width:0; }
+.draft-filter-icon { display:inline-flex; align-items:center; justify-content:center; flex:0 0 32px; width:32px; height:32px; padding:6px; border:1px solid var(--border); border-radius:7px; background:var(--surface,#202938); color:var(--text,#f2f4f8); cursor:pointer; }
+.draft-filter-icon:hover, .draft-filter-icon:focus-visible { border-color:var(--accent,#60a5fa); color:var(--accent,#60a5fa); outline:none; }
+.draft-filter-icon svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.coverage-move-search { display:flex; align-items:center; gap:8px; }
+.coverage-move-search input { min-width:170px; width:min(260px,42vw); }
+.draft-matchup-analysis-tooltip { background:#171d28 !important; opacity:1; }
