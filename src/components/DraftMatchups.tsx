@@ -17,6 +17,15 @@ import { getWeatherSpeedAbilityMultiplier } from "../lib/battle-order";
 import abilityStatBoosts from "../data/ability-stat-boosts.json";
 
 type Preset = { label: string; teamA: string[]; teamB: string[] };
+type DraftRawSet = Record<string, unknown>;
+type DraftSetDatabase = Record<string, Record<string, DraftRawSet>>;
+const DRAFT_SET_FORMATS = [
+  ["gen9ou", "Gen 9 OU"], ["gen9uu", "Gen 9 UU"], ["gen9ubers", "Gen 9 Ubers"],
+  ["gen9ru", "Gen 9 RU"], ["gen9nu", "Gen 9 NU"], ["gen9pu", "Gen 9 PU"],
+  ["gen9monotype", "Gen 9 Monotype"], ["gen9doublesou", "Gen 9 Doubles OU"],
+] as const;
+const cleanSetId = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+const presetString = (value: unknown): string => Array.isArray(value) ? presetString(value[0]) : typeof value === "string" || typeof value === "number" ? String(value) : "";
 const blankDraftField = { weather: "" as const, terrain: "" as const, defenderStealthRock: false, defenderSpikes: 0, defenderReflect: false, defenderLightScreen: false, defenderAuroraVeil: false, defenderLeechSeed: false, defenderSaltCure: false, trickRoom: false, tailwindSide: "" as const };
 type StatKey = "hp" | "atk" | "def" | "spa" | "spd" | "spe" | "bst";
 type SpeedBenchmark = { opponent: string; target: number; hindering: number | null; neutral: number | null; boosted: number | null };
@@ -141,7 +150,29 @@ export default function DraftMatchups() {
   const [setItemDraft, setSetItemDraft] = useState("");
   const [setAbilityDraft, setSetAbilityDraft] = useState("");
   const [setMovesDraft, setSetMovesDraft] = useState<string[]>(["", "", "", ""]);
+  const [draftPresetDatabase, setDraftPresetDatabase] = useState<DraftSetDatabase | null>(null);
+  const [draftPresetStatus, setDraftPresetStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [selectedDraftPreset, setSelectedDraftPreset] = useState("");
   const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    if (!setEditor || draftPresetDatabase || draftPresetStatus !== "idle") return;
+    setDraftPresetStatus("loading");
+    Promise.all(DRAFT_SET_FORMATS.map(async ([value, label]) => {
+      const response = await fetch(`https://pkmn.github.io/smogon/data/sets/${value}.json`);
+      if (!response.ok) throw new Error(`Preset data returned ${response.status}`);
+      return { label, data: await response.json() as DraftSetDatabase };
+    })).then(results => {
+      const merged: DraftSetDatabase = {};
+      for (const { label, data } of results) for (const [speciesName, sets] of Object.entries(data)) {
+        const key = cleanSetId(speciesName);
+        merged[key] ||= {};
+        for (const [setName, set] of Object.entries(sets || {})) merged[key][`${label} · ${setName}`] = set;
+      }
+      setDraftPresetDatabase(merged);
+      setDraftPresetStatus("ready");
+    }).catch(() => setDraftPresetStatus("error"));
+  }, [setEditor, draftPresetDatabase, draftPresetStatus]);
+
   const profileFor = (side: "A" | "B", name: string): DraftPokemonProfile => {
     const key = `${side}:${name}`;
     const selectedTera = teraCaptains[key] ? teraTypes[key] : undefined;
@@ -349,8 +380,22 @@ export default function DraftMatchups() {
     setDraftMatchupName(name);
     setEditorOpen(false);
   };
-  const openSetEditor = (side: "A" | "B", name: string) => { const saved = draftSets[`${side}:${name}`] || { item: "", ability: enabledAbility(side, name), moves: [] }; setSetItemDraft(saved.item); setSetAbilityDraft(saved.ability || enabledAbility(side, name)); setSetMovesDraft([0,1,2,3].map(i => saved.moves[i] || "")); setSetEditor({ side, name }); };
+  const openSetEditor = (side: "A" | "B", name: string) => { const saved = draftSets[`${side}:${name}`] || { item: "", ability: enabledAbility(side, name), moves: [] }; setSetItemDraft(saved.item); setSetAbilityDraft(saved.ability || enabledAbility(side, name)); setSetMovesDraft([0,1,2,3].map(i => saved.moves[i] || "")); setSelectedDraftPreset(""); if (draftPresetStatus === "error") setDraftPresetStatus("idle"); setSetEditor({ side, name }); };
   const saveSetEditor = () => { if (!setEditor) return; setDraftSets(current => ({ ...current, [`${setEditor.side}:${setEditor.name}`]: { item: setItemDraft, ability: setAbilityDraft, moves: setMovesDraft.filter(Boolean) } })); setSetEditor(null); };
+  const draftSetPresets = useMemo(() => {
+    if (!setEditor || !draftPresetDatabase) return [] as [string, DraftRawSet][];
+    const entry = draftPresetDatabase[cleanSetId(setEditor.name)];
+    return entry ? Object.entries(entry) as [string, DraftRawSet][] : [];
+  }, [setEditor, draftPresetDatabase]);
+  const applyDraftSetPreset = (key: string) => {
+    const preset = draftSetPresets.find(([name]) => name === key)?.[1];
+    if (!preset) return;
+    const rawMoves = preset.Moves ?? preset.moves;
+    const moves = (Array.isArray(rawMoves) ? rawMoves : rawMoves ? [rawMoves] : []).map(presetString).filter(Boolean).slice(0, 4);
+    setSetItemDraft(presetString(preset.Item ?? preset.item));
+    setSetAbilityDraft(presetString(preset.Ability ?? preset.ability));
+    setSetMovesDraft([0, 1, 2, 3].map(index => moves[index] || ""));
+  };
   const activeA = teamA.filter(Boolean);
   const activeB = teamB.filter(Boolean);
   const statValue = (name: string, key: StatKey) => baseStats(name)?.[key] ?? -1;
@@ -697,6 +742,6 @@ export default function DraftMatchups() {
         <div className="button-row draft-editor-actions"><button type="button" onClick={() => { const empty = Array.from({ length: 12 }, () => ""); setDraftA(empty); setDraftB(empty); setTeamA(empty); setTeamB(empty); }}>Clear both teams</button><button type="button" onClick={closeEditor}>Close</button></div>
       </section>
     </div>}
-    {setEditor && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSetEditor(null); }}><section className="draft-modal" role="dialog" aria-modal="true" aria-label={`Edit ${setEditor.name} set`}><div className="panel-title-row"><div><h2>{setEditor.name} · set</h2><p>These item and move choices are used in matchup hit/wall analysis and exported to Team Builder.</p></div><button type="button" onClick={() => setSetEditor(null)}>Close ×</button></div><label>Item<input list="draft-set-item-list" value={setItemDraft} onChange={event => setSetItemDraft(event.target.value)} placeholder="No item" /></label><datalist id="draft-set-item-list">{getItemList().map(item => <option key={item} value={item} />)}</datalist><label>Ability<input list="draft-set-ability-list" value={setAbilityDraft} onChange={event => setSetAbilityDraft(event.target.value)} placeholder="Choose ability" /></label><datalist id="draft-set-ability-list">{getSpeciesAbilities(setEditor.name).map(ability => <option key={ability} value={ability} />)}</datalist><div className="draft-editor-teams">{setMovesDraft.map((move, index) => <label key={index}>Move {index + 1}<input list="draft-set-move-list" value={move} onChange={event => setSetMovesDraft(current => current.map((value, i) => i === index ? event.target.value : value))} placeholder="Choose move" /></label>)}</div><datalist id="draft-set-move-list">{moveNames.map(move => <option key={move} value={move} />)}</datalist><div className="button-row draft-editor-actions"><button type="button" onClick={() => { setSetItemDraft(""); setSetAbilityDraft(""); setSetMovesDraft(["", "", "", ""]); }}>Clear</button><button type="button" onClick={saveSetEditor}>Save set</button></div></section></div>}
+    {setEditor && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSetEditor(null); }}><section className="draft-modal" role="dialog" aria-modal="true" aria-label={`Edit ${setEditor.name} set`}><div className="panel-title-row"><div><h2>{setEditor.name} · set</h2><p>These item and move choices are used in matchup hit/wall analysis and exported to Team Builder.</p></div><button type="button" onClick={() => setSetEditor(null)}>Close ×</button></div><label>Preset<select value={selectedDraftPreset} disabled={!draftPresetDatabase || !draftSetPresets.length} onChange={event => { setSelectedDraftPreset(event.target.value); applyDraftSetPreset(event.target.value); }}><option value="">{draftPresetStatus === "loading" ? "Loading Smogon sets…" : draftPresetStatus === "error" ? "Presets unavailable" : draftSetPresets.length ? "Choose a Smogon set…" : "No presets available"}</option>{draftSetPresets.map(([name]) => <option key={name} value={name}>{name}</option>)}</select></label><label>Item<input list="draft-set-item-list" value={setItemDraft} onChange={event => setSetItemDraft(event.target.value)} placeholder="No item" /></label><datalist id="draft-set-item-list">{getItemList().map(item => <option key={item} value={item} />)}</datalist><label>Ability<input list="draft-set-ability-list" value={setAbilityDraft} onChange={event => setSetAbilityDraft(event.target.value)} placeholder="Choose ability" /></label><datalist id="draft-set-ability-list">{getSpeciesAbilities(setEditor.name).map(ability => <option key={ability} value={ability} />)}</datalist><div className="draft-editor-teams">{setMovesDraft.map((move, index) => <label key={index}>Move {index + 1}<input list="draft-set-move-list" value={move} onChange={event => setSetMovesDraft(current => current.map((value, i) => i === index ? event.target.value : value))} placeholder="Choose move" /></label>)}</div><datalist id="draft-set-move-list">{moveNames.map(move => <option key={move} value={move} />)}</datalist><div className="button-row draft-editor-actions"><button type="button" onClick={() => { setSetItemDraft(""); setSetAbilityDraft(""); setSetMovesDraft(["", "", "", ""]); }}>Clear</button><button type="button" onClick={saveSetEditor}>Save set</button></div></section></div>}
   </main>;
 }

@@ -1486,14 +1486,16 @@ select, select:focus, select option, datalist option {
 .draft-held-item { display: flex; align-items: center; justify-content: center; gap: 5px; margin: 2px 0 3px; color: var(--muted); font-size: .64rem; line-height: 1.2; }
 .draft-held-item small { padding: 1px 4px; border: 1px solid rgba(96,165,250,.35); border-radius: 4px; color: #93c5fd; font-size: .59rem; font-weight: 700; white-space: nowrap; }
 
-/* Matrix Pokémon stat summary appears when hovering or focusing a name. */
+/* Matrix Pokémon stats are revealed only by hovering/focusing the name trigger. */
 .matrix-name-stats-hover { position: relative; display: inline-block; }
-.matrix-stats-hover-card { display: none; position: absolute; z-index: 2500; top: calc(100% + 5px); left: 0; width: 238px; padding: 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel, #171d28); color: var(--text, #f2f4f8); box-shadow: 0 8px 24px rgba(0,0,0,.42); text-align: left; white-space: normal; }
-.matrix-name-stats-hover:hover .matrix-stats-hover-card, .matrix-name-stats-hover:focus-within .matrix-stats-hover-card { display: block; }
+.matrix-stats-hover-card { display: none; position: absolute; z-index: 2500; top: calc(100% + 5px); left: 0; width: max-content; min-width: 390px; max-width: min(480px, 90vw); padding: 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel, #171d28); color: var(--text, #f2f4f8); box-shadow: 0 8px 24px rgba(0,0,0,.42); text-align: left; white-space: normal; pointer-events: none; }
+.matrix-pokemon-name:hover + .matrix-stats-hover-card, .matrix-pokemon-name:focus-visible + .matrix-stats-hover-card { display: block; }
 .matrix-stats-hover-card > strong { display: block; margin-bottom: 6px; font-size: .7rem; }
-.matrix-stats-hover-card table { width: 100%; border-collapse: collapse; font-size: .68rem; }
-.matrix-stats-hover-card th, .matrix-stats-hover-card td { padding: 2px 4px; border-bottom: 1px solid var(--border); text-align: right; }
-.matrix-stats-hover-card th:first-child { text-align: left; }
+.matrix-stats-hover-card table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: .68rem; }
+.matrix-stats-hover-card th, .matrix-stats-hover-card td { padding: 3px 6px; border-bottom: 1px solid var(--border); text-align: center; white-space: nowrap; }
+.matrix-stats-hover-card th:first-child { width: 66px; text-align: left; }
+.matrix-stats-hover-card thead th { color: var(--muted); font-weight: 800; }
+.matrix-stats-hover-card tbody tr:first-child td { font-weight: 900; }
 .matrix-stats-hover-card small { display: block; margin-top: 6px; color: var(--muted); font-size: .59rem; line-height: 1.3; }
 .reply-damage-value { display: inline-block; padding: 1px 4px; border-radius: 4px; font-weight: 800; }
 .reply-damage-value.ko-1 { background: #123a28; color: #86efac; }
@@ -1502,9 +1504,15 @@ select, select:focus, select option, datalist option {
 .reply-damage-value.ko-4 { background: #492b19; color: #fdba74; }
 .reply-damage-value.ko-5 { background: #451f27; color: #fda4af; }
 .reply-damage-value.ko-none { color: var(--muted); background: transparent; }
-.draft-item-type-line { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 7px; min-width: 0; }
-.draft-item-type-line .draft-held-item { display: inline-flex; margin: 1px 0; }
-.draft-item-type-line .draft-type-pills { display: inline-flex; margin: 1px 0; }
+.draft-item-type-line { display: flex; align-items: center; justify-content: center; flex-wrap: nowrap; gap: 4px; width: 100%; min-width: 0; overflow: hidden; white-space: nowrap; }
+.draft-item-type-line .draft-held-item { display: inline-flex; flex: 0 1 auto; min-width: 0; max-width: 66%; margin: 1px 0; overflow: hidden; white-space: nowrap; }
+.draft-item-type-line .draft-held-item > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.draft-item-type-line .draft-held-item small { flex: 0 0 auto; }
+.draft-item-type-line .draft-type-pills { display: inline-flex; flex: 0 0 auto; flex-wrap: nowrap; align-items: center; min-width: 0; width: auto; margin: 1px 0; gap: 2px; overflow: hidden; white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-item-type-line { gap: 3px; }
+.draft-matchup-table-symmetric .draft-item-type-line .draft-held-item { max-width: 62%; justify-content: flex-start; font-size: .56rem; }
+.draft-matchup-table-symmetric .draft-item-type-line .draft-held-item small { font-size: .5rem; padding: 0 2px; }
+.draft-matchup-table-symmetric .draft-item-type-line .draft-type-pills .type-badge { max-width: none; flex: 0 0 auto; }
 .draft-chosen-move-analysis > ul { padding-left: 18px; }
 .draft-chosen-move-analysis > ul > li { margin: 6px 0; }
 .draft-chosen-move-analysis ul ul { margin: 3px 0 7px; padding-left: 17px; }
