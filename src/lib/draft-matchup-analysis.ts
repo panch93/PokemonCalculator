@@ -41,6 +41,7 @@ export type DraftOpponentResult = {
   bestStabAttack?: DraftMoveThreat;
   bestReply?: DraftMoveThreat;
   bestStabReply?: DraftMoveThreat;
+  selectedAttacks?: DraftMoveThreat[];
   threat: boolean;
   reliablyThreatens: boolean;
   wallsAttacker: boolean;
@@ -90,7 +91,7 @@ export function selectDraftCandidateMoves(moveNames: Iterable<string>, generatio
 
 const moveCache = new Map<string, MoveDetails[]>();
 const analysisCache = new Map<string, DraftMatchupAnalysis>();
-const bestAttackCache = new Map<string, { best?: DraftMoveThreat; bestStab?: DraftMoveThreat }>();
+const bestAttackCache = new Map<string, { best?: DraftMoveThreat; bestStab?: DraftMoveThreat; selected?: DraftMoveThreat[] }>();
 function candidateMoves(species: string, generation: number, filter: DraftMoveFilter): MoveDetails[] {
   const key = `${generation}:${normalize(species)}:${JSON.stringify(filter)}`;
   const cached = moveCache.get(key);
@@ -201,7 +202,7 @@ async function bestAttack(
   isCancelled: () => boolean,
   filter: DraftMoveFilter,
   fieldState: FieldState,
-): Promise<{ best?: DraftMoveThreat; bestStab?: DraftMoveThreat }> {
+): Promise<{ best?: DraftMoveThreat; bestStab?: DraftMoveThreat; selected?: DraftMoveThreat[] }> {
   const cacheKey = JSON.stringify([generation, attackerProfile, defenderProfile, filter, fieldState]);
   const cached = bestAttackCache.get(cacheKey);
   if (cached) return cached;
@@ -222,6 +223,8 @@ async function bestAttack(
   });
   let best: DraftMoveThreat | undefined;
   let bestStab: DraftMoveThreat | undefined;
+  const selected: DraftMoveThreat[] = [];
+  const manualIds = new Set(manualMoves.map(move => normalize(move.name)));
   for (let index = 0; index < moves.length; index++) {
     if (isCancelled()) return {};
     const move = moves[index];
@@ -231,12 +234,13 @@ async function bestAttack(
     counters.evaluated++;
     if (result) {
       const candidate = summarizeMove(move, result, attackerProfile, defender, generation);
+      if (manualIds.has(normalize(move.name))) selected.push(candidate);
       if (isBetterMove(candidate, best)) best = candidate;
       if (candidate.stab && isBetterMove(candidate, bestStab)) bestStab = candidate;
     }
     if ((index + 1) % CHUNK_SIZE === 0) await new Promise<void>(resolve => setTimeout(resolve, 0));
   }
-  const result = { best, bestStab };
+  const result = { best, bestStab, selected };
   bestAttackCache.set(cacheKey, result);
   if (bestAttackCache.size > 4096) bestAttackCache.delete(bestAttackCache.keys().next().value || "");
   return result;
@@ -275,6 +279,7 @@ export async function analyzeDraftPokemon(
       bestStabAttack: outgoing.bestStab,
       bestReply: reply.best,
       bestStabReply: reply.bestStab,
+      selectedAttacks: outgoing.selected || [],
       threat: bestDamage >= DRAFT_STRONG_HIT_THRESHOLD,
       reliablyThreatens: Boolean(outgoing.best && outgoing.best.minPct >= DRAFT_STRONG_HIT_THRESHOLD && outgoing.best.accuracy >= 100),
       wallsAttacker: Boolean(outgoing.best && bestDamage <= DRAFT_WALL_THRESHOLD),
