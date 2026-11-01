@@ -14,6 +14,8 @@ export type DraftStatConfig = { ev: number; nature: "boost" | "neutral" | "hinde
 export type DraftPokemonProfile = {
   species: string;
   ability?: string;
+  item?: string;
+  moves?: string[];
   /** Include Stellar when the captain selected Stellar; it affects offensive STAB but not defensive typing. */
   teraType?: string;
   /** Configured EVs (or Champions Stat Points), natures, and stages from the draft editor. */
@@ -153,7 +155,7 @@ function makeDraftSet(profile: DraftPokemonProfile, move: MoveDetails, role: "at
   return {
     name: profile.species,
     species: profile.species,
-    item: "",
+    item: profile.item || "",
     ability: profile.ability || "",
     alliesFainted: Math.max(0, Math.min(5, profile.alliesFainted || 0)),
     nature: natureForStat(relevantStat, relevantConfig.nature),
@@ -203,7 +205,9 @@ async function bestAttack(
   const cacheKey = JSON.stringify([generation, attackerProfile, defenderProfile, filter, fieldState]);
   const cached = bestAttackCache.get(cacheKey);
   if (cached) return cached;
-  const moves = candidateMoves(attackerProfile.species, generation, filter);
+  const moves = attackerProfile.moves?.filter(Boolean).length
+    ? attackerProfile.moves.filter(Boolean).map(name => getMoveDetails(name, generation)).filter((move): move is MoveDetails => Boolean(move && isEligibleDraftMove(move)))
+    : candidateMoves(attackerProfile.species, generation, filter);
   let best: DraftMoveThreat | undefined;
   let bestStab: DraftMoveThreat | undefined;
   for (let index = 0; index < moves.length; index++) {
@@ -229,7 +233,7 @@ async function bestAttack(
 /**
  * Analyze one hovered draft Pokémon against the opposing roster using the
  * configured EVs/Champions Stat Points, natures, and stat stages on both sides.
- * Items and field effects remain neutral; results are potential move-pool matchups.
+ * Configured items, abilities, and supported field effects are included; results remain matchup estimates based on the selected or learnable move pool.
  */
 export async function analyzeDraftPokemon(
   attacker: DraftPokemonProfile,

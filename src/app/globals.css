@@ -1474,3 +1474,7 @@ select, select:focus, select option, datalist option {
 .condition-stat-warning select { border-color: #d97706; }
 .matrix-condition-icon.drop { color: #f59e0b; }
 @media (max-width: 540px) { .draft-team-import-modal { width: calc(100vw - 16px); } .draft-team-import-modal .draft-import-grid { gap: 7px; } .draft-team-import-modal .draft-import-side { padding: 6px; } .draft-team-import-modal .draft-import-option { grid-template-columns: 16px minmax(0, 1fr); column-gap: 5px; padding: 5px 4px; font-size: .72rem; } }
+
+/* Draft matchup Pokémon names open the per-set editor. */
+.draft-matchup-table .draft-pokemon-name[role="button"] { cursor: pointer; }
+.draft-set-edit-button { margin-left: .35rem; padding: 1px 5px; border: 1px solid var(--border, #777); border-radius: 4px; background: transparent; color: inherit; font-size: .68rem; cursor: pointer; }
