@@ -293,7 +293,6 @@ export default function MatchupMatrix(props: Props) {
   const [quickBoostedStat, setQuickBoostedStat] = useState<PokemonSet["boostedStat"]>("");
   const [quickMoves, setQuickMoves] = useState<string[]>(["", "", "", ""]);
   const allMoves = useMemo(() => getMoveList(), [learnsetRevision]);
-  const reverseReplies = useMemo(() => histogramHover ? reverseReplyMoves(histogramHover) : [], [histogramHover, learnsetsBySpecies, fieldState, colStages, rowStages, props.critical, props.generation, allMoves]);
   const openQuickEditor = (side: "left" | "right", index: number) => { const p = (side === "left" ? left : right)[index]; setQuickItem(p.item || ""); setQuickAbility(p.ability || ""); setQuickTera(p.importedTeraType || ""); setQuickBoostedStat(p.boostedStat || ""); setQuickMoves([...p.moves, "", "", "", ""].slice(0,4)); setQuickEditor({ side, index }); };
   const reverseReplyMoves = (hover: NonNullable<typeof histogramHover>) => {
     const known = hover.defender.moves.filter(Boolean).slice(0, 4);
@@ -307,6 +306,7 @@ export default function MatchupMatrix(props: Props) {
     const estimated = candidates.map(move => ({ move, result: calculateMove(hover.defender, hover.attacker, move, fieldState, colStages[hover.col] || { atk: 0, spa: 0, def: 0, spd: 0, spe: 0, acc: 0, eva: 0 }, rowStages[hover.row] || { atk: 0, spa: 0, def: 0, spd: 0, spe: 0, acc: 0, eva: 0 }, props.critical, props.generation, false) })).filter(entry => entry.result).sort((a, b) => (b.result?.maxPct || 0) - (a.result?.maxPct || 0)).slice(0, missing).map(entry => ({ move: entry.move, estimated: true }));
     return [...known.map(move => ({ move, estimated: false })), ...estimated];
   };
+  const reverseReplies = useMemo(() => histogramHover ? reverseReplyMoves(histogramHover) : [], [histogramHover, learnsetsBySpecies, fieldState, colStages, rowStages, props.critical, props.generation, allMoves]);
   const saveQuickEditor = () => { if (!quickEditor) return; const change = quickEditor.side === "left" ? props.onRowPokemonChange : props.onColPokemonChange; change(quickEditor.index, { item: quickItem, ability: quickAbility, moves: quickMoves, importedTeraType: quickTera, teraType: (quickEditor.side === "left" ? left : right)[quickEditor.index].teraType || "", boostedStat: quickBoostedStat }); setQuickEditor(null); };
   const [moveAtkEvs, setMoveAtkEvs] = useState(0);
   const [moveDefEvs, setMoveDefEvs] = useState(0);

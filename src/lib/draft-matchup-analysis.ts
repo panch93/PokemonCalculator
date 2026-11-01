@@ -205,9 +205,21 @@ async function bestAttack(
   const cacheKey = JSON.stringify([generation, attackerProfile, defenderProfile, filter, fieldState]);
   const cached = bestAttackCache.get(cacheKey);
   if (cached) return cached;
-  const moves = attackerProfile.moves?.filter(Boolean).length
-    ? attackerProfile.moves.filter(Boolean).map(name => getMoveDetails(name, generation)).filter((move): move is MoveDetails => Boolean(move && isEligibleDraftMove(move)))
-    : candidateMoves(attackerProfile.species, generation, filter);
+  // User-entered moves are additional fixed candidates, not a replacement for
+  // the format/filter-aware learnset search. This keeps the manual choice in the
+  // analysis while still allowing the remaining best learnset options to compete.
+  const manualMoves = (attackerProfile.moves || [])
+    .filter(Boolean)
+    .map(name => getMoveDetails(name, generation))
+    .filter((move): move is MoveDetails => Boolean(move && isEligibleDraftMove(move)));
+  const discoveredMoves = candidateMoves(attackerProfile.species, generation, filter);
+  const seenMoves = new Set<string>();
+  const moves = [...manualMoves, ...discoveredMoves].filter(move => {
+    const id = normalize(move.name);
+    if (seenMoves.has(id)) return false;
+    seenMoves.add(id);
+    return true;
+  });
   let best: DraftMoveThreat | undefined;
   let bestStab: DraftMoveThreat | undefined;
   for (let index = 0; index < moves.length; index++) {
@@ -278,7 +290,7 @@ export async function analyzeDraftPokemon(
     opponents: results,
     movesEvaluated: counters.evaluated,
     approximate: true,
-    note: `Potential matchups only: top three eligible moves per type/category after ${filter.minAccuracy}% accuracy and whitelist/blacklist filters, configured EVs/Stat Points, natures, and stat stages on both sides; no held items; selected weather and terrain are applied. Damage and multi-hit probabilities inherit the calculator's supported mechanics; this is not a guaranteed set or battle prediction.`,
+    note: `Potential matchups only: top three eligible moves per type/category after ${filter.minAccuracy}% accuracy and whitelist/blacklist filters, configured items, abilities, EVs/Stat Points, natures, and stat stages on both sides; selected weather and terrain are applied. Damage and multi-hit probabilities inherit the calculator's supported mechanics; this is not a guaranteed set or battle prediction.`,
   };
   if (!isCancelled()) {
     analysisCache.set(cacheKey, analysis);

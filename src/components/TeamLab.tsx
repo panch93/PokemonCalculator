@@ -196,7 +196,12 @@ export default function TeamLab() {
 
 function makeDraftImportPokemon(species: string, option?: { draftSets?: Record<string, { item?: string; ability?: string; moves?: string[] }>; abilityOverrides?: Record<string, string>; speedConfigs?: Record<string, { ev: number; nature: "boost" | "neutral" | "hinder" }>; statConfigs?: Record<string, { ev: number; nature: "boost" | "neutral" | "hinder" }> }, side: "A" | "B" = "A"): Team[number] {
   const key = `${side}:${species}`; const custom = option?.draftSets?.[key];
-  const stats = (stat: string) => stat === "spe" ? option?.speedConfigs?.[key] : option?.statConfigs?.[`${key}:${stat}`];
+  // Draft Matchups defaults Speed to 252 EVs with a boosting nature even when
+  // the user has not opened the Speed editor; preserve that same effective set
+  // when importing into Team Builder instead of silently converting it to 0.
+  const stats = (stat: string) => stat === "spe"
+    ? option?.speedConfigs?.[key] || { ev: 252, nature: "boost" as const }
+    : option?.statConfigs?.[`${key}:${stat}`];
   const evs = Object.fromEntries((['hp','atk','def','spa','spd','spe'] as const).map(stat => [stat, stats(stat)?.ev ?? 0])) as Team[number]['evs'];
   const natures: Record<string, { boost: string; hinder: string }> = { atk: { boost: 'Adamant', hinder: 'Modest' }, def: { boost: 'Bold', hinder: 'Lonely' }, spa: { boost: 'Modest', hinder: 'Adamant' }, spd: { boost: 'Calm', hinder: 'Naughty' }, spe: { boost: 'Timid', hinder: 'Brave' } };
   const natureStat = (['atk','def','spa','spd','spe'] as const).find(stat => stats(stat)?.nature === 'boost' || stats(stat)?.nature === 'hinder');
