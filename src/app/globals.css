@@ -1517,3 +1517,10 @@ select, select:focus, select option, datalist option {
 .draft-chosen-move-analysis > ul > li { margin: 6px 0; }
 .draft-chosen-move-analysis ul ul { margin: 3px 0 7px; padding-left: 17px; }
 .draft-chosen-move-analysis ul ul li { margin: 2px 0; font-size: .68rem; }
+
+
+/* Notes editors and hover notes */
+.matrix-notes-field { display: grid; gap: 5px; margin-top: 12px; }
+.matrix-notes-field textarea, .matrix-notes-editor textarea, .draft-modal textarea { width: 100%; min-width: 0; box-sizing: border-box; resize: vertical; }
+.matrix-pokemon-notes { display: block; margin-top: 6px !important; padding-top: 5px; border-top: 1px solid var(--border); color: var(--text, #f2f4f8) !important; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .62rem !important; line-height: 1.35 !important; }
+.matrix-pokemon-notes b { color: var(--muted); }
