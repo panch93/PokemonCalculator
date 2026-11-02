@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { calculateMove, getMoveDetails, getPokemonHp, getPokemonTypes, getAutoBoostedStat } from "../lib/calc";
-import { FieldState, Matchup, PokemonSet, StatStages } from "../lib/types";
+import { FieldState, MAX_IVS, Matchup, PokemonSet, StatStages } from "../lib/types";
 import { formatAbilityTooltip, formatItemTooltip } from "../lib/item-ability-descriptions";
 import { getBaseSpeed, getEffectiveSpeed, getEffectiveMovePriority, getMovePriorityLabel, getMovePriorityNote, getWeatherSpeedAbilityMultiplier } from "../lib/battle-order";
 import { getItemList, getMoveList, getSpeciesAbilities, getSpecies, getNature } from "../lib/showdown-data";
@@ -64,7 +64,7 @@ function statHoverValues(pokemon: PokemonSet, stages: StatStages, field: FieldSt
   return STAT_ROWS.map(([stat, label]) => {
     const base = Number(baseStats[stat] || 0);
     const ev = Math.max(0, Math.min(evMax, Number(pokemon.evs?.[stat] ?? 0)));
-    const iv = Math.max(0, Math.min(31, Number(pokemon.ivs?.[stat] ?? 31)));
+    const iv = MAX_IVS[stat];
     const legacy = generation <= 2;
     const dv = Math.floor(iv / 2);
     let value = legacy

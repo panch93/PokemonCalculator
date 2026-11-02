@@ -3,7 +3,7 @@ import { getMove } from "./showdown-data";
 import Dex from "./showdown-official/sim/dex";
 import { Moves as OFFICIAL_SHOWDOWN_MOVES } from "./showdown-official/data/moves";
 import { getEffectiveMovePriority } from "./battle-order";
-import { DamageSummary, FieldState, MoveDetails, PokemonSet, StatStages } from "./types";
+import { DamageSummary, FieldState, MoveDetails, PokemonSet, StatStages, getMaxIVs } from "./types";
 import { buildDamageDistribution, medianDamageOutcome, scaleDamageOutcomes } from "./damage-distribution";
 
 /** Read canonical English move descriptions from the live official Pokémon Showdown data. */
@@ -87,7 +87,7 @@ function makePokemon(set: PokemonSet, generation = DEFAULT_GEN, boosts: Partial<
     level: set.level || 100,
     teraType: resolveCalcType(set.teraType),
     evs: set.evs,
-    ivs: set.ivs,
+    ivs: getMaxIVs(),
     boosts,
   });
   // Selecting a Tera type means this set is Terastallized; blank/None leaves it normal.
@@ -615,7 +615,7 @@ export function getAutoBoostedStat(set: PokemonSet, generation = DEFAULT_GEN): N
       nature: set.nature.trim() || undefined,
       level: set.level || 100,
       evs: set.evs,
-      ivs: set.ivs,
+      ivs: getMaxIVs(),
     });
     const stats = (pokemon as unknown as { stats?: Record<string, number> }).stats || {};
     // Pokémon Showdown's tie priority for these abilities: Speed, Special Attack, Attack, Special Defense, Defense.
@@ -629,7 +629,7 @@ export function getAutoBoostedStat(set: PokemonSet, generation = DEFAULT_GEN): N
 export function getPokemonHp(set: PokemonSet, generation = DEFAULT_GEN): { current: number; max: number } {
   try {
     const gen = getGen(generation);
-    const pokemon = new Pokemon(gen, set.species, { level: set.level || 100, evs: set.evs, ivs: set.ivs, nature: set.nature || undefined });
+    const pokemon = new Pokemon(gen, set.species, { level: set.level || 100, evs: set.evs, ivs: getMaxIVs(), nature: set.nature || undefined });
     const max = pokemon.maxHP();
     return { max, current: Math.max(0, Math.min(max, Math.floor(set.currentHp ?? max))) };
   } catch { return { current: Math.max(0, Math.floor(set.currentHp ?? 0)), max: 0 }; }
@@ -645,7 +645,7 @@ export function getPokemonTypes(set: PokemonSet, generation = DEFAULT_GEN): stri
       level: set.level || 100,
       teraType: resolveCalcType(set.teraType),
       evs: set.evs,
-      ivs: set.ivs,
+      ivs: getMaxIVs(),
     }).types];
   } catch {
     return [];

@@ -2,6 +2,10 @@ export type StatId = "hp" | "atk" | "def" | "spa" | "spd" | "spe";
 
 export type Stats = Record<StatId, number>;
 
+/** The calculator assumes perfect IVs for every Pokémon in every format. */
+export const MAX_IVS: Readonly<Stats> = Object.freeze({ hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 });
+export function getMaxIVs(): Stats { return { ...MAX_IVS }; }
+
 export type PokemonSet = {
   name: string;
   species: string;

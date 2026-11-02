@@ -30,6 +30,12 @@ describe("battle order helpers", () => {
     expect(tailwind).toBe(normal * 2);
   });
 
+  it("assumes perfect Speed IVs even if an imported set contains lower IVs", () => {
+    const perfect = getEffectiveSpeed(base, field, "attacker");
+    const importedLowIvs = getEffectiveSpeed({ ...base, ivs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 } }, field, "attacker");
+    expect(importedLowIvs).toBe(perfect);
+  });
+
   it("applies Chlorophyll and other weather/terrain speed abilities", () => {
     expect(getWeatherSpeedAbilityMultiplier("Chlorophyll", { weather: "Sun", terrain: "" })).toBe(2);
     expect(getWeatherSpeedAbilityMultiplier("Chlorophyll", { weather: "Rain", terrain: "" })).toBe(1);

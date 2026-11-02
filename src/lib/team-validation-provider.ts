@@ -1,4 +1,4 @@
-import type { PokemonSet, Team } from "./types";
+import { getMaxIVs, type PokemonSet, type Team } from "./types";
 import type { FormatResolution, TeamFormatValidation } from "./format-types";
 
 export type SupportedFormatResolution = Extract<FormatResolution, { supported: true }>;
@@ -18,7 +18,7 @@ export function toShowdownSet(pokemon: PokemonSet) {
     moves: pokemon.moves.filter(Boolean),
     nature: pokemon.nature || "Hardy",
     evs: { ...pokemon.evs },
-    ivs: { ...pokemon.ivs },
+    ivs: getMaxIVs(),
     level: pokemon.level || 100,
     teraType: pokemon.teraType || undefined,
   };
