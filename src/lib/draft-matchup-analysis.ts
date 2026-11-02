@@ -42,6 +42,7 @@ export type DraftOpponentResult = {
   bestReply?: DraftMoveThreat;
   bestStabReply?: DraftMoveThreat;
   selectedAttacks?: DraftMoveThreat[];
+  selectedReplies?: DraftMoveThreat[];
   threat: boolean;
   reliablyThreatens: boolean;
   wallsAttacker: boolean;
@@ -280,6 +281,7 @@ export async function analyzeDraftPokemon(
       bestReply: reply.best,
       bestStabReply: reply.bestStab,
       selectedAttacks: outgoing.selected || [],
+      selectedReplies: reply.selected || [],
       threat: bestDamage >= DRAFT_STRONG_HIT_THRESHOLD,
       reliablyThreatens: Boolean(outgoing.best && outgoing.best.minPct >= DRAFT_STRONG_HIT_THRESHOLD && outgoing.best.accuracy >= 100),
       wallsAttacker: Boolean(outgoing.best && bestDamage <= DRAFT_WALL_THRESHOLD),
