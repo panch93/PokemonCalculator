@@ -3,7 +3,7 @@ import { isEverythingFormat } from "./format-normalization";
 
 export type LearnsetMap = Record<string, Record<string, unknown>>;
 
-/** Load the live, published Showdown learnset table (shared with the main data adapter). */
+/** Load the bundled official Showdown learnset table (shared with the main data adapter). */
 export async function loadLearnsets(forceRefresh = false): Promise<LearnsetMap> {
   const data = await loadShowdownData(forceRefresh);
   return Object.fromEntries(Object.entries(data.learnsets).map(([id, entry]) => [
@@ -20,7 +20,7 @@ export async function loadFormatLearnsets(_format: string, forceRefresh = false)
 export function getLearnsetModeLabel(format: string): string {
   return isEverythingFormat(format)
     ? "Historical all-generation + Champions move pool · format legality separate"
-    : "Live current-generation species learnset · format legality checked separately";
+    : "Bundled current-generation Showdown species learnset · format legality checked separately";
 }
 
 export async function getSpeciesLearnset(species: string, format = "gen9ou"): Promise<Set<string> | null> {

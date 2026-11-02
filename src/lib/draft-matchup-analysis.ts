@@ -1,6 +1,6 @@
 import { calculateMove, getMoveDetails, getPokemonHp } from "./calc";
 import { getChampionsSpeciesLearnset, getHistoricalSpeciesLearnset, getSpecies } from "./showdown-data";
-import type { DamageSummary, FieldState, MoveDetails, PokemonSet, StatId, Stats } from "./types";
+import { getMaxIVs, type DamageSummary, type FieldState, type MoveDetails, type PokemonSet, type StatId, type Stats } from "./types";
 import { DRAFT_STRONG_HIT_THRESHOLD, DRAFT_WALL_THRESHOLD, isEligibleDraftMove, passesDraftMoveFilters } from "./draft-matchup-rules";
 
 export { DRAFT_STRONG_HIT_THRESHOLD, DRAFT_WALL_THRESHOLD } from "./draft-matchup-rules";
@@ -62,7 +62,7 @@ const blankField: FieldState = {
   defenderReflect: false, defenderLightScreen: false, defenderAuroraVeil: false,
   defenderLeechSeed: false, defenderSaltCure: false, trickRoom: false, tailwindSide: "",
 };
-const fullIvs = (): Stats => ({ hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 });
+const fullIvs = (): Stats => getMaxIVs();
 const statId = (category: string): StatId => category === "Special" ? "spa" : "atk";
 const defenseId = (category: string): StatId => category === "Special" ? "spd" : "def";
 const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");

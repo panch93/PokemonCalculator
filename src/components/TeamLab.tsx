@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { sampleTeamA, sampleTeamB } from "../lib/sample-data";
 import { calculateMove } from "../lib/calc";
-import { FieldState, Matchup, StatStages, Team } from "../lib/types";
+import { FieldState, getMaxIVs, Matchup, StatStages, Team } from "../lib/types";
 import TeamPastePanel from "./TeamPastePanel";
 import MatchupMatrix from "./MatchupMatrix";
 import FieldPanel from "./FieldPanel";
@@ -134,11 +134,11 @@ export default function TeamLab() {
   };
 
   const importTeam = (side: "left" | "right", team: Team) => {
-    const normalized = team.map(p => ({ ...p, teraType: "", importedTeraType: p.importedTeraType ?? p.teraType ?? "" }));
+    const normalized = team.map(p => ({ ...p, ivs: getMaxIVs(), teraType: "", importedTeraType: p.importedTeraType ?? p.teraType ?? "" }));
     while (normalized.length < 6) normalized.push({
       name: `Empty Slot ${normalized.length + 1}`, species: "Pikachu", item: "", ability: "", nature: "Hardy", level: 100,
       teraType: "", importedTeraType: "", evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
-      ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: ["Thunderbolt", "", "", ""],
+      ivs: getMaxIVs(), moves: ["Thunderbolt", "", "", ""],
     });
     const nextTeam = normalized.slice(0, 6);
     if (side === "left") {
@@ -210,13 +210,13 @@ function makeDraftImportPokemon(species: string, option?: { draftSets?: Record<s
   const natures: Record<string, { boost: string; hinder: string }> = { atk: { boost: 'Adamant', hinder: 'Modest' }, def: { boost: 'Bold', hinder: 'Lonely' }, spa: { boost: 'Modest', hinder: 'Adamant' }, spd: { boost: 'Calm', hinder: 'Naughty' }, spe: { boost: 'Timid', hinder: 'Brave' } };
   const natureStat = (['atk','def','spa','spd','spe'] as const).find(stat => stats(stat)?.nature === 'boost' || stats(stat)?.nature === 'hinder');
   const nature = natureStat ? natures[natureStat][stats(natureStat)!.nature as 'boost' | 'hinder'] : 'Hardy';
-  return { name: species, species, item: custom?.item || "", ability: custom?.ability || option?.abilityOverrides?.[key] || getSpeciesAbilities(species)[0] || "", nature, level: 100, teraType: "", importedTeraType: "", evs, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: [0,1,2,3].map(i => custom?.moves?.[i] || "") };
+  return { name: species, species, item: custom?.item || "", ability: custom?.ability || option?.abilityOverrides?.[key] || getSpeciesAbilities(species)[0] || "", nature, level: 100, teraType: "", importedTeraType: "", evs, ivs: getMaxIVs(), moves: [0,1,2,3].map(i => custom?.moves?.[i] || "") };
 }
 
 function normalizeTeam(value: unknown, resetTera = false): Team | null {
   if (!Array.isArray(value) || value.length !== 6) return null;
   if (!value.every(p => p && typeof p.species === "string" && Array.isArray(p.moves))) return null;
-  return value.map(p => ({ ...p, teraType: resetTera ? "" : (p.teraType || ""), importedTeraType: p.importedTeraType ?? p.teraType ?? "", dead: Boolean(p.dead), status: p.status || "" })) as Team;
+  return value.map(p => ({ ...p, ivs: getMaxIVs(), teraType: resetTera ? "" : (p.teraType || ""), importedTeraType: p.importedTeraType ?? p.teraType ?? "", dead: Boolean(p.dead), status: p.status || "" })) as Team;
 }
 
 function reconcileMoves(team: Team, previous: string[]) {

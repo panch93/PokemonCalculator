@@ -135,6 +135,25 @@ describe("historical Everything! learnset pool", () => {
     expect(getHistoricalSpeciesLearnset("Beedrill")?.has("pollenpuff")).toBe(true);
   });
 
+  it("does not leak Vacuum Wave into species that do not learn it in any supported Showdown generation", () => {
+    expect(getHistoricalSpeciesLearnset("Garchomp")?.has("vacuumwave")).toBe(false);
+    expect(getHistoricalSpeciesLearnset("Talonflame")?.has("vacuumwave")).toBe(false);
+    expect(getHistoricalSpeciesLearnset("Lucario")?.has("vacuumwave")).toBe(true);
+  });
+
+  it("uses Showdown's resolved current learnset without cross-form move leakage", async () => {
+    const { getSpeciesLearnset } = await import("./index");
+    const learnset = await getSpeciesLearnset("Garchomp");
+    expect(learnset).not.toBeNull();
+    expect(learnset?.has("vacuumwave")).toBe(false);
+  });
+
+  it("does not leak Vacuum Wave into species that do not learn it in any supported Showdown generation", () => {
+    expect(getHistoricalSpeciesLearnset("Garchomp")?.has("vacuumwave")).toBe(false);
+    expect(getHistoricalSpeciesLearnset("Talonflame")?.has("vacuumwave")).toBe(false);
+    expect(getHistoricalSpeciesLearnset("Lucario")?.has("vacuumwave")).toBe(true);
+  });
+
   it("returns null for an unknown species", () => {
     expect(getHistoricalSpeciesLearnset("Definitely Not A Pokémon")).toBeNull();
   });

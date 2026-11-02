@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { exportTeam, extractPokepasteHtmlText, getPokepasteHtmlUrl, parseTeamPaste } from "../lib/team-parser";
-import { PokemonSet, Stats, Team } from "../lib/types";
+import { getMaxIVs, MAX_IVS, PokemonSet, Stats, Team } from "../lib/types";
 import AutocompleteInput from "./AutocompleteInput";
 import { getSpeciesLearnset } from "../lib/learnsets";
 import { getItemList, getMoveList, getSpecies, getSpeciesAbilities, getSpeciesList } from "../lib/showdown-data";
@@ -41,10 +41,10 @@ function parsePresetStats(value: unknown, defaults: Stats): Stats {
   return output;
 }
 function blankTeamSlot(index: number): PokemonSet {
-  return { name: "Pikachu", species: "Pikachu", item: "", ability: "", nature: "Hardy", level: 100, teraType: "", importedTeraType: "", evs: { ...DEFAULT_STATS }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: ["", "", "", ""] };
+  return { name: "Pikachu", species: "Pikachu", item: "", ability: "", nature: "Hardy", level: 100, teraType: "", importedTeraType: "", evs: { ...DEFAULT_STATS }, ivs: getMaxIVs(), moves: ["", "", "", ""] };
 }
 function paddedTeam(team: Team): Team {
-  const output = team.slice(0, 6).map(p => ({ ...p, evs: { ...DEFAULT_STATS, ...p.evs }, ivs: { ...p.ivs, hp: p.ivs?.hp ?? 31, atk: p.ivs?.atk ?? 31, def: p.ivs?.def ?? 31, spa: p.ivs?.spa ?? 31, spd: p.ivs?.spd ?? 31, spe: p.ivs?.spe ?? 31 }, moves: [...p.moves, "", "", "", ""].slice(0, 4) }));
+  const output = team.slice(0, 6).map(p => ({ ...p, evs: { ...DEFAULT_STATS, ...p.evs }, ivs: getMaxIVs(), moves: [...p.moves, "", "", "", ""].slice(0, 4) }));
   while (output.length < 6) output.push(blankTeamSlot(output.length));
   return output;
 }
@@ -61,7 +61,7 @@ function applyPreset(pokemon: PokemonSet, preset: RawSet): PokemonSet {
     nature: firstValue(preset.Nature ?? preset.nature) || pokemon.nature,
     level: Number(preset.Level ?? preset.level) || pokemon.level || 100,
     evs: parsePresetStats(preset.EVs ?? preset.evs, DEFAULT_STATS),
-    ivs: parsePresetStats(preset.IVs ?? preset.ivs, { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }),
+    ivs: getMaxIVs(),
     moves,
     ...(tera ? { importedTeraType: tera, teraType: "" } : {}),
   };
@@ -172,8 +172,8 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
   const updateStat = (side: Side, index: number, stat: keyof Stats, value: string, kind: "evs" | "ivs") => {
     const team = side === "left" ? builderA : builderB;
     const pokemon = team[index];
-    const max = kind === "evs" ? (isChampionsFormat ? 32 : 252) : 31;
-    updateBuilderPokemon(side, index, { [kind]: { ...pokemon[kind], [stat]: Math.max(0, Math.min(max, Number(value) || 0)) } } as Partial<PokemonSet>);
+    const max = isChampionsFormat ? 32 : 252;
+    updateBuilderPokemon(side, index, kind === "ivs" ? { ivs: getMaxIVs() } : { evs: { ...pokemon.evs, [stat]: Math.max(0, Math.min(max, Number(value) || 0)) } });
   };
   const download = (side: Side) => {
     const text = exportTeam(side === "left" ? left : right);
@@ -255,7 +255,7 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
         <div className="builder-moves">{[0,1,2,3].map(moveIndex => <label key={moveIndex}>Move {moveIndex + 1}<AutocompleteInput ariaLabel={`${pokemon.species} move ${moveIndex + 1}`} options={legalMovesFor(pokemon.species)} value={pokemon.moves[moveIndex] || ""} onChange={value => { const moves = [...pokemon.moves]; moves[moveIndex] = value; updateBuilderPokemon(side, index, { moves }); }} />{pokemon.moves[moveIndex] && !isEverythingFormat(format) && !moveIsLegal(pokemon.species, pokemon.moves[moveIndex]) && <span className="move-illegal-indicator" title={`Move is not in ${pokemon.species} species learnset; check the Format legality report for format rules`}>Learnset?</span>}</label>)}</div>
         <div className="builder-evs-heading"><strong>{isChampionsFormat ? "Stat Points" : "EVs"}</strong>{(() => { const limit = isChampionsFormat ? 66 : 510; const remaining = limit - Object.values(pokemon.evs).reduce((sum, value) => sum + value, 0); return <span className={remaining < 0 ? "evs-remaining-over" : ""}>Remaining: {remaining}</span>; })()}</div>
         <div className="builder-evs">{([ ["HP","hp"],["Atk","atk"],["Def","def"],["SpA","spa"],["SpD","spd"],["Spe","spe"] ] as const).map(([label, stat]) => <label key={stat} className={NATURE_EFFECTS[pokemon.nature]?.plus === label ? "nature-boost-label" : NATURE_EFFECTS[pokemon.nature]?.minus === label ? "nature-hinder-label" : ""}>{label}<input aria-label={`${pokemon.species} ${label} ${isChampionsFormat ? "Stat Points" : "EVs"}`} type="number" min="0" max={isChampionsFormat ? 32 : 252} step={isChampionsFormat ? 1 : 4} value={pokemon.evs[stat]} onChange={event => updateStat(side, index, stat, event.target.value, "evs")} /></label>)}</div>
-        <div className="builder-final-stats"><strong>Final stats</strong>{(() => { const entry = getSpecies(pokemon.species); const base = entry?.baseStats || {}; const nature = NATURE_EFFECTS[pokemon.nature] || {}; const labels: Record<string, string> = { hp: "HP", atk: "Atk", def: "Def", spa: "SpA", spd: "SpD", spe: "Spe" }; return (["hp","atk","def","spa","spd","spe"] as const).map(stat => { const b = Number(base[stat] || 1), iv = Number(pokemon.ivs?.[stat] ?? 31), ev = Number(pokemon.evs[stat] || 0); const core = isChampionsFormat ? Math.floor((2*b + 31 + Math.max(2*ev - 1, 0))*pokemon.level/100) : Math.floor((2*b + iv + Math.floor(ev/4))*pokemon.level/100); const value = isChampionsFormat ? (stat === "hp" ? (cleanId(pokemon.species) === "shedinja" ? 1 : core + pokemon.level + 10) : Math.floor((core + 5) * (nature.plus === labels[stat] ? 1.1 : nature.minus === labels[stat] ? 0.9 : 1))) : (stat === "hp" ? (cleanId(pokemon.species) === "shedinja" ? 1 : core + pokemon.level + 10) : Math.floor((core + 5) * (nature.plus === labels[stat] ? 1.1 : nature.minus === labels[stat] ? 0.9 : 1))); return <span key={stat} className={nature.plus === labels[stat] ? "nature-boost-label" : nature.minus === labels[stat] ? "nature-hinder-label" : ""}>{labels[stat]} <b>{value}</b></span>; }); })()}</div>
+        <div className="builder-final-stats"><strong>Final stats</strong>{(() => { const entry = getSpecies(pokemon.species); const base = entry?.baseStats || {}; const nature = NATURE_EFFECTS[pokemon.nature] || {}; const labels: Record<string, string> = { hp: "HP", atk: "Atk", def: "Def", spa: "SpA", spd: "SpD", spe: "Spe" }; return (["hp","atk","def","spa","spd","spe"] as const).map(stat => { const b = Number(base[stat] || 1), iv = MAX_IVS[stat], ev = Number(pokemon.evs[stat] || 0); const core = isChampionsFormat ? Math.floor((2*b + MAX_IVS[stat] + Math.max(2*ev - 1, 0))*pokemon.level/100) : Math.floor((2*b + iv + Math.floor(ev/4))*pokemon.level/100); const value = isChampionsFormat ? (stat === "hp" ? (cleanId(pokemon.species) === "shedinja" ? 1 : core + pokemon.level + 10) : Math.floor((core + 5) * (nature.plus === labels[stat] ? 1.1 : nature.minus === labels[stat] ? 0.9 : 1))) : (stat === "hp" ? (cleanId(pokemon.species) === "shedinja" ? 1 : core + pokemon.level + 10) : Math.floor((core + 5) * (nature.plus === labels[stat] ? 1.1 : nature.minus === labels[stat] ? 0.9 : 1))); return <span key={stat} className={nature.plus === labels[stat] ? "nature-boost-label" : nature.minus === labels[stat] ? "nature-hinder-label" : ""}>{labels[stat]} <b>{value}</b></span>; }); })()}</div>
       </article>;
     })}
   </section>;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateMove, getMoveDetails, koLabel } from "../src/lib/calc";
+import { calculateMove, getMoveDetails, getPokemonHp, koLabel } from "../src/lib/calc";
 import type { FieldState, PokemonSet } from "../src/lib/types";
 
 const field: FieldState = {
@@ -20,6 +20,16 @@ describe("damage calculator wrappers", () => {
     expect(Number.isFinite(result!.min)).toBe(true);
     expect(Number.isFinite(result!.max)).toBe(true);
     expect(result!.max).toBeGreaterThanOrEqual(result!.min);
+  });
+
+  it("uses perfect IVs for damage and HP even when imported set data contains lower IVs", () => {
+    const attacker = makeSet("Charizard", "Blaze", ["Flamethrower"]);
+    const defender = makeSet("Bulbasaur", "Overgrow", ["Tackle"]);
+    const lowIvs = { ...defender, ivs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 } };
+    const perfectDamage = calculateMove(attacker, defender, "Flamethrower", field, undefined, undefined, false, 9);
+    const normalizedDamage = calculateMove(attacker, lowIvs, "Flamethrower", field, undefined, undefined, false, 9);
+    expect(normalizedDamage?.max).toBe(perfectDamage?.max);
+    expect(getPokemonHp(lowIvs, 9).max).toBe(getPokemonHp(defender, 9).max);
   });
 
   it("exposes a probability histogram for ordinary damage rolls", () => {

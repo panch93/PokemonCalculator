@@ -12,7 +12,7 @@ import FormatSelector from "./FormatSelector";
 import PokemonSprite from "./PokemonSprite";
 import { abilityDefenseDescription, abilityDefenseMultiplier, getAbilityDefenseEffect } from "../lib/ability-defenses";
 import { analyzeDraftPokemon, DEFAULT_DRAFT_MOVE_FILTER, type DraftMoveFilter, type DraftMatchupAnalysis, type DraftPokemonProfile, type DraftOpponentResult, type DraftMoveThreat } from "../lib/draft-matchup-analysis";
-import type { Team } from "../lib/types";
+import { getMaxIVs, type Team } from "../lib/types";
 import { getWeatherSpeedAbilityMultiplier } from "../lib/battle-order";
 import abilityStatBoosts from "../data/ability-stat-boosts.json";
 
@@ -438,7 +438,7 @@ export default function DraftMatchups() {
   };
   const statHeading = (key: StatKey, side: "A" | "B") => <th key={`${side}-${key}`} className={`draft-stat-heading draft-stat-${key}`}><button type="button" onClick={() => chooseSort(key)} aria-label={`Sort by ${STAT_LABELS[key]}${sortStat === key ? ` ${sortDirection === "asc" ? "descending" : "ascending"} next` : ""}`} title={`Sort both teams by ${STAT_LABELS[key]}`}>{(key === "spe" ? "Spe" : STAT_LABELS[key])}{sortStat === key ? <span className={`draft-sort-indicator ${sortDirection === "desc" ? "sort-descending" : "sort-ascending"}`}>{sortDirection === "desc" ? " ↓" : " ↑"}</span> : null}</button></th>;
   const lastRow = Math.max(sortedA.length, sortedB.length) - 1;
-  const asTeam = (names: string[]): Team => names.map(species => ({ name: species, species, item: "", ability: getSpeciesAbilities(species)[0] || "", nature: "Hardy", level: 100, evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: [] }));
+  const asTeam = (names: string[]): Team => names.map(species => ({ name: species, species, item: "", ability: getSpeciesAbilities(species)[0] || "", nature: "Hardy", level: 100, evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: getMaxIVs(), moves: [] }));
   const updateDraft = (side: "A" | "B", index: number, value: string) => {
     const update = side === "A" ? setDraftA : setDraftB;
     const setTeam = side === "A" ? setTeamA : setTeamB;

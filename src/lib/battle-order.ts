@@ -1,5 +1,5 @@
 import { getMove, getNature, getSpecies } from "./showdown-data";
-import { FieldState, PokemonSet } from "./types";
+import { FieldState, MAX_IVS, PokemonSet } from "./types";
 
 type DexEntry = {
   exists?: boolean; name?: string; baseStats?: Record<string, number>;
@@ -27,7 +27,7 @@ export function getEffectiveSpeed(p: PokemonSet, field: FieldState, side: "attac
   const base = Number(species?.baseStats?.spe);
   if (!Number.isFinite(base)) return 0;
   const level = Math.max(1, Math.min(100, p.level || 100));
-  const iv = Math.max(0, Math.min(31, p.ivs?.spe ?? 31));
+  const iv = MAX_IVS.spe;
   const ev = Math.max(0, Math.min(252, p.evs?.spe ?? 0));
   let speed = Math.floor((Math.floor((2 * base + iv + Math.floor(ev / 4)) * level / 100) + 5));
   const nature = getNature(p.nature || "Serious") as DexEntry;
@@ -57,7 +57,7 @@ export function getBaseSpeed(p: PokemonSet): number {
   const base = Number(species?.baseStats?.spe);
   if (!Number.isFinite(base)) return 0;
   const level = Math.max(1, Math.min(100, p.level || 100));
-  const iv = Math.max(0, Math.min(31, p.ivs?.spe ?? 31));
+  const iv = MAX_IVS.spe;
   const ev = Math.max(0, Math.min(252, p.evs?.spe ?? 0));
   let speed = Math.floor(Math.floor((2 * base + iv + Math.floor(ev / 4)) * level / 100) + 5);
   const nature = getNature(p.nature || "Serious") as DexEntry;
@@ -104,7 +104,7 @@ export function getSpeedMultiplier(p: PokemonSet, field: FieldState, side: "atta
   const base = Number(species?.baseStats?.spe);
   if (!Number.isFinite(base)) return 1;
   const level = Math.max(1, Math.min(100, p.level || 100));
-  const iv = Math.max(0, Math.min(31, p.ivs?.spe ?? 31));
+  const iv = MAX_IVS.spe;
   const ev = Math.max(0, Math.min(252, p.evs?.spe ?? 0));
   let raw = Math.floor((Math.floor((2 * base + iv + Math.floor(ev / 4)) * level / 100) + 5));
   const nature = getNature(p.nature || "Serious") as DexEntry;

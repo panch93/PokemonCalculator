@@ -1,6 +1,5 @@
 import { resolveByName, toShowdownId } from "./ids";
-import historicalLearnsets from "./historical-learnsets.json";
-import Dex from "../showdown-official/sim/dex";
+import Dex, { type ModdedDex } from "../showdown-official/sim/dex";
 import { getLoadedShowdownData, loadShowdownData, getSpeciesLearnsetMoves, clearShowdownDataCache } from "./client";
 import { getNature as getFallbackNature, getNatureList as getFallbackNatureList, getNatureEffectsByDisplayStat as getFallbackNatureEffects } from "./natures";
 import type { ShowdownDescribedEntry, ShowdownMove, ShowdownSpecies } from "./types";
@@ -73,50 +72,78 @@ export function getSpeciesAbilitiesForGeneration(name: string, generation = 9): 
   }
 }
 
-/** Learnable moves from the official bundled Pokémon Champions mod, including inherited learnsets. */
-export function getChampionsSpeciesLearnset(name: string): Set<string> | null {
+/** Cache full, inherited learnsets by species; these tables are bundled from Showdown. */
+const championsLearnsetCache = new Map<string, Set<string> | null>();
+const historicalLearnsetCache = new Map<string, Set<string> | null>();
+
+function collectFullLearnset(dex: ModdedDex, name: string): Set<string> | null {
   try {
-    const dex = Dex.mod("champions");
     const species = dex.species.get(name) as unknown as { exists?: boolean; id?: string };
     if (!species?.exists || !species.id) return null;
     const entries = dex.species.getFullLearnset(species.id as Parameters<typeof dex.species.getFullLearnset>[0]) as Array<{ learnset?: Record<string, unknown> }>;
     const moves = new Set<string>();
-    for (const entry of entries) for (const moveId of Object.keys(entry.learnset || {})) moves.add(moveId);
+    for (const entry of entries) {
+      for (const moveId of Object.keys(entry.learnset || {})) {
+        const id = toShowdownId(moveId);
+        if (id && id !== "inherit") moves.add(id);
+      }
+    }
     return moves.size ? moves : null;
   } catch {
+    // A species may not exist in an older generation's Pokédex.
     return null;
   }
 }
+
+/** Learnable moves from the official bundled Pokémon Champions mod, including inherited learnsets. */
+export function getChampionsSpeciesLearnset(name: string): Set<string> | null {
+  const key = toShowdownId(name);
+  if (championsLearnsetCache.has(key)) return championsLearnsetCache.get(key) ?? null;
+  const moves = collectFullLearnset(Dex.mod("champions"), name);
+  championsLearnsetCache.set(key, moves);
+  return moves;
+}
+
 /**
- * Historical Everything! move pool assembled from official Showdown learnset tables
- * across supported generations and the Champions mod. Includes a species' forms
- * and named base/change-from species when Showdown records those relationships.
+ * Everything! is the union of each official generation's *resolved* species learnset
+ * plus the Champions mod. Use Showdown's Dex inheritance resolver rather than a
+ * generated union of raw tables: raw mod entries can be partial/inherited and are
+ * not independently valid learnsets. In particular, this excludes moves that only
+ * occur on unrelated species or stale generated snapshots.
  */
 export function getHistoricalSpeciesLearnset(name: string): Set<string> | null {
-  const data = current();
-  const species = data ? resolveByName(data.species, name) : undefined;
-  const candidates = new Set<string>([toShowdownId(name)]);
-  if (species) {
-    for (const related of [species.name, species.baseSpecies, species.changesFrom]) {
-      if (typeof related === "string" && related.trim()) candidates.add(toShowdownId(related));
-    }
-  }
+  const key = toShowdownId(name);
+  if (!key) return null;
+  if (historicalLearnsetCache.has(key)) return historicalLearnsetCache.get(key) ?? null;
+
   const moves = new Set<string>();
   let found = false;
-  for (const candidate of candidates) {
-    const table = (historicalLearnsets as Record<string, string[]>)[candidate];
-    if (!table) continue;
-    found = true;
-    for (const move of table) moves.add(move);
+  const generationDexes = [
+    "gen1", "gen1jpn", "gen1stadium",
+    "gen2", "gen2stadium2",
+    "gen3", "gen3colosseum", "gen3frlg", "gen3rs",
+    "gen4", "gen4pt",
+    "gen5", "gen5bw1",
+    "gen6", "gen6xy",
+    "gen7", "gen7letsgo", "gen7sm",
+    "gen8", "gen8bdsp", "gen8dlc1", "gen8legends",
+    "base", "gen9dlc1", "gen9legends", "gen9predlc",
+    "champions",
+  ];
+  for (const mod of generationDexes) {
+    try {
+      const dex = Dex.mod(mod);
+      const speciesMoves = collectFullLearnset(dex, name);
+      if (!speciesMoves) continue;
+      found = true;
+      for (const move of speciesMoves) moves.add(move);
+    } catch {
+      // Ignore unavailable species/mod combinations; other generations may contain it.
+    }
   }
-  // Keep the current upstream table as a supplement, so newly published moves
-  // can be present even before the generated historical bundle is refreshed.
-  const currentMoves = getSpeciesLearnsetMoves(name);
-  if (currentMoves) {
-    found = true;
-    for (const move of currentMoves) moves.add(move);
-  }
-  return found ? moves : null;
+  const result = found && moves.size ? moves : null;
+  historicalLearnsetCache.set(key, result);
+  return result;
 }
 
 export async function getSpeciesLearnset(name: string): Promise<Set<string> | null> {

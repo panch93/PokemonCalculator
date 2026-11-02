@@ -1,7 +1,7 @@
 import { unwrapTable, toShowdownId } from "./ids";
-import { collectSpeciesLearnsetMoves } from "./learnsets";
 import { mergeDescriptions } from "./descriptions";
 import type { ShowdownData, ShowdownDescribedEntry, ShowdownLearnsetEntry, ShowdownMove, ShowdownSpecies, ShowdownNature } from "./types";
+import Dex from "../showdown-official/sim/dex";
 
 // Data is bundled from the MIT-licensed smogon/pokemon-showdown repository.
 // The app deliberately does not fetch live data from play.pokemonshowdown.com
@@ -120,5 +120,23 @@ export function getLoadedShowdownData(): ShowdownData | null {
 
 export function getSpeciesLearnsetMoves(speciesName: string): Set<string> | null {
   if (!resolved) return null;
-  return collectSpeciesLearnsetMoves(resolved.learnsets, resolved.species, speciesName);
+  try {
+    // Resolve inheritance/forms exactly as Pokémon Showdown does. Combining the
+    // raw species, baseSpecies and changesFrom tables can leak moves between
+    // formes that intentionally have different learnsets.
+    const dex = Dex.mod("base");
+    const species = dex.species.get(speciesName);
+    if (!species?.exists || !species.id) return null;
+    const entries = dex.species.getFullLearnset(species.id);
+    const moves = new Set<string>();
+    for (const entry of entries) {
+      for (const moveId of Object.keys(entry.learnset || {})) {
+        const id = toShowdownId(moveId);
+        if (id && id !== "inherit") moves.add(id);
+      }
+    }
+    return moves.size ? moves : null;
+  } catch {
+    return null;
+  }
 }
