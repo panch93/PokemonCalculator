@@ -19,6 +19,7 @@ export type PokemonSet = {
   evs: Stats;
   ivs: Stats;
   moves: string[];
+  notes?: string;
 };
 
 export type Team = PokemonSet[];

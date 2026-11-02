@@ -12,6 +12,7 @@ import FieldPanel from "./FieldPanel";
 import { getLearnsetModeLabel, loadFormatLearnsets } from "../lib/learnsets";
 import FormatLegalityPanel from "./FormatLegalityPanel";
 import FormatSelector from "./FormatSelector";
+import { getSpeciesAbilities } from "../lib/showdown-data";
 
 const DEFAULT_FIELD: FieldState = {
   gameType: "Singles", weather: "", terrain: "", defenderStealthRock: false, defenderSpikes: 0, defenderReflect: false,
@@ -22,7 +23,7 @@ const ZERO_STAGES = (): StatStages[] => Array.from({ length: 6 }, () => ({ atk: 
 const initialMoves = (team: Team) => team.map(p => p.moves.find(Boolean) || "");
 const STORAGE_KEY = "pokemon-team-lab-v0.3.0";
 
-type SavedState = { schemaVersion?: number; generation?: number; field?: FieldState; teamA?: Team; teamB?: Team; movesA?: string[]; movesB?: string[]; stagesA?: StatStages[]; stagesB?: StatStages[]; swapped?: boolean; critical?: boolean };
+type SavedState = { schemaVersion?: number; generation?: number; overallNotes?: string; field?: FieldState; teamA?: Team; teamB?: Team; movesA?: string[]; movesB?: string[]; stagesA?: StatStages[]; stagesB?: StatStages[]; swapped?: boolean; critical?: boolean };
 
 export default function TeamLab() {
   const [left, setLeft] = useState<Team>(sampleTeamA);
@@ -31,6 +32,7 @@ export default function TeamLab() {
   const [selected, setSelected] = useState<{ row: number; col: number } | null>(null);
   const [swapped, setSwapped] = useState(false);
   const [critical, setCritical] = useState(false);
+  const [overallNotes, setOverallNotes] = useState("");
   const [movesA, setMovesA] = useState<string[]>(() => initialMoves(sampleTeamA));
   const [movesB, setMovesB] = useState<string[]>(() => initialMoves(sampleTeamB));
   const [stagesA, setStagesA] = useState<StatStages[]>(ZERO_STAGES);
@@ -38,7 +40,7 @@ export default function TeamLab() {
   const [storageReady, setStorageReady] = useState(false);
   const [teamsOpen, setTeamsOpen] = useState(false);
   const [draftPickerOpen, setDraftPickerOpen] = useState(false);
-  const [draftOptions, setDraftOptions] = useState<Array<{ id: string; name: string; teamA: string[]; teamB: string[] }>>([]);
+  const [draftOptions, setDraftOptions] = useState<Array<{ id: string; name: string; teamA: string[]; teamB: string[]; draftSets?: Record<string, { item?: string; ability?: string; moves?: string[] }>; abilityOverrides?: Record<string, string>; speedConfigs?: Record<string, { ev: number; nature: "boost" | "neutral" | "hinder" }>; statConfigs?: Record<string, { ev: number; nature: "boost" | "neutral" | "hinder" }> }>>([]);
   const [draftChoice, setDraftChoice] = useState("0");
   const [draftSelectedA, setDraftSelectedA] = useState<string[]>([]);
   const [draftSelectedB, setDraftSelectedB] = useState<string[]>([]);
@@ -76,7 +78,7 @@ export default function TeamLab() {
         // Older releases stored the imported Tera type as already active by default.
         // Migrate those saves so Terastallization starts disabled, while preserving
         // deliberate Tera selections in saves written by this version.
-        const resetLegacyTera = saved.schemaVersion !== 2 && saved.schemaVersion !== 3;
+        const resetLegacyTera = saved.schemaVersion !== 2 && saved.schemaVersion !== 3 && saved.schemaVersion !== 4 && saved.schemaVersion !== 5;
         const savedA = normalizeTeam(saved.teamA, resetLegacyTera) || sampleTeamA;
         const savedB = normalizeTeam(saved.teamB, resetLegacyTera) || sampleTeamB;
         setLeft(savedA); setRight(savedB);
@@ -90,6 +92,7 @@ export default function TeamLab() {
         if (saved.stagesB) setStagesB(normalizeStages(saved.stagesB));
         if (typeof saved.swapped === "boolean") setSwapped(saved.swapped);
         if (typeof saved.critical === "boolean") setCritical(saved.critical);
+        if (typeof saved.overallNotes === "string") setOverallNotes(saved.overallNotes);
       }
     } catch { /* Ignore unavailable or invalid browser storage. */ }
     setStorageReady(true);
@@ -98,9 +101,9 @@ export default function TeamLab() {
   useEffect(() => {
     if (!storageReady) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 4, generation, teamA: left, teamB: right, field, movesA, movesB, stagesA, stagesB, swapped, critical }));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 5, generation, teamA: left, teamB: right, field, movesA, movesB, stagesA, stagesB, swapped, critical, overallNotes }));
     } catch { /* The app still works if storage is disabled or full. */ }
-  }, [left, right, field, movesA, movesB, stagesA, stagesB, swapped, critical, generation, storageReady]);
+  }, [left, right, field, movesA, movesB, stagesA, stagesB, swapped, critical, overallNotes, generation, storageReady]);
 
   const matchupsA = useMemo<(Matchup | null)[][]>(() => left.map((attacker, row) => right.map((defender, col) => {
     const moves = attacker.moves.filter(Boolean).slice(0, 4)
@@ -176,24 +179,39 @@ export default function TeamLab() {
           left={rowTeam} right={colTeam} generation={generation} matchups={visibleMatchups} fieldState={field} format={format} selected={selected} swapped={swapped}
           rowMoves={rowMoves} rowStages={rowStages} colStages={colStages} critical={critical} onCriticalChange={setCritical}
           onToggleSwap={() => { setSwapped(value => !value); setSelected(value => value ? ({ row: value.col, col: value.row }) : null); }}
+          overallNotes={overallNotes}
+          onOverallNotesChange={setOverallNotes}
           onSelect={(row, col) => setSelected({ row, col })}
           onMoveChange={updateRowMove}
           onRowStageChange={(index, stat, value) => updateStage(index, stat, value, swapped ? "right" : "left")}
           onColStageChange={(index, stat, value) => updateStage(index, stat, value, swapped ? "left" : "right")}
-          onResetStages={() => { setStagesA(ZERO_STAGES()); setStagesB(ZERO_STAGES()); setLeft(previous => previous.map(p => ({ ...p, currentHp: undefined }))); setRight(previous => previous.map(p => ({ ...p, currentHp: undefined }))); }}
+          onResetStages={() => { setStagesA(ZERO_STAGES()); setStagesB(ZERO_STAGES()); setLeft(previous => previous.map(p => ({ ...p, currentHp: undefined, notes: "" }))); setRight(previous => previous.map(p => ({ ...p, currentHp: undefined, notes: "" }))); setOverallNotes(""); }}
           onResetRowStages={index => (swapped ? setStagesB : setStagesA)(prev => prev.map((stage, i) => i === index ? { atk: 0, spa: 0, def: 0, spd: 0, spe: 0, acc: 0, eva: 0 } : stage))}
           onResetColStages={index => (swapped ? setStagesA : setStagesB)(prev => prev.map((stage, i) => i === index ? { atk: 0, spa: 0, def: 0, spd: 0, spe: 0, acc: 0, eva: 0 } : stage))}
           onRowPokemonChange={(index, patch) => updatePokemon(swapped ? "right" : "left", index, patch)}
           onColPokemonChange={(index, patch) => updatePokemon(swapped ? "left" : "right", index, patch)}
         />
       </div>
-      {draftPickerOpen && <div className="teams-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDraftPickerOpen(false); }}><section className="panel teams-modal draft-team-import-modal" role="dialog" aria-modal="true" aria-labelledby="draft-team-import-title"><div className="panel-title-row"><div><h2 id="draft-team-import-title">Select Pokémon from Draft Matchup</h2><p>Select up to six Pokémon from each side. A side with no selections will remain unchanged.</p></div><button type="button" onClick={() => setDraftPickerOpen(false)}>Close ×</button></div>{draftOptions.length ? <><label>Draft matchup <select value={draftChoice} onChange={event => { setDraftChoice(event.target.value); setDraftSelectedA([]); setDraftSelectedB([]); }}><option value="">Choose matchup…</option>{draftOptions.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select></label>{(() => { const option = draftOptions.find(item => item.id === draftChoice); if (!option) return <p>Select a saved draft matchup.</p>; const pickList = (side: "A" | "B", names: string[], selected: string[], setter: (next: string[]) => void) => <div className="draft-import-side"><h3>Team {side} <small>{selected.length}/6 selected</small></h3><ul className="draft-import-options">{names.map((name, index) => <li key={`${side}-${index}-${name}`}><label className="draft-import-option"><input type="checkbox" checked={selected.includes(name)} disabled={!selected.includes(name) && selected.length >= 6} onChange={event => setter(event.target.checked ? [...selected, name] : selected.filter(value => value !== name))} /><span className="draft-import-pokemon-name" title={name}>{name}</span></label></li>)}</ul></div>; return <><div className="draft-import-grid">{pickList("A", option.teamA, draftSelectedA, setDraftSelectedA)}{pickList("B", option.teamB, draftSelectedB, setDraftSelectedB)}</div><div className="button-row"><button type="button" disabled={!draftSelectedA.length && !draftSelectedB.length} onClick={() => { if (draftSelectedA.length) importTeam("left", draftSelectedA.map(makeDraftImportPokemon)); if (draftSelectedB.length) importTeam("right", draftSelectedB.map(makeDraftImportPokemon)); setDraftPickerOpen(false); }}>Import selected Pokémon</button></div></>; })()}</> : <p>No saved draft matchups found. Save a matchup in Draft Matchups first.</p>}</section></div>}
-      <TeamPastePanel left={left} right={right} format={format} onSelectDraft={() => { setTeamsOpen(false); try { const saved = JSON.parse(localStorage.getItem("pokemon-team-lab-draft-matchups-v2") || "{}"); const entries = Object.entries(saved.matchups || {}).map(([id, value]: [string, any]) => ({ id, name: value.matchupName || `Matchup ${Number(id) + 1}`, teamA: Array.isArray(value.teamA) ? value.teamA.filter(Boolean) : [], teamB: Array.isArray(value.teamB) ? value.teamB.filter(Boolean) : [] })); setDraftOptions(entries); setDraftChoice(String(saved.currentIndex ?? entries[0]?.id ?? "0")); setDraftSelectedA([]); setDraftSelectedB([]); setDraftPickerOpen(true); } catch { setDraftOptions([]); setDraftPickerOpen(true); } }} open={teamsOpen} onClose={() => setTeamsOpen(false)} onImport={importTeam} onEditTeam={(side, team) => { if (side === "left") { setLeft(team); setMovesA(previous => reconcileMoves(team, previous)); } else { setRight(team); setMovesB(previous => reconcileMoves(team, previous)); } }} />
+      {draftPickerOpen && <div className="teams-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDraftPickerOpen(false); }}><section className="panel teams-modal draft-team-import-modal" role="dialog" aria-modal="true" aria-labelledby="draft-team-import-title"><div className="panel-title-row"><div><h2 id="draft-team-import-title">Select Pokémon from Draft Matchup</h2><p>Select up to six Pokémon from each side. A side with no selections will remain unchanged.</p></div><button type="button" onClick={() => setDraftPickerOpen(false)}>Close ×</button></div>{draftOptions.length ? <><label>Draft matchup <select value={draftChoice} onChange={event => { setDraftChoice(event.target.value); setDraftSelectedA([]); setDraftSelectedB([]); }}><option value="">Choose matchup…</option>{draftOptions.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select></label>{(() => { const option = draftOptions.find(item => item.id === draftChoice); if (!option) return <p>Select a saved draft matchup.</p>; const pickList = (side: "A" | "B", names: string[], selected: string[], setter: (next: string[]) => void) => <div className="draft-import-side"><h3>Team {side} <small>{selected.length}/6 selected</small></h3><ul className="draft-import-options">{names.map((name, index) => <li key={`${side}-${index}-${name}`}><label className="draft-import-option"><input type="checkbox" checked={selected.includes(name)} disabled={!selected.includes(name) && selected.length >= 6} onChange={event => setter(event.target.checked ? [...selected, name] : selected.filter(value => value !== name))} /><span className="draft-import-pokemon-name" title={name}>{name}</span></label></li>)}</ul></div>; return <><div className="draft-import-grid">{pickList("A", option.teamA, draftSelectedA, setDraftSelectedA)}{pickList("B", option.teamB, draftSelectedB, setDraftSelectedB)}</div><div className="button-row"><button type="button" disabled={!draftSelectedA.length && !draftSelectedB.length} onClick={() => { if (draftSelectedA.length) importTeam("left", draftSelectedA.map(name => makeDraftImportPokemon(name, option, "A"))); if (draftSelectedB.length) importTeam("right", draftSelectedB.map(name => makeDraftImportPokemon(name, option, "B"))); setDraftPickerOpen(false); }}>Import selected Pokémon</button></div></>; })()}</> : <p>No saved draft matchups found. Save a matchup in Draft Matchups first.</p>}</section></div>}
+      <TeamPastePanel left={left} right={right} format={format} onSelectDraft={() => { setTeamsOpen(false); try { const saved = JSON.parse(localStorage.getItem("pokemon-team-lab-draft-matchups-v2") || "{}"); const entries = Object.entries(saved.matchups || {}).map(([id, value]: [string, any]) => ({ id, name: value.matchupName || `Matchup ${Number(id) + 1}`, teamA: Array.isArray(value.teamA) ? value.teamA.filter(Boolean) : [], teamB: Array.isArray(value.teamB) ? value.teamB.filter(Boolean) : [], draftSets: value.draftSets, abilityOverrides: value.abilityOverrides, speedConfigs: value.speedConfigs, statConfigs: value.statConfigs })); setDraftOptions(entries); setDraftChoice(String(saved.currentIndex ?? entries[0]?.id ?? "0")); setDraftSelectedA([]); setDraftSelectedB([]); setDraftPickerOpen(true); } catch { setDraftOptions([]); setDraftPickerOpen(true); } }} open={teamsOpen} onClose={() => setTeamsOpen(false)} onImport={importTeam} onEditTeam={(side, team) => { if (side === "left") { setLeft(team); setMovesA(previous => reconcileMoves(team, previous)); } else { setRight(team); setMovesB(previous => reconcileMoves(team, previous)); } }} />
     </main>
   );
 }
 
-function makeDraftImportPokemon(species: string): Team[number] { return { name: species, species, item: "", ability: "", nature: "Hardy", level: 100, teraType: "", importedTeraType: "", evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: ["", "", "", ""] }; }
+function makeDraftImportPokemon(species: string, option?: { draftSets?: Record<string, { item?: string; ability?: string; moves?: string[] }>; abilityOverrides?: Record<string, string>; speedConfigs?: Record<string, { ev: number; nature: "boost" | "neutral" | "hinder" }>; statConfigs?: Record<string, { ev: number; nature: "boost" | "neutral" | "hinder" }> }, side: "A" | "B" = "A"): Team[number] {
+  const key = `${side}:${species}`; const custom = option?.draftSets?.[key];
+  // Draft Matchups defaults Speed to 252 EVs with a boosting nature even when
+  // the user has not opened the Speed editor; preserve that same effective set
+  // when importing into Team Builder instead of silently converting it to 0.
+  const stats = (stat: string) => stat === "spe"
+    ? option?.speedConfigs?.[key] || { ev: 252, nature: "boost" as const }
+    : option?.statConfigs?.[`${key}:${stat}`];
+  const evs = Object.fromEntries((['hp','atk','def','spa','spd','spe'] as const).map(stat => [stat, stats(stat)?.ev ?? 0])) as Team[number]['evs'];
+  const natures: Record<string, { boost: string; hinder: string }> = { atk: { boost: 'Adamant', hinder: 'Modest' }, def: { boost: 'Bold', hinder: 'Lonely' }, spa: { boost: 'Modest', hinder: 'Adamant' }, spd: { boost: 'Calm', hinder: 'Naughty' }, spe: { boost: 'Timid', hinder: 'Brave' } };
+  const natureStat = (['atk','def','spa','spd','spe'] as const).find(stat => stats(stat)?.nature === 'boost' || stats(stat)?.nature === 'hinder');
+  const nature = natureStat ? natures[natureStat][stats(natureStat)!.nature as 'boost' | 'hinder'] : 'Hardy';
+  return { name: species, species, item: custom?.item || "", ability: custom?.ability || option?.abilityOverrides?.[key] || getSpeciesAbilities(species)[0] || "", nature, level: 100, teraType: "", importedTeraType: "", evs, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: [0,1,2,3].map(i => custom?.moves?.[i] || "") };
+}
 
 function normalizeTeam(value: unknown, resetTera = false): Team | null {
   if (!Array.isArray(value) || value.length !== 6) return null;

@@ -1474,3 +1474,53 @@ select, select:focus, select option, datalist option {
 .condition-stat-warning select { border-color: #d97706; }
 .matrix-condition-icon.drop { color: #f59e0b; }
 @media (max-width: 540px) { .draft-team-import-modal { width: calc(100vw - 16px); } .draft-team-import-modal .draft-import-grid { gap: 7px; } .draft-team-import-modal .draft-import-side { padding: 6px; } .draft-team-import-modal .draft-import-option { grid-template-columns: 16px minmax(0, 1fr); column-gap: 5px; padding: 5px 4px; font-size: .72rem; } }
+
+/* Draft matchup Pokémon names open the per-set editor. */
+.draft-matchup-table .draft-pokemon-name[role="button"] { cursor: pointer; }
+.draft-set-edit-button { margin-left: .35rem; padding: 1px 5px; border: 1px solid var(--border, #777); border-radius: 4px; background: transparent; color: inherit; font-size: .68rem; cursor: pointer; }
+
+/* Compact per-Pokémon set editor and held-item row in Draft Matchups. */
+.draft-set-edit-button { display: inline-grid; place-items: center; flex: 0 0 auto; width: 19px; height: 19px; margin-left: 2px; padding: 2px; border: 1px solid var(--border, #777); border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; }
+.draft-set-edit-button:hover, .draft-set-edit-button:focus-visible { color: var(--text); border-color: var(--accent-2); background: rgba(148,163,184,.12); }
+.draft-set-edit-button svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.draft-held-item { display: flex; align-items: center; justify-content: center; gap: 5px; margin: 2px 0 3px; color: var(--muted); font-size: .64rem; line-height: 1.2; }
+.draft-held-item small { padding: 1px 4px; border: 1px solid rgba(96,165,250,.35); border-radius: 4px; color: #93c5fd; font-size: .59rem; font-weight: 700; white-space: nowrap; }
+
+/* Matrix stats are triggered strictly by the Pokémon-name hit area, never by focus or its parent. */
+.matrix-name-stats-hover { position: relative; display: inline-block; max-width: 100%; vertical-align: top; }
+.matrix-name-stats-hover > .matrix-pokemon-name { position: relative; z-index: 1; }
+.matrix-stats-hover-portal { display: block; position: fixed; z-index: 10000; width: min(320px, calc(100vw - 16px)); min-width: 0; max-width: calc(100vw - 16px); padding: 5px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel, #171d28); color: var(--text, #f2f4f8); box-shadow: 0 6px 18px rgba(0,0,0,.42); text-align: left; white-space: normal; pointer-events: none; max-height: calc(100vh - 16px); overflow: auto; }
+.matrix-stats-hover-card > strong { display: block; margin-bottom: 3px; font-size: .62rem; line-height: 1.2; }
+.matrix-stats-hover-card table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: .6rem; }
+.matrix-stats-hover-card th, .matrix-stats-hover-card td { padding: 2px 3px; border-bottom: 1px solid var(--border); text-align: center; white-space: nowrap; }
+.matrix-stats-hover-card th:first-child { width: 54px; text-align: left; }
+.matrix-stats-hover-card thead th { color: var(--muted); font-weight: 800; }
+.matrix-stats-hover-card tbody tr:first-child td { font-weight: 900; }
+.matrix-stats-hover-card small { display: block; margin-top: 4px; color: var(--muted); font-size: .53rem; line-height: 1.2; }
+.reply-damage-value { display: inline-block; padding: 1px 4px; border-radius: 4px; font-weight: 800; }
+.reply-damage-value.ko-1 { background: #123a28; color: #86efac; }
+.reply-damage-value.ko-2 { background: #293d20; color: #bef264; }
+.reply-damage-value.ko-3 { background: #443b18; color: #fde047; }
+.reply-damage-value.ko-4 { background: #492b19; color: #fdba74; }
+.reply-damage-value.ko-5 { background: #451f27; color: #fda4af; }
+.reply-damage-value.ko-none { color: var(--muted); background: transparent; }
+.draft-item-type-line { display: flex; align-items: center; justify-content: center; flex-wrap: nowrap; gap: 4px; width: 100%; min-width: 0; overflow: hidden; white-space: nowrap; }
+.draft-item-type-line .draft-held-item { display: inline-flex; flex: 0 1 auto; min-width: 0; max-width: 66%; margin: 1px 0; overflow: hidden; white-space: nowrap; }
+.draft-item-type-line .draft-held-item > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.draft-item-type-line .draft-held-item small { flex: 0 0 auto; }
+.draft-item-type-line .draft-type-pills { display: inline-flex; flex: 0 0 auto; flex-wrap: nowrap; align-items: center; min-width: 0; width: auto; margin: 1px 0; gap: 2px; overflow: hidden; white-space: nowrap; }
+.draft-matchup-table-symmetric .draft-item-type-line { gap: 3px; }
+.draft-matchup-table-symmetric .draft-item-type-line .draft-held-item { max-width: 62%; justify-content: flex-start; font-size: .56rem; }
+.draft-matchup-table-symmetric .draft-item-type-line .draft-held-item small { font-size: .5rem; padding: 0 2px; }
+.draft-matchup-table-symmetric .draft-item-type-line .draft-type-pills .type-badge { max-width: none; flex: 0 0 auto; }
+.draft-chosen-move-analysis > ul { padding-left: 18px; }
+.draft-chosen-move-analysis > ul > li { margin: 6px 0; }
+.draft-chosen-move-analysis ul ul { margin: 3px 0 7px; padding-left: 17px; }
+.draft-chosen-move-analysis ul ul li { margin: 2px 0; font-size: .68rem; }
+
+
+/* Notes editors and hover notes */
+.matrix-notes-field { display: grid; gap: 5px; margin-top: 12px; }
+.matrix-notes-field textarea, .matrix-notes-editor textarea, .draft-modal textarea { width: 100%; min-width: 0; box-sizing: border-box; resize: vertical; }
+.matrix-pokemon-notes { display: block; margin-top: 6px !important; padding-top: 5px; border-top: 1px solid var(--border); color: var(--text, #f2f4f8) !important; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .62rem !important; line-height: 1.35 !important; }
+.matrix-pokemon-notes b { color: var(--muted); }

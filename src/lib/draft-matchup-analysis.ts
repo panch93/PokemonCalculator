@@ -14,6 +14,8 @@ export type DraftStatConfig = { ev: number; nature: "boost" | "neutral" | "hinde
 export type DraftPokemonProfile = {
   species: string;
   ability?: string;
+  item?: string;
+  moves?: string[];
   /** Include Stellar when the captain selected Stellar; it affects offensive STAB but not defensive typing. */
   teraType?: string;
   /** Configured EVs (or Champions Stat Points), natures, and stages from the draft editor. */
@@ -39,6 +41,8 @@ export type DraftOpponentResult = {
   bestStabAttack?: DraftMoveThreat;
   bestReply?: DraftMoveThreat;
   bestStabReply?: DraftMoveThreat;
+  selectedAttacks?: DraftMoveThreat[];
+  selectedReplies?: DraftMoveThreat[];
   threat: boolean;
   reliablyThreatens: boolean;
   wallsAttacker: boolean;
@@ -88,7 +92,7 @@ export function selectDraftCandidateMoves(moveNames: Iterable<string>, generatio
 
 const moveCache = new Map<string, MoveDetails[]>();
 const analysisCache = new Map<string, DraftMatchupAnalysis>();
-const bestAttackCache = new Map<string, { best?: DraftMoveThreat; bestStab?: DraftMoveThreat }>();
+const bestAttackCache = new Map<string, { best?: DraftMoveThreat; bestStab?: DraftMoveThreat; selected?: DraftMoveThreat[] }>();
 function candidateMoves(species: string, generation: number, filter: DraftMoveFilter): MoveDetails[] {
   const key = `${generation}:${normalize(species)}:${JSON.stringify(filter)}`;
   const cached = moveCache.get(key);
@@ -153,7 +157,7 @@ function makeDraftSet(profile: DraftPokemonProfile, move: MoveDetails, role: "at
   return {
     name: profile.species,
     species: profile.species,
-    item: "",
+    item: profile.item || "",
     ability: profile.ability || "",
     alliesFainted: Math.max(0, Math.min(5, profile.alliesFainted || 0)),
     nature: natureForStat(relevantStat, relevantConfig.nature),
@@ -199,13 +203,29 @@ async function bestAttack(
   isCancelled: () => boolean,
   filter: DraftMoveFilter,
   fieldState: FieldState,
-): Promise<{ best?: DraftMoveThreat; bestStab?: DraftMoveThreat }> {
+): Promise<{ best?: DraftMoveThreat; bestStab?: DraftMoveThreat; selected?: DraftMoveThreat[] }> {
   const cacheKey = JSON.stringify([generation, attackerProfile, defenderProfile, filter, fieldState]);
   const cached = bestAttackCache.get(cacheKey);
   if (cached) return cached;
-  const moves = candidateMoves(attackerProfile.species, generation, filter);
+  // User-entered moves are additional fixed candidates, not a replacement for
+  // the format/filter-aware learnset search. This keeps the manual choice in the
+  // analysis while still allowing the remaining best learnset options to compete.
+  const manualMoves = (attackerProfile.moves || [])
+    .filter(Boolean)
+    .map(name => getMoveDetails(name, generation))
+    .filter((move): move is MoveDetails => Boolean(move && isEligibleDraftMove(move)));
+  const discoveredMoves = candidateMoves(attackerProfile.species, generation, filter);
+  const seenMoves = new Set<string>();
+  const moves = [...manualMoves, ...discoveredMoves].filter(move => {
+    const id = normalize(move.name);
+    if (seenMoves.has(id)) return false;
+    seenMoves.add(id);
+    return true;
+  });
   let best: DraftMoveThreat | undefined;
   let bestStab: DraftMoveThreat | undefined;
+  const selected: DraftMoveThreat[] = [];
+  const manualIds = new Set(manualMoves.map(move => normalize(move.name)));
   for (let index = 0; index < moves.length; index++) {
     if (isCancelled()) return {};
     const move = moves[index];
@@ -215,12 +235,13 @@ async function bestAttack(
     counters.evaluated++;
     if (result) {
       const candidate = summarizeMove(move, result, attackerProfile, defender, generation);
+      if (manualIds.has(normalize(move.name))) selected.push(candidate);
       if (isBetterMove(candidate, best)) best = candidate;
       if (candidate.stab && isBetterMove(candidate, bestStab)) bestStab = candidate;
     }
     if ((index + 1) % CHUNK_SIZE === 0) await new Promise<void>(resolve => setTimeout(resolve, 0));
   }
-  const result = { best, bestStab };
+  const result = { best, bestStab, selected };
   bestAttackCache.set(cacheKey, result);
   if (bestAttackCache.size > 4096) bestAttackCache.delete(bestAttackCache.keys().next().value || "");
   return result;
@@ -229,7 +250,7 @@ async function bestAttack(
 /**
  * Analyze one hovered draft Pokémon against the opposing roster using the
  * configured EVs/Champions Stat Points, natures, and stat stages on both sides.
- * Items and field effects remain neutral; results are potential move-pool matchups.
+ * Configured items, abilities, and supported field effects are included; results remain matchup estimates based on the selected or learnable move pool.
  */
 export async function analyzeDraftPokemon(
   attacker: DraftPokemonProfile,
@@ -259,6 +280,8 @@ export async function analyzeDraftPokemon(
       bestStabAttack: outgoing.bestStab,
       bestReply: reply.best,
       bestStabReply: reply.bestStab,
+      selectedAttacks: outgoing.selected || [],
+      selectedReplies: reply.selected || [],
       threat: bestDamage >= DRAFT_STRONG_HIT_THRESHOLD,
       reliablyThreatens: Boolean(outgoing.best && outgoing.best.minPct >= DRAFT_STRONG_HIT_THRESHOLD && outgoing.best.accuracy >= 100),
       wallsAttacker: Boolean(outgoing.best && bestDamage <= DRAFT_WALL_THRESHOLD),
@@ -274,7 +297,7 @@ export async function analyzeDraftPokemon(
     opponents: results,
     movesEvaluated: counters.evaluated,
     approximate: true,
-    note: `Potential matchups only: top three eligible moves per type/category after ${filter.minAccuracy}% accuracy and whitelist/blacklist filters, configured EVs/Stat Points, natures, and stat stages on both sides; no held items; selected weather and terrain are applied. Damage and multi-hit probabilities inherit the calculator's supported mechanics; this is not a guaranteed set or battle prediction.`,
+    note: `Potential matchups only: top three eligible moves per type/category after ${filter.minAccuracy}% accuracy and whitelist/blacklist filters, configured items, abilities, EVs/Stat Points, natures, and stat stages on both sides; selected weather and terrain are applied. Damage and multi-hit probabilities inherit the calculator's supported mechanics; this is not a guaranteed set or battle prediction.`,
   };
   if (!isCancelled()) {
     analysisCache.set(cacheKey, analysis);
