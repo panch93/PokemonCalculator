@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@smogon/calc": "0.12.0",
-    "next": "16.4.2",
+    "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
