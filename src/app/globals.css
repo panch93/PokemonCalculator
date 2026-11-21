@@ -1586,3 +1586,40 @@ select, select:focus, select option, datalist option {
 .draft-team-analysis-detail-grid p { font-size: .72rem; }
 @media (max-width: 720px) { .team-analysis-rosters, .draft-team-analysis-sides { grid-template-columns: 1fr; } .team-analysis-roster-pokemon { grid-template-columns: repeat(3, minmax(0, 1fr)); } .draft-team-analysis-pokemon { width: calc(33.333% - 6px); } .draft-team-analysis-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 430px) { .draft-team-analysis-detail-grid { grid-template-columns: 1fr; } }
+
+/* Learnable setup-move and sweep-turn analysis. */
+
+.team-analysis-setup { border-top: 1px solid var(--border); margin-top: 10px; padding: 10px 12px 12px; }
+.team-analysis-setup h3, .team-analysis-setup h4 { margin: 0 0 5px; font-size: .84rem; }
+.team-analysis-setup > p { margin: 3px 0 8px; color: var(--muted, #aab2c0); font-size: .7rem; line-height: 1.45; }
+.team-analysis-setup-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.team-analysis-setup-list details { min-width: 0; border: 1px solid var(--border); border-radius: 7px; padding: 7px 9px; background: color-mix(in srgb, var(--panel, #171d28) 80%, transparent); }
+.team-analysis-setup-list summary { display: flex; flex-wrap: wrap; gap: 4px 9px; align-items: baseline; cursor: pointer; }
+.team-analysis-setup-list summary strong { font-size: .75rem; }
+.team-analysis-setup-list summary small { color: var(--muted, #aab2c0); font-size: .66rem; }
+.team-analysis-setup-list ul { margin: 7px 0 0; padding-left: 17px; }
+.team-analysis-setup-list li { margin: 5px 0; font-size: .68rem; line-height: 1.4; overflow-wrap: anywhere; }
+.draft-team-analysis-detail-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 0; }
+.draft-team-analysis-detail-grid > section { border-top: 0; padding-top: 0; }
+.draft-team-analysis-detail-grid h4 { margin: 0 0 5px; font-size: .8rem; }
+@media (max-width: 760px) { .team-analysis-setup-list { grid-template-columns: 1fr; } .draft-team-analysis-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 430px) { .draft-team-analysis-detail-grid { grid-template-columns: 1fr; } }
+
+/* Effective-Speed order strips shared by Draft Matchups and 6v6 Team Lab. */
+.draft-speed-order, .matrix-speed-order { display: flex; align-items: center; gap: 7px; min-width: 0; overflow-x: auto; padding: 8px 2px 10px; margin: 2px 0 8px; border-bottom: 1px solid var(--border); }
+.draft-speed-order-mon, .matrix-speed-order-mon { flex: 0 0 auto; display: grid; justify-items: center; gap: 1px; min-width: 48px; padding: 3px 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); }
+.draft-speed-order-mon.team-a, .matrix-speed-order-mon.team-a { border-bottom: 3px solid #60a5fa; }
+.draft-speed-order-mon.team-b, .matrix-speed-order-mon.team-b { border-bottom: 3px solid #f59e0b; }
+.draft-speed-order-sprite, .matrix-speed-order-sprite { width: 38px; height: 38px; object-fit: contain; }
+.draft-speed-order-mon small, .matrix-speed-order-mon small { color: var(--text); font-size: .66rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.matrix-speed-order-mon.fainted { opacity: .48; filter: grayscale(1); }
+.team-analysis-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; width: 100%; }
+.analysis-tag { display: inline-flex; align-items: center; padding: 2px 5px; border-radius: 999px; border: 1px solid currentColor; font-size: .58rem; line-height: 1.15; font-style: normal; font-weight: 800; white-space: nowrap; }
+.analysis-tag.setup { color: #c084fc; }
+.analysis-tag.sweeper { color: #fb7185; }
+.analysis-tag.walling { color: #60a5fa; }
+@media (max-width: 720px) { .draft-speed-order, .matrix-speed-order { gap: 4px; } .draft-speed-order-mon, .matrix-speed-order-mon { min-width: 42px; padding: 2px 3px; } .draft-speed-order-sprite, .matrix-speed-order-sprite { width: 32px; height: 32px; } }
+.speed-order-label { flex: 0 0 auto; color: var(--muted); font-size: .65rem; font-weight: 700; white-space: nowrap; }
+.speed-order-team { flex: 0 0 auto; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; font-size: .62rem; font-weight: 900; }
+.speed-order-team.team-a { color: #93c5fd; background: rgba(96,165,250,.14); }
+.speed-order-team.team-b { color: #fcd34d; background: rgba(245,158,11,.14); }

@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import { getAbility, getHistoricalSpeciesLearnset, getMove, getSpecies, getSpeciesAbilities, getSpeciesAbilitiesForGeneration, getSpeciesList, getMoveList, getItemList, getItem } from "../lib/showdown-data";
+import { getAbility, getHistoricalSpeciesLearnset, getMove, getNature, getSpecies, getSpeciesAbilities, getSpeciesAbilitiesForGeneration, getSpeciesList, getMoveList, getItemList, getItem } from "../lib/showdown-data";
 import { POKEMON_TYPES } from "../lib/pokemon-visuals";
 import { TypeChart } from "../lib/showdown-official/data/typechart";
 import AutocompleteInput from "./AutocompleteInput";
@@ -15,6 +15,7 @@ import { abilityDefenseDescription, abilityDefenseMultiplier, getAbilityDefenseE
 import { analyzeDraftPokemon, DEFAULT_DRAFT_MOVE_FILTER, type DraftMoveFilter, type DraftMatchupAnalysis, type DraftPokemonProfile, type DraftOpponentResult, type DraftMoveThreat } from "../lib/draft-matchup-analysis";
 import { getMaxIVs, type Team } from "../lib/types";
 import { getWeatherSpeedAbilityMultiplier } from "../lib/battle-order";
+import { getDraftProfileEffectiveSpeed } from "../lib/draft-matchup-analysis";
 import abilityStatBoosts from "../data/ability-stat-boosts.json";
 
 type Preset = { label: string; teamA: string[]; teamB: string[] };
@@ -120,10 +121,13 @@ export default function DraftMatchups() {
   const [matchupHover, setMatchupHover] = useState<{ side: "A" | "B"; name: string; kind: MatchupHoverKind; x: number; y: number } | null>(null);
   const [matchupAnalyses, setMatchupAnalyses] = useState<Record<string, DraftMatchupAnalysis>>({});
   const [matchupAnalysisLoading, setMatchupAnalysisLoading] = useState(false);
+  const [speedOptimizationRunning, setSpeedOptimizationRunning] = useState(false);
   const [bestFourOpen, setBestFourOpen] = useState(false);
   const [moveFilterOpen, setMoveFilterOpen] = useState(false);
   const [teamAnalysisOpen, setTeamAnalysisOpen] = useState(false);
   const [teamAnalysisSelection, setTeamAnalysisSelection] = useState<{ side: "A" | "B"; name: string } | null>(null);
+  const [teamAnalysisSetup, setTeamAnalysisSetup] = useState<Record<string, DraftMatchupAnalysis["setupSweeps"]>>({});
+  const [teamAnalysisSetupLoading, setTeamAnalysisSetupLoading] = useState(false);
   const [moveFilter, setMoveFilter] = useState<DraftMoveFilter>(DEFAULT_DRAFT_MOVE_FILTER);
   const [moveFilterDraft, setMoveFilterDraft] = useState<DraftMoveFilter>(DEFAULT_DRAFT_MOVE_FILTER);
   const moveNames = useMemo(() => getMoveList(), []);
@@ -241,6 +245,35 @@ export default function DraftMatchups() {
     run().catch(() => { if (!cancelled) setMatchupAnalysisLoading(false); });
     return () => { cancelled = true; };
   }, [teamA, teamB, abilityOverrides, supremeFainted, teraCaptains, teraTypes, speedConfigs, statConfigs, format, mechanicsGeneration, moveFilter, draftWeather, draftTerrain, draftSets]);
+  useEffect(() => {
+    if (!teamAnalysisOpen) return;
+    let cancelled = false;
+    const queue: Array<{ side: "A" | "B"; name: string; opponents: string[] }> = [
+      ...activeA.map(name => ({ side: "A" as const, name, opponents: activeB })),
+      ...activeB.map(name => ({ side: "B" as const, name, opponents: activeA })),
+    ];
+    setTeamAnalysisSetup({});
+    setTeamAnalysisSetupLoading(true);
+    const run = async () => {
+      for (const entry of queue) {
+        if (cancelled) return;
+        const result = await analyzeDraftPokemon(
+          profileFor(entry.side, entry.name),
+          entry.opponents.map(name => profileFor(entry.side === "A" ? "B" : "A", name)),
+          mechanicsGeneration,
+          () => cancelled,
+          moveFilter,
+          { ...blankDraftField, weather: draftWeather, terrain: draftTerrain },
+          true,
+        );
+        if (cancelled) return;
+        setTeamAnalysisSetup(current => ({ ...current, [`${entry.side}:${entry.name}`]: result.setupSweeps }));
+      }
+    };
+    run().catch(() => { if (!cancelled) setTeamAnalysisSetup({}); }).finally(() => { if (!cancelled) setTeamAnalysisSetupLoading(false); });
+    return () => { cancelled = true; };
+  }, [teamAnalysisOpen, teamA, teamB, abilityOverrides, supremeFainted, teraCaptains, teraTypes, speedConfigs, statConfigs, format, mechanicsGeneration, moveFilter, draftWeather, draftTerrain, draftSets]);
+
   useEffect(() => () => { if (matchupHoverTimer.current) clearTimeout(matchupHoverTimer.current); }, []);
 
   const storageKey = "pokemon-team-lab-draft-matchups-v2";
@@ -399,6 +432,42 @@ export default function DraftMatchups() {
     setSetItemDraft(presetString(preset.Item ?? preset.item));
     setSetAbilityDraft(presetString(preset.Ability ?? preset.ability));
     setSetMovesDraft([0, 1, 2, 3].map(index => moves[index] || ""));
+
+    // Smogon usage sets include EVs and a nature. Apply these to the same
+    // stat configuration stores used by the matchup speed/stat editors so
+    // importing a preset replaces (rather than layers over) the old spread.
+    // Capture the editor identity before updating state. React state can be null
+    // between renders, so do not dereference the nullable state inside updater closures.
+    const editor = setEditor;
+    if (!editor) return;
+    const rawEvs = preset.EVs ?? preset.evs;
+    const evObject = rawEvs && typeof rawEvs === "object" && !Array.isArray(rawEvs)
+      ? rawEvs as Record<string, unknown>
+      : {};
+    const statAliases: Record<string, "hp" | "atk" | "def" | "spa" | "spd" | "spe"> = {
+      hp: "hp", atk: "atk", attack: "atk", def: "def", defense: "def",
+      spa: "spa", spatk: "spa", specialattack: "spa", spd: "spd", spdef: "spd", specialdefense: "spd",
+      spe: "spe", speed: "spe",
+    };
+    const evs: Record<"hp" | "atk" | "def" | "spa" | "spd" | "spe", number> = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+    for (const [rawStat, rawValue] of Object.entries(evObject)) {
+      const stat = statAliases[cleanSetId(rawStat)];
+      if (stat) evs[stat] = Math.max(0, Math.min(252, Math.round(Number(rawValue) || 0)));
+    }
+    const natureName = presetString(preset.Nature ?? preset.nature) || "Hardy";
+    const nature = getNature(natureName);
+    const effectFor = (stat: "hp" | "atk" | "def" | "spa" | "spd" | "spe"): "boost" | "neutral" | "hinder" =>
+      nature?.plus === stat ? "boost" : nature?.minus === stat ? "hinder" : "neutral";
+    const setKey = `${editor.side}:${editor.name}`;
+    setSpeedConfigs(current => ({ ...current, [setKey]: { ev: evs.spe, nature: effectFor("spe"), stage: current[setKey]?.stage ?? 0 } }));
+    setStatConfigs(current => {
+      const next = { ...current };
+      for (const stat of ["hp", "atk", "def", "spa", "spd"] as const) {
+        const statKey = `${setKey}:${stat}`;
+        next[statKey] = { ev: evs[stat], nature: effectFor(stat), stage: current[statKey]?.stage ?? 0 };
+      }
+      return next;
+    });
   };
   const activeA = teamA.filter(Boolean);
   const activeB = teamB.filter(Boolean);
@@ -609,10 +678,94 @@ export default function DraftMatchups() {
       return kind === "walls" || kind === "walledBy" ? damage(a) - damage(b) : damage(b) - damage(a);
     });
   };
+  const speedField = { ...blankDraftField, weather: draftWeather, terrain: draftTerrain };
+  const profileSpeed = (side: "A" | "B", name: string, override?: SpeedConfig, battleSide: "attacker" | "defender" = side === "A" ? "attacker" : "defender") => {
+    const profile = profileFor(side, name);
+    if (override) profile.stats = { ...profile.stats, spe: { ...override, stage: override.stage ?? 0 } };
+    return getDraftProfileEffectiveSpeed(profile, speedField, battleSide);
+  };
+  const matchupActionIsViable = (attackerSide: "A" | "B", attackerName: string, defenderSide: "A" | "B", defenderName: string, counterThreat?: DraftMoveThreat) => {
+    const attackerSpeed = profileSpeed(attackerSide, attackerName, undefined, "attacker");
+    const defenderSpeed = profileSpeed(defenderSide, defenderName, undefined, "defender");
+    // If the attacker is slower, it only remains a useful threat when it can
+    // survive the defender's best return hit. The hover retains all raw results.
+    return attackerSpeed > defenderSpeed || !counterThreat || counterThreat.maxPct < 100;
+  };
+  const calculateSpeedEvs = () => {
+    if (speedOptimizationRunning) return;
+    setSpeedOptimizationRunning(true);
+    try {
+      const max = maxStatValue(format);
+      const budget = isChampionsFormat(format) ? 66 : 510;
+      const step = isChampionsFormat(format) ? 1 : 4;
+      const teamNames = { A: [...activeA], B: [...activeB] };
+      const next: Record<string, SpeedConfig> = { ...speedConfigs };
+      const current = (side: "A" | "B", name: string): SpeedConfig => ({ ...(next[`${side}:${name}`] || { ev: max, nature: "boost" as const, stage: 0 }), ev: clampDraftStat(next[`${side}:${name}`]?.ev ?? max, format) });
+      const rankedAll = ([...teamNames.A.map(name => ({ side: "A" as const, name })), ...teamNames.B.map(name => ({ side: "B" as const, name }))])
+        .sort((a, b) => profileSpeed(b.side, b.name, current(b.side, b.name)) - profileSpeed(a.side, a.name, current(a.side, a.name)));
+      const topHalfKeys = new Set(rankedAll.slice(0, Math.ceil(rankedAll.length / 2)).map(entry => `${entry.side}:${entry.name}`));
+      const isTopHalf = (side: "A" | "B", name: string) => topHalfKeys.has(`${side}:${name}`);
+      const optimize = (side: "A" | "B", name: string, opposingSide: "A" | "B") => {
+        if (!isTopHalf(side, name)) {
+          const before = current(side, name);
+          const slowSpread: SpeedConfig = { ...before, ev: 0, nature: "neutral" };
+          next[`${side}:${name}`] = slowSpread;
+          return before.ev !== 0 || before.nature !== "neutral";
+        }
+        const opponents = teamNames[opposingSide];
+        if (!opponents.length) return false;
+        const before = current(side, name);
+        const usedElsewhere = (["hp", "atk", "def", "spa", "spd"] as const).reduce((sum, stat) => sum + configForStat(side, name, stat).ev, 0);
+        const availableSpeed = Math.max(0, Math.min(max, budget - usedElsewhere));
+        let best = before;
+        let bestCount = -1;
+        let bestCost = Number.POSITIVE_INFINITY;
+        for (const nature of ["neutral", "boost"] as const) {
+          for (let ev = 0; ev <= availableSpeed; ev += step) {
+            const candidate: SpeedConfig = { ...before, ev, nature };
+            const speed = profileSpeed(side, name, candidate, "attacker");
+            const beaten = opponents.filter(opponent => speed > profileSpeed(opposingSide, opponent, current(opposingSide, opponent), "defender")).length;
+            const cost = ev + (nature === "boost" ? max + 1 : 0);
+            if (beaten > bestCount || (beaten === bestCount && cost < bestCost)) {
+              best = candidate; bestCount = beaten; bestCost = cost;
+            }
+          }
+        }
+        const changed = best.ev !== before.ev || best.nature !== before.nature;
+        next[`${side}:${name}`] = best;
+        return changed;
+      };
+      // Alternating best responses converge to a stable set of Speed
+      // benchmarks; the opponent's current spread is re-evaluated each pass.
+      const seenSpreads = new Set<string>();
+      for (let pass = 0; pass < 64; pass++) {
+        const signature = [...teamNames.A.map(name => `A:${name}:${current("A", name).ev}:${current("A", name).nature}`), ...teamNames.B.map(name => `B:${name}:${current("B", name).ev}:${current("B", name).nature}`)].join("|");
+        if (seenSpreads.has(signature)) break;
+        seenSpreads.add(signature);
+        let changed = false;
+        for (const name of teamNames.A) changed = optimize("A", name, "B") || changed;
+        for (const name of teamNames.B) changed = optimize("B", name, "A") || changed;
+        if (!changed) break;
+      }
+      setSpeedConfigs(next);
+    } finally {
+      setSpeedOptimizationRunning(false);
+    }
+  };
+
   const matchupCount = (side: "A" | "B", name: string, kind: MatchupHoverKind) => {
     const analysis = analysisFor(side, name);
     if (!analysis) return null;
-    const total = matchupRowsFor(side, name, kind).length;
+    const total = matchupRowsFor(side, name, kind).filter(row => {
+      const opponentSide = side === "A" ? "B" : "A";
+      const opponentName = row.species;
+      const attackerSide = kind === "hitBy" ? opponentSide : side;
+      const attackerName = kind === "hitBy" ? opponentName : name;
+      const defenderSide = kind === "hitBy" ? side : opponentSide;
+      const defenderName = kind === "hitBy" ? name : opponentName;
+      const counter = kind === "hitBy" ? row.bestAttack : row.bestReply;
+      return kind === "hits" || kind === "hitBy" ? matchupActionIsViable(attackerSide, attackerName, defenderSide, defenderName, counter) : true;
+    }).length;
     const ownMoves = Boolean(draftSets[`${side}:${name}`]?.moves.some(Boolean));
     const opposingSide = side === "A" ? "B" : "A";
     const opposingMoves = (side === "A" ? teamB : teamA).some(opponent => Boolean(opponent && draftSets[`${opposingSide}:${opponent}`]?.moves.some(Boolean)));
@@ -622,6 +775,13 @@ export default function DraftMatchups() {
       const candidates = kind === "walls" || kind === "hitBy" ? row.selectedReplies || [] : row.selectedAttacks || [];
       const best = candidates.reduce<DraftMoveThreat | undefined>((current, move) => !current || move.maxPct > current.maxPct || (move.maxPct === current.maxPct && move.chance70 > current.chance70) ? move : current, undefined);
       if (!best) return false;
+      const opponentSide = side === "A" ? "B" : "A";
+      const attackerSide = kind === "hitBy" ? opponentSide : side;
+      const attackerName = kind === "hitBy" ? row.species : name;
+      const defenderSide = kind === "hitBy" ? side : opponentSide;
+      const defenderName = kind === "hitBy" ? name : row.species;
+      const counter = kind === "hitBy" ? row.bestAttack : row.bestReply;
+      if ((kind === "hits" || kind === "hitBy") && !matchupActionIsViable(attackerSide, attackerName, defenderSide, defenderName, counter)) return false;
       return kind === "hits" || kind === "hitBy" ? best.maxPct >= 70 : best.maxPct <= 35;
     }).length;
     return `${selectedCount}/${total}`;
@@ -637,13 +797,14 @@ export default function DraftMatchups() {
 
     <section className="panel draft-controls">
       <div className="draft-preset-control"><label htmlFor="draft-preset">Matchup preset</label><select id="draft-preset" value={presetIndex} onChange={event => setPreset(Number(event.target.value))}>{PRESETS.map((preset, index) => <option key={preset.label} value={index}>{index + 1}. {savedMatchupNames[String(index)] || (index === presetIndex ? matchupName : preset.label)}</option>)}</select></div>
-      <button type="button" className="primary" onClick={() => { setTeamAnalysisSelection(activeA[0] ? { side: "A", name: activeA[0] } : activeB[0] ? { side: "B", name: activeB[0] } : null); setTeamAnalysisOpen(true); }}>Team analysis</button><button type="button" className="primary" onClick={() => setSupportOpen(true)}>Support moves</button>
+      <button type="button" className="primary" onClick={() => { setTeamAnalysisSelection(activeA[0] ? { side: "A", name: activeA[0] } : activeB[0] ? { side: "B", name: activeB[0] } : null); setTeamAnalysisOpen(true); }}>Team analysis</button><button type="button" onClick={calculateSpeedEvs} title="Optimises Speed on the fastest half of the combined matchup against the opposing Speed spreads, alternating up to 64 passes or until stable. The slower half is set to neutral nature and 0 Speed investment." disabled={speedOptimizationRunning || (!activeA.length && !activeB.length)}>{speedOptimizationRunning ? "Calculating Speed…" : "Calculate Speed EVs"}</button><button type="button" className="primary" onClick={() => setSupportOpen(true)}>Support moves</button>
       <div className="draft-team-counts"><span>Team A: <strong>{activeA.length}/12</strong> · <strong>{totalPoints("A", activeA)} pts</strong></span><span>Team B: <strong>{activeB.length}/12</strong> · <strong>{totalPoints("B", activeB)} pts</strong></span></div>
       <button className="primary" type="button" onClick={openEditor}>Edit matchup</button>
     </section>
 
     <section className="panel">
       <div className="panel-title-row"><div><h2>{matchupName}</h2><p>Hover over a Speed value for EV / Stat Point calculations.</p></div><div className="draft-team-formats"><label>Weather <select value={draftWeather} onChange={event => setDraftWeather(event.target.value as typeof draftWeather)}><option value="">None</option><option value="Sun">Sun</option><option value="Rain">Rain</option><option value="Sand">Sand</option><option value="Snow">Snow</option></select></label><label>Terrain <select value={draftTerrain} onChange={event => setDraftTerrain(event.target.value as typeof draftTerrain)}><option value="">None</option><option value="Electric">Electric</option><option value="Grassy">Grassy</option><option value="Misty">Misty</option><option value="Psychic">Psychic</option></select></label><label>Mechanics Gen <select aria-label="Draft matchup battle mechanics generation" value={mechanicsGeneration} onChange={event => setMechanicsGeneration(Number(event.target.value))}>{Array.from({ length: 9 }, (_, i) => i + 1).map(gen => <option key={gen} value={gen}>Gen {gen}{gen === 1 ? " · RBY" : gen === 2 ? " · GSC" : gen === 3 ? " · ADV" : gen === 4 ? " · DPP" : gen === 5 ? " · BW" : gen === 6 ? " · XY" : gen === 7 ? " · SM" : gen === 8 ? " · SS" : " · SV"}</option>)}<option value={10}>Pokémon Champions</option></select></label><label className="draft-matchup-format-control">Matchup format<span><FormatSelector value={format} onChange={setFormat} /><button type="button" className="draft-filter-icon" aria-label="Move filters" title={`Current move filters: minimum accuracy ${moveFilter.minAccuracy}%; minimum priority ${moveFilter.minPriority}; whitelist ${moveFilter.whitelist.length ? moveFilter.whitelist.join(", ") : "none"}; blacklist ${moveFilter.blacklist.length ? moveFilter.blacklist.join(", ") : "none"}.`} onClick={() => { setMoveFilterDraft({ ...moveFilter }); setMoveFilterOpen(true); }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10m-7 6h4" /></svg></button></span></label></div></div>
+      <div className="draft-speed-order" aria-label="All Pokémon ordered by effective Speed"><span className="speed-order-label">Effective Speed · fastest → slowest</span><span className="speed-order-team team-a">A</span><span className="speed-order-team team-b">B</span>{[...activeA.map(name => ({ name, side: "A" as const })), ...activeB.map(name => ({ name, side: "B" as const }))].map(entry => ({ ...entry, speed: profileSpeed(entry.side, entry.name) })).sort((a,b) => b.speed - a.speed).map(entry => <div className={`draft-speed-order-mon team-${entry.side.toLowerCase()}`} key={`${entry.side}:${entry.name}`} title={`Team ${entry.side} · ${entry.name} · Effective Speed ${entry.speed}`}><PokemonSprite species={entry.name} className="draft-speed-order-sprite" /><small>{entry.speed}</small></div>)}</div>
       <div className="matrix-scroll draft-table-scroll"><table className="draft-matchup-table draft-matchup-table-symmetric">
         <thead><tr><th className="draft-sprite-heading" aria-label="Team A portrait"></th><th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("A")}>Team A</button></th>{(["bst", "spd", "spa", "def", "atk", "hp", "spe"] as StatKey[]).map(key => statHeading(key, "A"))}{(["spe", "hp", "atk", "def", "spa", "spd", "bst"] as StatKey[]).map(key => statHeading(key, "B"))}<th><button type="button" className="draft-heading-button" onClick={() => setTypeTeam("B")}>Team B</button></th><th className="draft-sprite-heading" aria-label="Team B portrait"></th></tr></thead>
         <tbody>{Array.from({ length: Math.max(0, lastRow + 1) }, (_, index) => {
@@ -701,7 +862,7 @@ export default function DraftMatchups() {
               {analysis.opponents.some(row => (row.bestAttack?.maxPct || 0) > 35 && (row.bestAttack?.maxPct || 0) < 70) ? <ul>{analysis.opponents.filter(row => (row.bestAttack?.maxPct || 0) > 35 && (row.bestAttack?.maxPct || 0) < 70).sort((a,b)=>(b.bestAttack?.maxPct || 0)-(a.bestAttack?.maxPct || 0)).map(row => <li key={row.species}><b>{row.species}</b> — {row.bestAttack ? `${row.bestAttack.move} (${row.bestAttack.category.toLowerCase()}) · ${row.bestAttack.minPct.toFixed(0)}–${row.bestAttack.maxPct.toFixed(0)}%` : "—"}</li>)}</ul> : <p className="muted">No targets in this damage range.</p>}
             </section>
             {!profileFor(matchupHover.side, matchupHover.name).moves?.some(Boolean) && <section className="draft-matchup-analysis-section draft-best-four" onMouseEnter={() => setBestFourOpen(true)} onMouseLeave={() => setBestFourOpen(false)}><button type="button" onFocus={() => setBestFourOpen(true)} onBlur={() => setBestFourOpen(false)}>Find best 4 moves</button>
-              {bestFourOpen && <div className="draft-best-four-panel"><strong>Best move coverage (based on each target’s top move)</strong>{(() => { const counts = new Map<string, { move: string; category: string; type: string; hits: number; damage: number; targets: string[] }>(); for (const row of analysis.opponents) { const move = row.bestAttack; if (!move) continue; const entry = counts.get(move.move) || { move: move.move, category: move.category, type: move.type, hits: 0, damage: 0, targets: [] }; entry.damage += move.maxPct; if (move.maxPct >= 70) entry.hits++; entry.targets.push(`${row.species} ${move.maxPct.toFixed(0)}%`); counts.set(move.move, entry); } const selected = [...counts.values()].sort((a,b)=>b.hits-a.hits || b.damage-a.damage).slice(0,4); const chosen = new Set<string>(selected.map(item=>item.move)); const chosenRows = analysis.opponents.filter(row=>row.bestAttack && chosen.has(row.bestAttack.move)); return <><ol>{selected.map(item=><li key={item.move}><b>{item.move}</b> <small>({item.category.toLowerCase()} · {item.type}) — {item.hits} hits, {item.damage.toFixed(0)} summed max-damage %</small></li>)}</ol><strong>Hits using these moves ({chosenRows.filter(row=>(row.bestAttack?.maxPct || 0)>=70).length})</strong><ul>{chosenRows.filter(row=>(row.bestAttack?.maxPct || 0)>=70).map(row=><li key={row.species}>{row.species} — {row.bestAttack?.move} {row.bestAttack?.maxPct.toFixed(0)}%</li>)}</ul><strong>Damages using these moves</strong><ul>{chosenRows.filter(row=>(row.bestAttack?.maxPct || 0)>35 && (row.bestAttack?.maxPct || 0)<70).map(row=><li key={row.species}>{row.species} — {row.bestAttack?.move} {row.bestAttack?.maxPct.toFixed(0)}%</li>)}</ul></>; })()}</div>}
+              {bestFourOpen && <div className="draft-best-four-panel"><strong>Best move coverage (based on each target’s top move)</strong>{(() => { const counts = new Map<string, { move: string; category: string; type: string; hits: number; damage: number; targets: string[] }>(); for (const row of analysis.opponents) { const move = row.bestAttack; if (!move) continue; const entry: { move: string; category: string; type: string; hits: number; damage: number; targets: string[] } = counts.get(move.move) || { move: move.move, category: move.category, type: move.type, hits: 0, damage: 0, targets: [] }; entry.damage += move.maxPct; if (move.maxPct >= 70) entry.hits++; entry.targets.push(`${row.species} ${move.maxPct.toFixed(0)}%`); counts.set(move.move, entry); } const selected = [...counts.values()].sort((a,b)=>b.hits-a.hits || b.damage-a.damage).slice(0,4); const chosen = new Set<string>(selected.map(item=>item.move)); const chosenRows = analysis.opponents.filter(row=>row.bestAttack && chosen.has(row.bestAttack.move)); return <><ol>{selected.map(item=><li key={item.move}><b>{item.move}</b> <small>({item.category.toLowerCase()} · {item.type}) — {item.hits} hits, {item.damage.toFixed(0)} summed max-damage %</small></li>)}</ol><strong>Hits using these moves ({chosenRows.filter(row=>(row.bestAttack?.maxPct || 0)>=70).length})</strong><ul>{chosenRows.filter(row=>(row.bestAttack?.maxPct || 0)>=70).map(row=><li key={row.species}>{row.species} — {row.bestAttack?.move} {row.bestAttack?.maxPct.toFixed(0)}%</li>)}</ul><strong>Damages using these moves</strong><ul>{chosenRows.filter(row=>(row.bestAttack?.maxPct || 0)>35 && (row.bestAttack?.maxPct || 0)<70).map(row=><li key={row.species}>{row.species} — {row.bestAttack?.move} {row.bestAttack?.maxPct.toFixed(0)}%</li>)}</ul></>; })()}</div>}
             </section>}
           </>}
           {kind === "hitBy" && <section className="draft-matchup-analysis-section"><strong>Damaged by ({analysis.opponents.filter(row => (row.bestReply?.maxPct || 0) > 35 && (row.bestReply?.maxPct || 0) < 70).length})</strong><p>Opponents whose best reply deals more than 35% and less than 70% to this Pokémon.</p><ul>{analysis.opponents.filter(row => (row.bestReply?.maxPct || 0) > 35 && (row.bestReply?.maxPct || 0) < 70).sort((a,b)=>(b.bestReply?.maxPct || 0)-(a.bestReply?.maxPct || 0)).map(row=><li key={row.species}><b>{row.species}</b> — {row.bestReply ? `${row.bestReply.move} (${row.bestReply.category.toLowerCase()}) · ${row.bestReply.minPct.toFixed(0)}–${row.bestReply.maxPct.toFixed(0)}%` : "—"}</li>)}</ul></section>}
@@ -743,7 +904,7 @@ export default function DraftMatchups() {
     {speedEdit && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSpeedEdit(null); }}><section className="draft-modal draft-speed-modal" role="dialog" aria-modal="true" aria-label={`${speedEdit.name} ${STAT_LABELS[speedEdit.stat]} settings`}><div className="panel-title-row"><div><h2>{speedEdit.name} · {STAT_LABELS[speedEdit.stat]} settings</h2><p>Base stats remain displayed in the table; these settings are saved for matchup planning and stat calculations. {isChampionsFormat(format) ? "Champions uses Stat Points (0–32 per stat)." : "Standard formats use EVs (0–252 per stat)."}</p></div><div className="draft-stat-modal-actions"><button type="button" title="Reset this stat's EVs or Stat Points, nature, and stage." onClick={() => updateStatConfig(speedEdit.side, speedEdit.name, speedEdit.stat, { ev: 0, nature: "neutral", stage: 0 })}>Reset this stat</button><button type="button" onClick={() => setSpeedEdit(null)}>Close ×</button></div></div>{(() => { const cfg = configForStat(speedEdit.side, speedEdit.name, speedEdit.stat); const isHp = speedEdit.stat === "hp"; return <div className="draft-speed-fields"><label>{STAT_LABELS[speedEdit.stat]} {statValueLabel(format)} <span className="draft-ev-input-with-max"><input type="number" min="0" max={maxStatValue(format)} step={isChampionsFormat(format) ? 1 : 4} value={cfg.ev} onChange={e => updateStatConfig(speedEdit.side, speedEdit.name, speedEdit.stat, { ev: clampDraftStat(Number(e.target.value), format) })} /><button type="button" onClick={() => updateStatConfig(speedEdit.side, speedEdit.name, speedEdit.stat, { ev: maxStatValue(format) })}>Max {maxStatValue(format)}</button></span></label>{!isHp && <label>Nature<select value={cfg.nature} onChange={e => updateStatConfig(speedEdit.side, speedEdit.name, speedEdit.stat, { nature: e.target.value as StatConfig["nature"] })}><option value="boost">Boosting (+{STAT_LABELS[speedEdit.stat]})</option><option value="neutral">Neutral</option><option value="hinder">Hindering (−{STAT_LABELS[speedEdit.stat]})</option></select></label>}{!isHp && <label>{STAT_LABELS[speedEdit.stat]} stage<select value={cfg.stage} onChange={e => updateStatConfig(speedEdit.side, speedEdit.name, speedEdit.stat, { stage: Number(e.target.value) })}>{Array.from({length: 13}, (_, i) => i - 6).map(stage => <option key={stage} value={stage}>{stage > 0 ? `+${stage}` : stage}</option>)}</select></label>}</div>; })()}</section></div>}
 
     <DraftMoveFilterModal open={moveFilterOpen} title={`Move filters · ${matchupName}`} description="Filters apply to both attacking directions. Whitelisted moves bypass accuracy and priority thresholds, but blacklist entries always win. Settings are saved separately for each matchup." value={moveFilterDraft} moveNames={moveNames} onSave={setMoveFilter} onClose={() => setMoveFilterOpen(false)} />
-    {teamAnalysisOpen && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setTeamAnalysisOpen(false); }}><section className="draft-modal draft-team-analysis-modal" role="dialog" aria-modal="true" aria-labelledby="draft-team-analysis-title"><div className="panel-title-row"><div><h2 id="draft-team-analysis-title">Draft matchup team analysis</h2><p>Existing matchup analysis for both rosters. Select a Pokémon to inspect its offensive and defensive matchups.</p></div><button type="button" onClick={() => setTeamAnalysisOpen(false)}>Close ×</button></div><div className="draft-team-analysis-sides">{([{ side: "A" as const, names: activeA }, { side: "B" as const, names: activeB }]).map(team => <section className="draft-team-analysis-side" key={team.side}><h3>Team {team.side}</h3><div className="draft-team-analysis-pokemon">{team.names.map(name => { const selected = teamAnalysisSelection?.side === team.side && teamAnalysisSelection.name === name; const analysis = analysisFor(team.side, name); const hits = analysis?.opponents.filter(row => row.threat).length ?? 0; const walls = analysis?.opponents.filter(row => row.attackerWalls).length ?? 0; const hitBy = analysis?.opponents.filter(row => (row.bestReply?.maxPct || 0) >= 70).length ?? 0; return <button type="button" key={`${team.side}:${name}`} className={`draft-team-analysis-pokemon ${selected ? "selected" : ""}`} onClick={() => setTeamAnalysisSelection({ side: team.side, name })}><PokemonSprite species={name} className="draft-team-analysis-sprite" /><span>{name}</span><small>Hits {hits} · Walls {walls} · Hit by {hitBy}</small></button>; })}</div></section>)}</div>{teamAnalysisSelection && (() => { const { side, name } = teamAnalysisSelection; const analysis = analysisFor(side, name); const rows = analysis?.opponents || []; const categories = [{ title: "Hits", rows: rows.filter(row => row.threat).sort((a,b) => (b.bestAttack?.maxPct || 0) - (a.bestAttack?.maxPct || 0)), field: "bestAttack" as const }, { title: "Walls", rows: rows.filter(row => row.attackerWalls).sort((a,b) => (a.bestReply?.maxPct || 0) - (b.bestReply?.maxPct || 0)), field: "bestReply" as const }, { title: "Hit by", rows: rows.filter(row => (row.bestReply?.maxPct || 0) >= 70).sort((a,b) => (b.bestReply?.maxPct || 0) - (a.bestReply?.maxPct || 0)), field: "bestReply" as const }, { title: "Walled by", rows: rows.filter(row => row.wallsAttacker).sort((a,b) => (a.bestAttack?.maxPct || 0) - (b.bestAttack?.maxPct || 0)), field: "bestAttack" as const }]; return <section className="draft-team-analysis-detail"><h3>Team {side} · {name}</h3>{matchupAnalysisLoading && !analysis ? <p className="muted">Calculating matchup data…</p> : analysis ? <div className="draft-team-analysis-detail-grid">{categories.map(category => <section key={category.title}><h4>{category.title} ({category.rows.length})</h4>{category.rows.length ? <ul>{category.rows.map(row => { const move = row[category.field]; return <li key={row.species}><b>{row.species}</b>{move ? ` — ${move.move} · ${move.minPct.toFixed(1)}–${move.maxPct.toFixed(1)}%` : ""}</li>; })}</ul> : <p className="muted">No matching Pokémon.</p>}</section>)}</div> : <p className="muted">No analysis available yet.</p>}</section>; })()}</section></div>}
+    {teamAnalysisOpen && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setTeamAnalysisOpen(false); }}><section className="draft-modal draft-team-analysis-modal" role="dialog" aria-modal="true" aria-labelledby="draft-team-analysis-title"><div className="panel-title-row"><div><h2 id="draft-team-analysis-title">Draft matchup team analysis</h2><p>Existing matchup analysis for both rosters. Select a Pokémon to inspect its offensive and defensive matchups.</p></div><button type="button" onClick={() => setTeamAnalysisOpen(false)}>Close ×</button></div><div className="team-analysis-rosters">{([{ side: "A" as const, names: activeA }, { side: "B" as const, names: activeB }]).map(team => <section className="team-analysis-roster" key={team.side}><h3>Team {team.side}</h3><div className="team-analysis-roster-pokemon">{team.names.map(name => { const selected = teamAnalysisSelection?.side === team.side && teamAnalysisSelection.name === name; const analysis = analysisFor(team.side, name); const hits = analysis?.opponents.filter(row => row.threat && matchupActionIsViable(team.side, name, team.side === "A" ? "B" : "A", row.species, row.bestReply)).length ?? 0; const walls = analysis?.opponents.filter(row => row.attackerWalls).length ?? 0; const hitBy = analysis?.opponents.filter(row => (row.bestReply?.maxPct || 0) >= 70 && matchupActionIsViable(team.side === "A" ? "B" : "A", row.species, team.side, name, row.bestAttack)).length ?? 0; const opponentCount = analysis?.opponents.length || 0; const roleThreshold = opponentCount ? Math.min(opponentCount, Math.max(1, Math.ceil(opponentCount / 2))) : Number.POSITIVE_INFINITY; const sweepTargets = analysis?.opponents.filter(row => row.threat && matchupActionIsViable(team.side, name, team.side === "A" ? "B" : "A", row.species, row.bestReply)).length || 0; const wallTargets = analysis?.opponents.filter(row => row.attackerWalls).length || 0; return <button type="button" key={`${team.side}:${name}`} className={`team-analysis-roster-mon ${selected ? "selected" : ""}`} onClick={() => setTeamAnalysisSelection({ side: team.side, name })}><PokemonSprite species={name} className="team-analysis-roster-sprite" /><span>{name}</span><small>Hits {hits} · Walls {walls} · Hit by {hitBy}</small><span className="team-analysis-tags">{teamAnalysisSetup[`${team.side}:${name}`]?.some(setup => setup.plausibleTargets > 0) ? <i className="analysis-tag setup">Setup</i> : null}{sweepTargets >= roleThreshold ? <i className="analysis-tag sweeper">Sweeper</i> : null}{wallTargets >= roleThreshold ? <i className="analysis-tag walling">Walling</i> : null}</span></button>; })}</div></section>)}</div>{teamAnalysisSelection && (() => { const { side, name } = teamAnalysisSelection; const analysis = analysisFor(side, name); const rows = analysis?.opponents || []; const categories = [{ title: "Hits", rows: rows.filter(row => row.threat && matchupActionIsViable(side, name, side === "A" ? "B" : "A", row.species, row.bestReply)).sort((a,b) => (b.bestAttack?.maxPct || 0) - (a.bestAttack?.maxPct || 0)), field: "bestAttack" as const }, { title: "Walls", rows: rows.filter(row => row.attackerWalls).sort((a,b) => (a.bestReply?.maxPct || 0) - (b.bestReply?.maxPct || 0)), field: "bestReply" as const }, { title: "Hit by", rows: rows.filter(row => (row.bestReply?.maxPct || 0) >= 70 && matchupActionIsViable(side === "A" ? "B" : "A", row.species, side, name, row.bestAttack)).sort((a,b) => (b.bestReply?.maxPct || 0) - (a.bestReply?.maxPct || 0)), field: "bestReply" as const }, { title: "Walled by", rows: rows.filter(row => row.wallsAttacker).sort((a,b) => (a.bestAttack?.maxPct || 0) - (b.bestAttack?.maxPct || 0)), field: "bestAttack" as const }]; return <section className="team-analysis-selected"><h3>Team {side} · {name}</h3>{matchupAnalysisLoading && !analysis ? <p className="muted">Calculating matchup data…</p> : analysis ? <><div className="team-analysis-columns draft-team-analysis-detail-grid">{categories.map(category => <section key={category.title}><h4>{category.title} ({category.rows.length})</h4>{category.rows.length ? <ul>{category.rows.map(row => { const move = row[category.field]; return <li key={row.species}><b>{row.species}</b>{move ? ` — ${move.move} · ${move.minPct.toFixed(1)}–${move.maxPct.toFixed(1)}%` : ""}</li>; })}</ul> : <p className="muted">No matching Pokémon.</p>}</section>)}</div><section className="team-analysis-setup"><h4>Setup strategy</h4>{teamAnalysisSetupLoading && !teamAnalysisSetup[`${side}:${name}`] ? <p className="muted">Evaluating viable setup strategies across both rosters…</p> : (() => { const viable = (teamAnalysisSetup[`${side}:${name}`] || []).filter(setup => setup.plausibleTargets > 0).sort((a, b) => b.plausibleTargets - a.plausibleTargets); return viable.length ? <p>Can plausibly set up against {Math.max(...viable.map(setup => setup.plausibleTargets))} opposing Pokémon. Strongest lines: {viable.slice(0, 2).map(setup => `${setup.move} (${setup.plausibleTargets} targets)`).join(" · ")}{viable.length > 2 ? ` · +${viable.length - 2} other viable line(s)` : ""}.</p> : <p className="muted">No setup line can currently set up and sweep the remaining roster under the configured Speed, damage and survival assumptions.</p>; })()}</section></> : <p className="muted">No analysis available yet.</p>}</section>; })()}</section></div>}
     {setEditor && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeSetEditor(); }}><section className="draft-modal" role="dialog" aria-modal="true" aria-label={`Edit ${setEditor.name} set`}><div className="panel-title-row"><div><h2>{setEditor.name} · set</h2><p>These item and move choices are used in matchup hit/wall analysis and exported to Team Builder.</p></div><button type="button" onClick={closeSetEditor}>Close ×</button></div><label>Preset<select value={selectedDraftPreset} disabled={!draftPresetDatabase || !draftSetPresets.length} onChange={event => { setSelectedDraftPreset(event.target.value); applyDraftSetPreset(event.target.value); }}><option value="">{draftPresetStatus === "loading" ? "Loading Smogon sets…" : draftPresetStatus === "error" ? "Presets unavailable" : draftSetPresets.length ? "Choose a Smogon set…" : "No presets available"}</option>{draftSetPresets.map(([name]) => <option key={name} value={name}>{name}</option>)}</select></label><label>Item<input list="draft-set-item-list" value={setItemDraft} onChange={event => setSetItemDraft(event.target.value)} placeholder="No item" /></label><datalist id="draft-set-item-list">{getItemList().map(item => <option key={item} value={item} />)}</datalist><label>Ability<input list="draft-set-ability-list" value={setAbilityDraft} onChange={event => setSetAbilityDraft(event.target.value)} placeholder="Choose ability" /></label><datalist id="draft-set-ability-list">{getSpeciesAbilities(setEditor.name).map(ability => <option key={ability} value={ability} />)}</datalist><div className="draft-editor-teams">{setMovesDraft.map((move, index) => <label key={index}>Move {index + 1}<input list="draft-set-move-list" value={move} onChange={event => setSetMovesDraft(current => current.map((value, i) => i === index ? event.target.value : value))} placeholder="Choose move" /></label>)}</div><datalist id="draft-set-move-list">{moveNames.map(move => <option key={move} value={move} />)}</datalist><label>Notes<textarea rows={3} value={setNotesDraft} onChange={event => setSetNotesDraft(event.target.value)} placeholder="Notes shown when hovering over this Pokémon’s name…" /></label><div className="button-row draft-editor-actions"><button type="button" onClick={() => { setSetItemDraft(""); setSetAbilityDraft(""); setSetMovesDraft(["", "", "", ""]); setSetNotesDraft(""); }}>Clear</button></div></section></div>}
   </main>;
 }
