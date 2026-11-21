@@ -1525,17 +1525,38 @@ select, select:focus, select option, datalist option {
 .matrix-pokemon-notes { display: block; margin-top: 6px !important; padding-top: 5px; border-top: 1px solid var(--border); color: var(--text, #f2f4f8) !important; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .62rem !important; line-height: 1.35 !important; }
 .matrix-pokemon-notes b { color: var(--muted); }
 
-/* Draft 6v6 analysis and EV-budget indicator */
-.draft-ev-remaining { display:block; min-height:1.1em; margin-top:2px; color:#63c98a; font-size:.58rem; font-weight:600; white-space:nowrap; }
-.draft-ev-remaining.evs-remaining-positive { color:#63c98a; }
-.draft-ev-remaining.evs-remaining-zero { color:var(--muted); }
-.draft-ev-remaining.evs-remaining-over { color:#f07878; }
-.draft-team-analysis-modal { width:min(1100px, 96vw); max-height:90vh; overflow:auto; }
-.draft-team-analysis-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:8px; }
-.draft-team-analysis-grid article { min-width:0; padding:10px; border:1px solid var(--border); border-radius:9px; }
-.draft-team-analysis-grid article > strong { display:block; margin-bottom:4px; }
-.draft-team-analysis-grid p { color:var(--muted); font-size:.72rem; line-height:1.4; }
-.draft-team-analysis-grid ul,.draft-team-analysis-grid ol { margin:6px 0 0; padding-left:18px; }
-.draft-team-analysis-grid li { margin:5px 0; font-size:.73rem; line-height:1.35; }
-.draft-team-analysis-grid li small { display:block; color:var(--muted); font-size:.66rem; }
-@media(max-width:800px) { .draft-team-analysis-grid { grid-template-columns:1fr; } }
+/* Compact remaining EV / Stat Point value beneath BST. */
+.draft-matchup-table-symmetric .draft-bst-budget {
+  display: block;
+  min-height: 13px;
+  margin-top: 2px;
+  color: var(--muted, #aab2c0);
+  font-size: .58rem;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.draft-matchup-table-symmetric .draft-bst-budget.has-remaining { color: #65dba0; }
+.draft-matchup-table-symmetric .draft-bst-budget.is-over { color: #f07878; }
+
+.team-analysis-modal { width: min(1120px, calc(100vw - 24px)); max-width: 1120px; max-height: min(90vh, 900px); overflow: auto; }
+.team-analysis-header-actions { display: flex; flex: 0 0 auto; gap: 6px; }
+.team-analysis-explainer, .team-analysis-footnote { margin: 8px 0 12px; color: var(--muted, #aab2c0); font-size: .76rem; line-height: 1.45; }
+.team-analysis-progress { padding: 8px 10px; border-radius: 6px; background: var(--surface, rgba(120,140,170,.12)); font-size: .78rem; }
+.team-analysis-error { color: #f07878; }
+.team-analysis-results { display: grid; gap: 8px; }
+.team-analysis-run { border: 1px solid var(--border); border-radius: 8px; background: var(--panel, #171d28); overflow: hidden; }
+.team-analysis-run > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px 12px; padding: 10px 12px; cursor: pointer; list-style-position: inside; }
+.team-analysis-run > summary strong { color: var(--text, #f2f4f8); }
+.team-analysis-run > summary span, .team-analysis-run > summary small { color: var(--muted, #aab2c0); font-size: .72rem; }
+.team-analysis-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 0 12px 12px; }
+.team-analysis-columns > section { min-width: 0; border-top: 1px solid var(--border); padding-top: 8px; }
+.team-analysis-columns h3 { margin: 0 0 4px; font-size: .84rem; }
+.team-analysis-columns p { margin: 3px 0 7px; color: var(--muted, #aab2c0); font-size: .68rem; line-height: 1.4; }
+.team-analysis-columns ul { margin: 0; padding-left: 17px; }
+.team-analysis-columns li { margin: 5px 0; font-size: .72rem; line-height: 1.35; overflow-wrap: anywhere; }
+.team-analysis-columns li small { color: var(--muted, #aab2c0); }
+.team-analysis-subdetails { margin-top: 8px; font-size: .7rem; }
+.team-analysis-subdetails > summary { color: var(--muted, #aab2c0); cursor: pointer; }
+@media (max-width: 760px) { .team-analysis-columns { grid-template-columns: 1fr; } .team-analysis-header-actions { flex-wrap: wrap; } }

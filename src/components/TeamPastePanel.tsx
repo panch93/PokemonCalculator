@@ -164,7 +164,7 @@ export default function TeamPastePanel({ left, right, format, open, onClose, onI
   const changeSpecies = (side: Side, index: number, species: string) => {
     const current = side === "left" ? builderA : builderB;
     const old = current[index];
-    const nextName = species.trim();
+    const nextName = species.trim() || old.species;
     setSelectedPresets(previous => { const next = { ...previous }; delete next[`${side}-${index}`]; return next; });
     const availableAbilities = getSpeciesAbilities(nextName);
     updateBuilderPokemon(side, index, { species: nextName, name: nextName, ability: availableAbilities.length === 1 ? availableAbilities[0] : "", item: "", moves: ["", "", "", ""], nature: "Hardy", evs: { ...DEFAULT_STATS }, teraType: "", importedTeraType: "" });

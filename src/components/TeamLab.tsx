@@ -2,17 +2,18 @@
 
 import Link from "next/link";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { sampleTeamA, sampleTeamB } from "../lib/sample-data";
 import { calculateMove } from "../lib/calc";
-import { FieldState, getMaxIVs, Matchup, StatStages, Team } from "../lib/types";
+import { FieldState, getMaxIVs, Matchup, StatStages, Team, type StatId } from "../lib/types";
 import TeamPastePanel from "./TeamPastePanel";
 import MatchupMatrix from "./MatchupMatrix";
 import FieldPanel from "./FieldPanel";
 import { getLearnsetModeLabel, loadFormatLearnsets } from "../lib/learnsets";
 import FormatLegalityPanel from "./FormatLegalityPanel";
 import FormatSelector from "./FormatSelector";
-import { getSpeciesAbilities } from "../lib/showdown-data";
+import { getNature, getSpecies, getSpeciesAbilities } from "../lib/showdown-data";
+import { analyzeDraftPokemon, DEFAULT_DRAFT_MOVE_FILTER, type DraftMatchupAnalysis, type DraftPokemonProfile } from "../lib/draft-matchup-analysis";
 
 const DEFAULT_FIELD: FieldState = {
   gameType: "Singles", weather: "", terrain: "", defenderStealthRock: false, defenderSpikes: 0, defenderReflect: false,
@@ -24,6 +25,7 @@ const initialMoves = (team: Team) => team.map(p => p.moves.find(Boolean) || "");
 const STORAGE_KEY = "pokemon-team-lab-v0.3.0";
 
 type SavedState = { schemaVersion?: number; generation?: number; overallNotes?: string; field?: FieldState; teamA?: Team; teamB?: Team; movesA?: string[]; movesB?: string[]; stagesA?: StatStages[]; stagesB?: StatStages[]; swapped?: boolean; critical?: boolean };
+type TeamAnalysisRun = { side: "left" | "right"; species: string; scenario: string; profile: DraftPokemonProfile; analysis: DraftMatchupAnalysis; opponentScenarios: Array<{ species: string; scenario: string }> };
 
 export default function TeamLab() {
   const [left, setLeft] = useState<Team>(sampleTeamA);
@@ -48,6 +50,12 @@ export default function TeamLab() {
   const [mechanics, setMechanics] = useState({ tera: true });
   const [generation, setGeneration] = useState(9);
   const [learnsetStatus, setLearnsetStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [teamAnalysisOpen, setTeamAnalysisOpen] = useState(false);
+  const [teamAnalysisLoading, setTeamAnalysisLoading] = useState(false);
+  const [teamAnalysisRuns, setTeamAnalysisRuns] = useState<TeamAnalysisRun[]>([]);
+  const [teamAnalysisError, setTeamAnalysisError] = useState("");
+  const [teamAnalysisProgress, setTeamAnalysisProgress] = useState("");
+  const teamAnalysisToken = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,6 +171,111 @@ export default function TeamLab() {
   // after mount; gating the whole app on storageReady could leave the UI stuck on loading
   // if a browser extension or storage implementation interferes with the effect.
 
+  const runTeamAnalysis = async () => {
+    const token = ++teamAnalysisToken.current;
+    setTeamAnalysisOpen(true);
+    setTeamAnalysisLoading(true);
+    setTeamAnalysisError("");
+    setTeamAnalysisRuns([]);
+    const isCancelled = () => teamAnalysisToken.current !== token;
+    const active = (team: Team) => team.filter(p => Boolean(p.species) && !p.dead && !/^empty slot/i.test(p.name || ""));
+    const championsMode = generation >= 10 || /champions/i.test(format);
+    const budget = championsMode ? 66 : 510;
+    const perStatMax = championsMode ? 32 : 252;
+    const makeProfiles = (pokemon: Team[number], team: Team): Array<{ profile: DraftPokemonProfile; scenario: string }> => {
+      const baseEvs = { ...pokemon.evs };
+      const used = Object.values(baseEvs).reduce((sum, value) => sum + (Number(value) || 0), 0);
+      const remaining = Math.max(0, budget - used);
+      const speciesData = getSpecies(pokemon.species);
+      const baseStats = speciesData?.baseStats || {};
+      const nature = getNature(pokemon.nature || "Hardy");
+      const natureFor = (stat: StatId): "boost" | "neutral" | "hinder" => nature?.plus === stat ? "boost" : nature?.minus === stat ? "hinder" : "neutral";
+      const ability = pokemon.ability || "";
+      const teraType = mechanics.tera && generation === 9 ? (pokemon.teraType || "") : "";
+      const alliesFainted = team.filter(other => other !== pokemon && other.dead).length;
+      const build = (evs: typeof baseEvs, item: string): DraftPokemonProfile => ({
+        species: pokemon.species, ability, item, moves: pokemon.moves.filter(Boolean), teraType,
+        championsMode, level: pokemon.level || (championsMode ? 50 : 100), alliesFainted,
+        stats: Object.fromEntries((['hp','atk','def','spa','spd','spe'] as StatId[]).map(stat => [stat, { ev: evs[stat] || 0, nature: natureFor(stat), stage: 0 }])) as DraftPokemonProfile['stats'],
+      });
+      const knownItem = pokemon.item?.trim() || "";
+      const scenarios: Array<{ profile: DraftPokemonProfile; scenario: string }> = [{ profile: build(baseEvs, knownItem), scenario: knownItem ? `Configured set · ${knownItem}` : "Configured EVs · item unknown" }];
+      const addTo = (evs: typeof baseEvs, priorities: StatId[]) => {
+        let points = remaining;
+        const unit = generation >= 10 ? 1 : 4;
+        points = Math.floor(points / unit) * unit;
+        for (const stat of priorities) {
+          if (points <= 0) break;
+          const capacity = Math.max(0, perStatMax - (evs[stat] || 0));
+          const amount = Math.min(capacity, points);
+          evs[stat] = (evs[stat] || 0) + amount;
+          points -= amount;
+        }
+        return evs;
+      };
+      const attackStat: StatId = (baseStats.atk || 0) >= (baseStats.spa || 0) ? "atk" : "spa";
+      if (remaining > 0) {
+        const offensive = addTo({ ...baseEvs }, [attackStat, "spe", "hp", attackStat === "atk" ? "spa" : "atk"]);
+        const offensiveItem = knownItem || "Life Orb";
+        scenarios.push({ profile: build(offensive, offensiveItem), scenario: `${knownItem ? "Remaining EVs: offense + Speed" : "Life Orb assumption + offensive EVs"}` });
+        const bulky = addTo({ ...baseEvs }, ["hp", "def", "spd", "spe"]);
+        const bulkyItem = knownItem || "Assault Vest";
+        scenarios.push({ profile: build(bulky, bulkyItem), scenario: `${knownItem ? "Remaining EVs: HP / defenses" : "Assault Vest assumption + bulky EVs"}` });
+        if (!knownItem && (field.defenderStealthRock || field.defenderSpikes > 0)) scenarios.push({ profile: build(bulky, "Heavy-Duty Boots"), scenario: "Heavy-Duty Boots assumption + bulky EVs" });
+      } else if (!knownItem) {
+        scenarios.push({ profile: build(baseEvs, "Life Orb"), scenario: "Life Orb assumption · configured EVs" });
+        scenarios.push({ profile: build(baseEvs, "Assault Vest"), scenario: "Assault Vest assumption · configured EVs" });
+        if (field.defenderStealthRock || field.defenderSpikes > 0) scenarios.push({ profile: build(baseEvs, "Heavy-Duty Boots"), scenario: "Heavy-Duty Boots assumption · configured EVs" });
+      }
+      return scenarios;
+    };
+    try {
+      const runs: TeamAnalysisRun[] = [];
+      const sides = [{ side: "left" as const, own: active(left), opposing: active(right), ownTeam: left, opposingTeam: right }, { side: "right" as const, own: active(right), opposing: active(left), ownTeam: right, opposingTeam: left }];
+      for (const side of sides) {
+        for (const pokemon of side.own) {
+          if (isCancelled()) return;
+          const attackerScenarios = makeProfiles(pokemon, side.ownTeam);
+          const defenderScenarios = side.opposing.flatMap(opponent => {
+            const options = makeProfiles(opponent, side.opposingTeam);
+            // Test the entered target set and one plausible defensive allocation/item,
+            // rather than multiplying every attack scenario by every target scenario.
+            const chosen = options.length > 2 ? [options[0], options[2], ...(options[3] ? [options[3]] : [])] : options;
+            return chosen.map(entry => ({ species: opponent.species, scenario: entry.scenario, profile: entry.profile }));
+          });
+          for (const attackerScenario of attackerScenarios) {
+            if (isCancelled()) return;
+            setTeamAnalysisProgress(`${side.side === "left" ? "Team A" : "Team B"}: ${pokemon.species} · ${attackerScenario.scenario}`);
+            const analysis = await analyzeDraftPokemon(
+              attackerScenario.profile,
+              defenderScenarios.map(entry => entry.profile),
+              generation,
+              isCancelled,
+              { ...DEFAULT_DRAFT_MOVE_FILTER, minAccuracy: 0, minPriority: -7 },
+              field,
+            );
+            if (isCancelled()) return;
+            runs.push({ side: side.side, species: pokemon.species, scenario: attackerScenario.scenario, profile: attackerScenario.profile, analysis, opponentScenarios: defenderScenarios.map(({ species, scenario }) => ({ species, scenario })) });
+            setTeamAnalysisRuns([...runs]);
+          }
+        }
+      }
+    } catch (error) {
+      if (!isCancelled()) setTeamAnalysisError(error instanceof Error ? error.message : "Team analysis failed.");
+    } finally {
+      if (!isCancelled()) {
+        setTeamAnalysisLoading(false);
+        setTeamAnalysisProgress("");
+      }
+    }
+  };
+
+  const closeTeamAnalysis = () => {
+    teamAnalysisToken.current += 1;
+    setTeamAnalysisLoading(false);
+    setTeamAnalysisOpen(false);
+  };
+
   return (
     <main>
       <header className="hero">
@@ -170,7 +283,7 @@ export default function TeamLab() {
           <div className="top-rule-controls"><label>Mechanics Gen <select aria-label="Battle mechanics generation" value={generation} onChange={e => { const next = Number(e.target.value); setGeneration(next); if (next !== 9) setMechanics({ tera: false }); }}>{Array.from({ length: 9 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Gen {g}{g === 1 ? " · RBY" : g === 2 ? " · GSC" : g === 3 ? " · ADV" : g === 4 ? " · DPP" : g === 5 ? " · BW" : g === 6 ? " · XY" : g === 7 ? " · SM" : g === 8 ? " · SS" : " · SV"}</option>)}<option value={10}>Pokémon Champions</option></select></label><label>Format <FormatSelector value={format} onChange={setFormat} /></label>
           <details className="mechanics-menu"><summary>Battle mechanics</summary><div className="mechanics-options"><label><input type="checkbox" checked={mechanics.tera && generation === 9} disabled={generation !== 9} onChange={e => setMechanics({ tera: e.target.checked })} />Terastallization</label><small>Generations 1–9 use their corresponding Smogon Calc generation. Pokémon Champions uses bundled official Champions move metadata with the shared Gen 9-compatible damage formula adapter; scripted effects that the damage engine cannot represent directly may remain approximate. Terastallization is available only in Gen 9.</small></div></details></div>
         </div>
-        <div className="hero-actions"><Link className="nav-link" href="/draft">Draft Matchups</Link><button type="button" onClick={refreshTeamLearnsets} disabled={learnsetStatus === "loading"}>{learnsetStatus === "loading" ? "Loading learnsets…" : "Refresh team learnsets"}</button><span className={`learnset-status ${learnsetStatus}`} role="status">{learnsetStatus === "loading" ? "Learnsets loading" : learnsetStatus === "ready" ? getLearnsetModeLabel(format) : "Learnsets unavailable"}</span><button onClick={() => setTeamsOpen(true)}>Teams · Import / Export</button></div>
+        <div className="hero-actions"><Link className="nav-link" href="/draft">Draft Matchups</Link><button type="button" onClick={refreshTeamLearnsets} disabled={learnsetStatus === "loading"}>{learnsetStatus === "loading" ? "Loading learnsets…" : "Refresh team learnsets"}</button><button type="button" onClick={runTeamAnalysis}>Team analysis</button><span className={`learnset-status ${learnsetStatus}`} role="status">{learnsetStatus === "loading" ? "Learnsets loading" : learnsetStatus === "ready" ? getLearnsetModeLabel(format) : "Learnsets unavailable"}</span><button onClick={() => setTeamsOpen(true)}>Teams · Import / Export</button></div>
       </header>
       {!format.trim().toLowerCase().replace(/[^a-z0-9]/g, "").includes("everything") && <FormatLegalityPanel teamA={left} teamB={right} format={format} />}
       <div className="workspace workspace-full">
@@ -193,6 +306,27 @@ export default function TeamLab() {
         />
       </div>
       {draftPickerOpen && <div className="teams-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDraftPickerOpen(false); }}><section className="panel teams-modal draft-team-import-modal" role="dialog" aria-modal="true" aria-labelledby="draft-team-import-title"><div className="panel-title-row"><div><h2 id="draft-team-import-title">Select Pokémon from Draft Matchup</h2><p>Select up to six Pokémon from each side. A side with no selections will remain unchanged.</p></div><button type="button" onClick={() => setDraftPickerOpen(false)}>Close ×</button></div>{draftOptions.length ? <><label>Draft matchup <select value={draftChoice} onChange={event => { setDraftChoice(event.target.value); setDraftSelectedA([]); setDraftSelectedB([]); }}><option value="">Choose matchup…</option>{draftOptions.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select></label>{(() => { const option = draftOptions.find(item => item.id === draftChoice); if (!option) return <p>Select a saved draft matchup.</p>; const pickList = (side: "A" | "B", names: string[], selected: string[], setter: (next: string[]) => void) => <div className="draft-import-side"><h3>Team {side} <small>{selected.length}/6 selected</small></h3><ul className="draft-import-options">{names.map((name, index) => <li key={`${side}-${index}-${name}`}><label className="draft-import-option"><input type="checkbox" checked={selected.includes(name)} disabled={!selected.includes(name) && selected.length >= 6} onChange={event => setter(event.target.checked ? [...selected, name] : selected.filter(value => value !== name))} /><span className="draft-import-pokemon-name" title={name}>{name}</span></label></li>)}</ul></div>; return <><div className="draft-import-grid">{pickList("A", option.teamA, draftSelectedA, setDraftSelectedA)}{pickList("B", option.teamB, draftSelectedB, setDraftSelectedB)}</div><div className="button-row"><button type="button" disabled={!draftSelectedA.length && !draftSelectedB.length} onClick={() => { if (draftSelectedA.length) importTeam("left", draftSelectedA.map(name => makeDraftImportPokemon(name, option, "A"))); if (draftSelectedB.length) importTeam("right", draftSelectedB.map(name => makeDraftImportPokemon(name, option, "B"))); setDraftPickerOpen(false); }}>Import selected Pokémon</button></div></>; })()}</> : <p>No saved draft matchups found. Save a matchup in Draft Matchups first.</p>}</section></div>}
+      {teamAnalysisOpen && <div className="teams-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeTeamAnalysis(); }}><section className="panel teams-modal team-analysis-modal" role="dialog" aria-modal="true" aria-labelledby="team-analysis-title"><div className="panel-title-row"><div><h2 id="team-analysis-title">6v6 Team Analysis</h2><p>Alive Pokémon only · learnset-based moves · configured information plus clearly labelled item / EV assumptions.</p></div><div className="team-analysis-header-actions"><button type="button" onClick={runTeamAnalysis} disabled={teamAnalysisLoading}>Recalculate</button><button type="button" onClick={closeTeamAnalysis}>Close ×</button></div></div>
+        <div className="team-analysis-explainer">Known items and EVs are respected. If an item is blank, the analysis also tests Life Orb and Assault Vest assumptions (plus Heavy-Duty Boots when hazards are enabled). Unused EV budget is explored in offensive + Speed and bulky allocations. Move candidates come from the Pokémon’s Showdown learnset; the engine limits evaluation to its strongest eligible candidates per type/category. These are possible gameplans, not claims about an opponent’s actual set.</div>
+        {teamAnalysisLoading && <p className="team-analysis-progress">Calculating: {teamAnalysisProgress || "Preparing alive Pokémon…"}</p>}
+        {teamAnalysisError && <p className="team-analysis-error">{teamAnalysisError}</p>}
+        {!teamAnalysisLoading && !teamAnalysisRuns.length && !teamAnalysisError && <p className="muted">No alive Pokémon to analyse. Mark fainted Pokémon as dead or add Pokémon to both teams.</p>}
+        <div className="team-analysis-results">{teamAnalysisRuns.map((run, runIndex) => {
+          const rows = run.analysis.opponents.map((opponent, index) => ({ opponent, scenario: run.opponentScenarios[index]?.scenario || "Opponent set" }));
+          const hits = rows.filter(row => (row.opponent.bestAttack?.maxPct || 0) >= 70).sort((a,b) => (b.opponent.bestAttack?.maxPct || 0) - (a.opponent.bestAttack?.maxPct || 0));
+          const damages = rows.filter(row => (row.opponent.bestAttack?.maxPct || 0) > 35 && (row.opponent.bestAttack?.maxPct || 0) < 70).sort((a,b) => (b.opponent.bestAttack?.maxPct || 0) - (a.opponent.bestAttack?.maxPct || 0));
+          const switchIns = rows.filter(row => row.opponent.bestReply && row.opponent.bestReply.maxPct <= 35).sort((a,b) => (a.opponent.bestReply?.maxPct || 0) - (b.opponent.bestReply?.maxPct || 0));
+          const koRows = rows.filter(row => row.opponent.bestAttack && row.opponent.bestAttack.maxPct > 0).sort((a,b) => (b.opponent.bestAttack?.maxPct || 0) - (a.opponent.bestAttack?.maxPct || 0)).slice(0,5);
+          const sideLabel = run.side === "left" ? "Team A" : "Team B";
+          const allocation = (['hp','atk','def','spa','spd','spe'] as StatId[]).map(stat => `${stat.toUpperCase()} ${run.profile.stats?.[stat]?.ev ?? 0}`).join(" · ");
+          return <details className="team-analysis-run" key={`${run.side}:${run.species}:${run.scenario}:${runIndex}`} open={runIndex < 2}><summary><strong>{sideLabel} · {run.species}</strong><span>{run.scenario}</span><small>{allocation} · {hits.length} strong-hit targets · {switchIns.length} potential switch-ins</small></summary><div className="team-analysis-columns">
+            <section><h3>Win conditions</h3><p>Opponents taking at least 70% from a learnable move in this scenario.</p>{hits.length ? <ul>{hits.slice(0,8).map((row,index)=><li key={`${row.opponent.species}:${index}`}><b>{row.opponent.species}</b> — {row.opponent.bestAttack?.move} · {row.opponent.bestAttack?.minPct.toFixed(1)}–{row.opponent.bestAttack?.maxPct.toFixed(1)}% <small>({row.opponent.bestAttack?.accuracy}% accuracy · {row.scenario})</small></li>)}</ul> : <p className="muted">No strong-hit targets found.</p>}{damages.length > 0 && <details className="team-analysis-subdetails"><summary>Other damage targets ({damages.length})</summary><ul>{damages.slice(0,8).map((row,index)=><li key={`${row.opponent.species}:${index}`}><b>{row.opponent.species}</b> — {row.opponent.bestAttack?.move} · {row.opponent.bestAttack?.minPct.toFixed(1)}–{row.opponent.bestAttack?.maxPct.toFixed(1)}%</li>)}</ul></details>}</section>
+            <section><h3>Defensive switching</h3><p>Potential switch-ins into the opponent’s best learnable attack (35% maximum or less).</p>{switchIns.length ? <ul>{switchIns.slice(0,8).map((row,index)=><li key={`${row.opponent.species}:${index}`}><b>{row.opponent.species}</b> — {row.opponent.bestReply?.move} · {row.opponent.bestReply?.minPct.toFixed(1)}–{row.opponent.bestReply?.maxPct.toFixed(1)}% <small>({row.scenario})</small></li>)}</ul> : <p className="muted">No reliable low-damage switch-ins in this scenario.</p>}</section>
+            <section><h3>KO thresholds</h3><p>Estimated extra chip needed to move a target into the damage range. Percentages are relative to full HP.</p>{koRows.length ? <ul>{koRows.map((row,index)=>{ const move=row.opponent.bestAttack!; const guaranteed=Math.max(0,100-move.minPct); const possible=Math.max(0,100-move.maxPct); return <li key={`${row.opponent.species}:${index}`}><b>{row.opponent.species}</b> — {move.move} ({move.minPct.toFixed(1)}–{move.maxPct.toFixed(1)}%); <small>{guaranteed <= 0 ? `Damage-roll KO from full HP if it hits (${move.accuracy}% accuracy)` : `~${guaranteed.toFixed(1)}% chip for a damage-roll-guaranteed KO on a hit`}; {possible <= 0 ? `KO possible without chip (${move.accuracy}% accuracy)` : `~${possible.toFixed(1)}% chip for a possible KO`}; {row.scenario}</small></li>;})}</ul> : <p className="muted">No damaging learnset moves found.</p>}</section>
+          </div></details>;
+        })}</div>
+        {teamAnalysisRuns.length > 0 && <p className="team-analysis-footnote">The analysis is intentionally scenario-based. Unknown items are tested as Life Orb / Assault Vest, and Heavy-Duty Boots when hazards are enabled; this is a representative subset, not every item in the game. Unspent EVs are allocated into representative offensive or defensive spreads; the exact allocation is shown per scenario. It does not infer a guaranteed set, and switching safety does not yet account for every status move, hazard sequence, recovery turn, or double-switch.</p>}
+      </section></div>}
       <TeamPastePanel left={left} right={right} format={format} onSelectDraft={() => { setTeamsOpen(false); try { const saved = JSON.parse(localStorage.getItem("pokemon-team-lab-draft-matchups-v2") || "{}"); const entries = Object.entries(saved.matchups || {}).map(([id, value]: [string, any]) => ({ id, name: value.matchupName || `Matchup ${Number(id) + 1}`, teamA: Array.isArray(value.teamA) ? value.teamA.filter(Boolean) : [], teamB: Array.isArray(value.teamB) ? value.teamB.filter(Boolean) : [], draftSets: value.draftSets, abilityOverrides: value.abilityOverrides, speedConfigs: value.speedConfigs, statConfigs: value.statConfigs })); setDraftOptions(entries); setDraftChoice(String(saved.currentIndex ?? entries[0]?.id ?? "0")); setDraftSelectedA([]); setDraftSelectedB([]); setDraftPickerOpen(true); } catch { setDraftOptions([]); setDraftPickerOpen(true); } }} open={teamsOpen} onClose={() => setTeamsOpen(false)} onImport={importTeam} onEditTeam={(side, team) => { if (side === "left") { setLeft(team); setMovesA(previous => reconcileMoves(team, previous)); } else { setRight(team); setMovesB(previous => reconcileMoves(team, previous)); } }} />
     </main>
   );
