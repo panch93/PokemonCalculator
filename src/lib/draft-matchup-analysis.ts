@@ -207,14 +207,30 @@ async function bestAttack(
   const cacheKey = JSON.stringify([generation, attackerProfile, defenderProfile, filter, fieldState]);
   const cached = bestAttackCache.get(cacheKey);
   if (cached) return cached;
-  // User-entered moves are additional fixed candidates, not a replacement for
-  // the format/filter-aware learnset search. This keeps the manual choice in the
-  // analysis while still allowing the remaining best learnset options to compete.
+  // A complete four-move set is authoritative: do not spend time exploring
+  // hypothetical alternatives when all move slots are already known.
   const manualMoves = (attackerProfile.moves || [])
     .filter(Boolean)
     .map(name => getMoveDetails(name, generation))
-    .filter((move): move is MoveDetails => Boolean(move && isEligibleDraftMove(move)));
-  const discoveredMoves = candidateMoves(attackerProfile.species, generation, filter);
+    .filter((move): move is MoveDetails => Boolean(move && isEligibleDraftMove(move) && passesDraftMoveFilters(move, filter)));
+  const hasCompleteMoveset = (attackerProfile.moves || []).filter(Boolean).length >= 4;
+  const manualStabByType = new Map<string, number>();
+  const speciesTypes = getSpecies(attackerProfile.species)?.types || [];
+  for (const move of manualMoves) {
+    if (speciesTypes.includes(move.type) || attackerProfile.teraType === move.type) {
+      const score = candidatePowerScore(move);
+      manualStabByType.set(move.type, Math.max(manualStabByType.get(move.type) ?? -1, score));
+    }
+  }
+  const discoveredMoves = hasCompleteMoveset ? [] : candidateMoves(attackerProfile.species, generation, filter).filter(move => {
+    // Avoid filling unknown slots with weaker same-type STAB options when a
+    // known move already covers that type. Stronger learnable upgrades remain
+    // eligible, as do non-STAB coverage moves and other move categories.
+    const knownStabScore = manualStabByType.get(move.type);
+    if (knownStabScore === undefined) return true;
+    const isStab = speciesTypes.includes(move.type) || attackerProfile.teraType === move.type;
+    return !isStab || candidatePowerScore(move) > knownStabScore;
+  });
   const seenMoves = new Set<string>();
   const moves = [...manualMoves, ...discoveredMoves].filter(move => {
     const id = normalize(move.name);

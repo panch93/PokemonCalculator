@@ -1560,3 +1560,29 @@ select, select:focus, select option, datalist option {
 .team-analysis-subdetails { margin-top: 8px; font-size: .7rem; }
 .team-analysis-subdetails > summary { color: var(--muted, #aab2c0); cursor: pointer; }
 @media (max-width: 760px) { .team-analysis-columns { grid-template-columns: 1fr; } .team-analysis-header-actions { flex-wrap: wrap; } }
+
+/* Team analysis roster selector: two opposing sides, with details below. */
+.team-analysis-rosters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 12px 0 16px; }
+.team-analysis-roster, .draft-team-analysis-side { min-width: 0; border: 1px solid var(--border); border-radius: 9px; padding: 10px; background: var(--panel, #171d28); }
+.team-analysis-roster h3, .draft-team-analysis-side h3 { margin: 0 0 9px; font-size: .88rem; }
+.team-analysis-roster-pokemon { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.team-analysis-roster-mon, .draft-team-analysis-pokemon { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 7px 5px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: inherit; cursor: pointer; }
+.team-analysis-roster-mon.selected, .draft-team-analysis-pokemon.selected { border-color: var(--accent, #60a5fa); background: color-mix(in srgb, var(--accent, #60a5fa) 12%, transparent); }
+.team-analysis-roster-sprite, .draft-team-analysis-sprite { width: 54px; height: 54px; object-fit: contain; }
+.team-analysis-roster-mon span, .draft-team-analysis-pokemon span { max-width: 100%; overflow-wrap: anywhere; text-align: center; font-size: .74rem; font-weight: 650; }
+.team-analysis-roster-mon small, .draft-team-analysis-pokemon small { color: var(--muted); text-align: center; font-size: .64rem; }
+.team-analysis-selected { margin-top: 10px; }
+.team-analysis-selected > h3 { margin: 0 0 8px; font-size: .95rem; }
+.draft-team-analysis-modal { width: min(1080px, calc(100vw - 24px)); max-height: min(90vh, 900px); overflow: auto; }
+.draft-team-analysis-sides { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
+.draft-team-analysis-pokemon { display: inline-flex; width: calc(25% - 6px); vertical-align: top; margin: 0 3px 6px 0; }
+.draft-team-analysis-detail { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 10px; }
+.draft-team-analysis-detail h3 { margin: 0 0 8px; }
+.draft-team-analysis-detail-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.draft-team-analysis-detail-grid > section { min-width: 0; }
+.draft-team-analysis-detail-grid h4 { margin: 0 0 5px; font-size: .8rem; }
+.draft-team-analysis-detail-grid ul { margin: 0; padding-left: 17px; }
+.draft-team-analysis-detail-grid li { margin: 4px 0; font-size: .72rem; overflow-wrap: anywhere; }
+.draft-team-analysis-detail-grid p { font-size: .72rem; }
+@media (max-width: 720px) { .team-analysis-rosters, .draft-team-analysis-sides { grid-template-columns: 1fr; } .team-analysis-roster-pokemon { grid-template-columns: repeat(3, minmax(0, 1fr)); } .draft-team-analysis-pokemon { width: calc(33.333% - 6px); } .draft-team-analysis-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 430px) { .draft-team-analysis-detail-grid { grid-template-columns: 1fr; } }
