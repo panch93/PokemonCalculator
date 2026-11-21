@@ -113,6 +113,7 @@ export default function DraftMatchups() {
   const [savedMatchupNames, setSavedMatchupNames] = useState<Record<string, string>>({});
   const [typeTeam, setTypeTeam] = useState<"A" | "B" | null>(null);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [teamAnalysisOpen, setTeamAnalysisOpen] = useState(false);
   const [speedEdit, setSpeedEdit] = useState<{ side: "A" | "B"; name: string; stat: Exclude<StatKey, "bst"> } | null>(null);
   const [speedHover, setSpeedHover] = useState<{ side: "A" | "B"; name: string; x: number; y: number } | null>(null);
   type MatchupHoverKind = "hits" | "walls" | "hitBy" | "walledBy";
@@ -396,6 +397,20 @@ export default function DraftMatchups() {
     setSetItemDraft(presetString(preset.Item ?? preset.item));
     setSetAbilityDraft(presetString(preset.Ability ?? preset.ability));
     setSetMovesDraft([0, 1, 2, 3].map(index => moves[index] || ""));
+    const rawEvs = preset.EVs ?? preset.evs;
+    const evObject = rawEvs && typeof rawEvs === "object" && !Array.isArray(rawEvs) ? rawEvs as Record<string, unknown> : {};
+    const evValue = (stat: string) => clampDraftStat(Number(evObject[stat] ?? 0), format);
+    const evStats = ["hp", "atk", "def", "spa", "spd", "spe"] as const;
+    const evs = Object.fromEntries(evStats.map(stat => [stat, evValue(stat)])) as Record<typeof evStats[number], number>;
+    setSpeedConfigs(current => ({ ...current, [`${setEditor!.side}:${setEditor!.name}`]: { ...(current[`${setEditor!.side}:${setEditor!.name}`] || { nature: "boost" as const, stage: 0 }), ev: evs.spe } }));
+    setStatConfigs(current => {
+      const next = { ...current };
+      for (const stat of evStats.filter(stat => stat !== "spe")) {
+        const key = `${setEditor!.side}:${setEditor!.name}:${stat}`;
+        next[key] = { ...(next[key] || { nature: "neutral" as const, stage: 0 }), ev: evs[stat] };
+      }
+      return next;
+    });
   };
   const activeA = teamA.filter(Boolean);
   const activeB = teamB.filter(Boolean);
@@ -423,7 +438,12 @@ export default function DraftMatchups() {
   const renderStatCell = (name: string, side: "A" | "B", key: StatKey) => {
     const stats = name ? baseStats(name) : null;
     const value = stats ? stats[key] : null;
-    if (key === "bst") return <td key={`${side}-${key}`} className="draft-base-stat draft-stat-bst"><span style={value === null ? undefined : statColor(value, key)}>{value ?? "—"}</span><small className="draft-stat-config-placeholder" aria-hidden="true">&nbsp;</small></td>;
+    if (key === "bst") {
+      const configured = name ? (["hp", "atk", "def", "spa", "spd", "spe"] as const).reduce((sum, stat) => sum + configForStat(side, name, stat).ev, 0) : 0;
+      const limit = isChampionsFormat(format) ? 66 : 510;
+      const remaining = limit - configured;
+      return <td key={`${side}-${key}`} className="draft-base-stat draft-stat-bst"><span style={value === null ? undefined : statColor(value, key)}>{value ?? "—"}</span><small className={`draft-ev-remaining ${remaining < 0 ? "evs-remaining-over" : remaining > 0 ? "evs-remaining-positive" : "evs-remaining-zero"}`}>{name ? `Remaining: ${remaining}` : ""}</small></td>;
+    }
     const cfg = name ? configForStat(side, name, key) : null;
     const natureLabel = key === "hp" ? "" : cfg?.nature === "boost" ? "+" : cfg?.nature === "hinder" ? "−" : "";
     const stageLabel = key === "hp" ? "" : cfg ? (cfg.stage > 0 ? `+${cfg.stage}` : String(cfg.stage)) : "";
@@ -629,6 +649,7 @@ export default function DraftMatchups() {
     <section className="panel draft-controls">
       <div className="draft-preset-control"><label htmlFor="draft-preset">Matchup preset</label><select id="draft-preset" value={presetIndex} onChange={event => setPreset(Number(event.target.value))}>{PRESETS.map((preset, index) => <option key={preset.label} value={index}>{index + 1}. {savedMatchupNames[String(index)] || (index === presetIndex ? matchupName : preset.label)}</option>)}</select></div>
       <button type="button" className="primary" onClick={() => setSupportOpen(true)}>Support moves</button>
+      <button type="button" onClick={() => setTeamAnalysisOpen(true)}>Team analysis</button>
       <div className="draft-team-counts"><span>Team A: <strong>{activeA.length}/12</strong> · <strong>{totalPoints("A", activeA)} pts</strong></span><span>Team B: <strong>{activeB.length}/12</strong> · <strong>{totalPoints("B", activeB)} pts</strong></span></div>
       <button className="primary" type="button" onClick={openEditor}>Edit matchup</button>
     </section>
@@ -696,10 +717,71 @@ export default function DraftMatchups() {
             </section>}
           </>}
           {kind === "hitBy" && <section className="draft-matchup-analysis-section"><strong>Damaged by ({analysis.opponents.filter(row => (row.bestReply?.maxPct || 0) > 35 && (row.bestReply?.maxPct || 0) < 70).length})</strong><p>Opponents whose best reply deals more than 35% and less than 70% to this Pokémon.</p><ul>{analysis.opponents.filter(row => (row.bestReply?.maxPct || 0) > 35 && (row.bestReply?.maxPct || 0) < 70).sort((a,b)=>(b.bestReply?.maxPct || 0)-(a.bestReply?.maxPct || 0)).map(row=><li key={row.species}><b>{row.species}</b> — {row.bestReply ? `${row.bestReply.move} (${row.bestReply.category.toLowerCase()}) · ${row.bestReply.minPct.toFixed(0)}–${row.bestReply.maxPct.toFixed(0)}%` : "—"}</li>)}</ul></section>}
-          <section className="draft-matchup-analysis-section draft-chosen-move-analysis"><strong>Chosen move analysis</strong><p>{kind === "walls" || kind === "hitBy" ? "Best damage from each opponent’s selected moves against this Pokémon." : `Best damage from ${matchupHover.name}’s selected moves against each opponent.`} {kind === "walledBy" ? "Opposing Pokémon listed here are walled by the selected moves (maximum damage at or below 35%)." : kind === "walls" ? "Opponents listed here cannot deal more than 35% with their selected moves." : "Only Pokémon meeting the corresponding hit threshold are listed."}</p>{(() => { const rows = analysis.opponents.map(row => { const candidates = kind === "walls" || kind === "hitBy" ? row.selectedReplies || [] : row.selectedAttacks || []; const result = candidates.reduce<DraftMoveThreat | undefined>((best, move) => !best || move.maxPct > best.maxPct || (move.maxPct === best.maxPct && move.chance70 > best.chance70) ? move : best, undefined); return { row, result }; }).filter(({ result }) => result && ((kind === "hits" || kind === "hitBy") ? result.maxPct >= 70 : result.maxPct <= 35)).sort((a, b) => (b.result?.maxPct || 0) - (a.result?.maxPct || 0)); return rows.length ? <ul>{rows.map(({ row, result }) => <li key={row.species}><b>{row.species}</b> — <b>{result!.move}</b> <span className={`reply-damage-value ${result!.maxPct >= 100 ? "ko-1" : result!.maxPct >= 50 ? "ko-2" : result!.maxPct >= 33.34 ? "ko-3" : result!.maxPct >= 25 ? "ko-4" : result!.maxPct > 0 ? "ko-5" : "ko-none"}`}>{result!.minPct.toFixed(1)}–{result!.maxPct.toFixed(1)}%</span><small> · {result!.category.toLowerCase()} · {result!.type} · {result!.accuracy}% accuracy</small></li>)}</ul> : <p className="muted">{kind === "walledBy" ? "No opposing Pokémon are walled by the selected moves, or no moves have been selected." : "No Pokémon meet this threshold using the selected moves."}</p>; })()}</section>
+          <section className="draft-matchup-analysis-section draft-chosen-move-analysis">
+            <strong>Chosen move analysis</strong>
+            <p>Uses only the moves selected in this Pokémon’s set (or the opponents’ selected moves for incoming damage). For each opposing Pokémon, the strongest selected move is shown.</p>
+            {(() => {
+              const incoming = kind === "walls" || kind === "hitBy";
+              const chosenRows = analysis.opponents.map(row => {
+                const candidates = incoming ? row.selectedReplies || [] : row.selectedAttacks || [];
+                const result = candidates.reduce<DraftMoveThreat | undefined>((best, move) => !best || move.maxPct > best.maxPct || (move.maxPct === best.maxPct && move.chance70 > best.chance70) ? move : best, undefined);
+                return { row, result };
+              });
+              const high = chosenRows.filter(({ result }) => (result?.maxPct || 0) >= 70).sort((a,b)=>(b.result?.maxPct || 0)-(a.result?.maxPct || 0));
+              const middle = chosenRows.filter(({ result }) => (result?.maxPct || 0) > 35 && (result?.maxPct || 0) < 70).sort((a,b)=>(b.result?.maxPct || 0)-(a.result?.maxPct || 0));
+              const title = incoming ? "Hit by" : "Hits";
+              const renderChosen = (rows: typeof chosenRows) => rows.length ? <ul>{rows.map(({ row, result }) => <li key={row.species}><b>{row.species}</b> — <b>{result!.move}</b> <span className={`reply-damage-value ${result!.maxPct >= 100 ? "ko-1" : result!.maxPct >= 50 ? "ko-2" : result!.maxPct >= 33.34 ? "ko-3" : result!.maxPct >= 25 ? "ko-4" : result!.maxPct > 0 ? "ko-5" : "ko-none"}`}>{result!.minPct.toFixed(1)}–{result!.maxPct.toFixed(1)}%</span><small> · {result!.category.toLowerCase()} · {result!.type} · {result!.accuracy}% accuracy</small></li>)}</ul> : <p className="muted">No opposing Pokémon meet this threshold using the selected moves.</p>;
+              return <>
+                <section className="draft-matchup-analysis-section"><strong>{title} ({high.length})</strong><p>Selected moves dealing at least 70% maximum damage.</p>{renderChosen(high)}</section>
+                <section className="draft-matchup-analysis-section"><strong>{incoming ? "Damaged by" : "Damages"} ({middle.length})</strong><p>Selected moves dealing more than 35% and less than 70% maximum damage.</p>{renderChosen(middle)}</section>
+              </>;
+            })()}
+          </section>
           <small>Damage calculations are shared and cached across the matchup lists.</small>
         </>;
       })()}
+    </div>}
+
+    {teamAnalysisOpen && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setTeamAnalysisOpen(false); }}>
+      <section className="draft-modal draft-team-analysis-modal" role="dialog" aria-modal="true" aria-labelledby="draft-team-analysis-title">
+        <div className="panel-title-row"><div><h2 id="draft-team-analysis-title">6v6 Team analysis</h2><p>Win conditions, defensive switching and KO thresholds, derived from the current matchup calculations and configured sets.</p></div><button type="button" onClick={() => setTeamAnalysisOpen(false)}>Close ×</button></div>
+        {matchupAnalysisLoading && <p className="muted">Updating matchup calculations…</p>}
+        {(["A", "B"] as const).map(side => {
+          const own = side === "A" ? activeA : activeB;
+          const foes = side === "A" ? activeB : activeA;
+          const foeSide = side === "A" ? "B" : "A";
+          const analyses = own.map(name => ({ name, analysis: analysisFor(side, name) })).filter((entry): entry is { name: string; analysis: DraftMatchupAnalysis } => Boolean(entry.analysis));
+          const threats = analyses.map(({ name, analysis }) => {
+            const hitTargets = analysis.opponents.filter(row => (row.bestAttack?.maxPct || 0) >= 70);
+            const damageTargets = analysis.opponents.filter(row => (row.bestAttack?.maxPct || 0) > 35 && (row.bestAttack?.maxPct || 0) < 70);
+            const fastTargets = foes.filter(foe => (effectiveSpeedFor(side, name) ?? 0) > (effectiveSpeedFor(foeSide, foe) ?? Number.POSITIVE_INFINITY));
+            return { name, hitTargets, damageTargets, fastTargets, score: hitTargets.length * 2 + damageTargets.length + fastTargets.length * 0.5 };
+          }).sort((a,b)=>b.score-a.score);
+          const incoming = foes.flatMap(foe => {
+            const analysis = analysisFor(foeSide, foe);
+            return own.map(name => {
+              const row = analysis?.opponents.find(item => item.species === name);
+              return row ? { foe, name, damage: row.bestAttack } : null;
+            }).filter((row): row is { foe: string; name: string; damage: DraftMoveThreat } => Boolean(row?.damage));
+          });
+          const switchIns = own.map(name => {
+            const against = incoming.filter(row => row.name === name);
+            const safe = against.filter(row => row.damage.maxPct <= 35);
+            const dangerous = against.filter(row => row.damage.maxPct >= 70);
+            return { name, safe, dangerous, total: against.length };
+          }).sort((a,b)=>(b.safe.length - a.safe.length) || (a.dangerous.length - b.dangerous.length));
+          const koRows = analyses.flatMap(({ name, analysis }) => analysis.opponents.filter(row => row.bestAttack && row.bestAttack.maxPct < 100 && row.bestAttack.maxPct > 0).map(row => ({ attacker: name, target: row.species, move: row.bestAttack!, guaranteedChip: Math.max(0, 100 - row.bestAttack!.minPct), rollChip: Math.max(0, 100 - row.bestAttack!.maxPct) })));
+          return <section className="draft-matchup-analysis-section" key={side}>
+            <h3>Team {side}</h3>
+            <div className="draft-team-analysis-grid">
+              <article><strong>1. Win conditions</strong><p>Potential offensive closers: Pokémon with the most 70%+ targets, useful mid-range damage and favourable configured Speed comparisons. This is a shortlist, not a sweep guarantee.</p>{threats.length ? <ol>{threats.slice(0,6).map(item=><li key={item.name}><b>{item.name}</b> — {item.hitTargets.length} strong-hit targets, {item.damageTargets.length} damage targets, faster than {item.fastTargets.length}/{foes.length}<small>{item.hitTargets.length ? ` · threatens ${item.hitTargets.map(row=>row.species).join(", ")}` : " · no 70%+ targets in the current calculation"}</small></li>)}</ol> : <p className="muted">Matchup results are not ready.</p>}</article>
+              <article><strong>2. Defensive switching</strong><p>Incoming best-move estimates across the opposing roster. Safe means at most 35% maximum damage; dangerous means at least 70%. This is a damage-based switch-in screen, not a full counter guarantee.</p>{switchIns.length ? <ul>{switchIns.map(item=><li key={item.name}><b>{item.name}</b> — {item.safe.length}/{item.total} opposing attackers deal ≤35%; {item.dangerous.length} deal ≥70%<small>{item.safe.length ? ` · safer into ${item.safe.map(row=>row.foe).join(", ")}` : " · no low-damage switch-ins identified"}</small></li>)}</ul> : <p className="muted">No defensive data available.</p>}</article>
+              <article><strong>3. KO thresholds & chip</strong><p>For each best attack, guaranteed chip is based on the minimum damage roll; roll-dependent chip uses the maximum roll. Percentages are of total HP.</p>{koRows.length ? <ul>{koRows.sort((a,b)=>a.guaranteedChip-b.guaranteedChip).slice(0,12).map((row,index)=><li key={`${row.attacker}-${row.target}-${index}`}><b>{row.attacker}</b> → {row.target}: {row.move.move} ({row.move.minPct.toFixed(1)}–{row.move.maxPct.toFixed(1)}%)<small> · guaranteed KO with ≥{row.guaranteedChip.toFixed(1)}% prior chip; possible KO with ≥{row.rollChip.toFixed(1)}%</small></li>)}</ul> : <p className="muted">No non-guaranteed damage ranges are available yet.</p>}</article>
+            </div>
+          </section>;
+        })}
+        <p className="draft-matchup-analysis-note">Limitations: these estimates use the app’s current move candidate filters, selected items/abilities/moves, configured EVs or Stat Points, stages, Tera, weather and terrain. They do not simulate switching sequences, hazards, recovery, status turns, scouting, opponent sets or a guaranteed battle line. KO chip thresholds are raw damage thresholds and do not yet model hazard rounding or healing.</p>
+      </section>
     </div>}
 
     {typeTeam && <div className="draft-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setTypeTeam(null); }}>

@@ -25,6 +25,8 @@ export default function AutocompleteInput({ value, options, onChange, ariaLabel,
       onChange={event => { onChange(event.target.value); setOpen(true); setActive(-1); setShowAll(false); }}
       onKeyDown={event => {
         if (event.key === "Escape") { setOpen(false); return; }
+        // Never consume Backspace/Delete: users must be able to clear a previously selected value.
+        if (event.key === "Backspace" || event.key === "Delete") { setOpen(true); setActive(-1); setShowAll(false); return; }
         if (event.key === "ArrowDown" && matches.length) { event.preventDefault(); setOpen(true); scrollActive(active < 0 ? 0 : (active + 1) % matches.length); }
         if (event.key === "ArrowUp" && matches.length) { event.preventDefault(); setOpen(true); scrollActive(active < 0 ? matches.length - 1 : (active - 1 + matches.length) % matches.length); }
         if (event.key === "Enter" && open && matches.length) { event.preventDefault(); choose(matches[active >= 0 ? active : 0]); }

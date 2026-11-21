@@ -1524,3 +1524,18 @@ select, select:focus, select option, datalist option {
 .matrix-notes-field textarea, .matrix-notes-editor textarea, .draft-modal textarea { width: 100%; min-width: 0; box-sizing: border-box; resize: vertical; }
 .matrix-pokemon-notes { display: block; margin-top: 6px !important; padding-top: 5px; border-top: 1px solid var(--border); color: var(--text, #f2f4f8) !important; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .62rem !important; line-height: 1.35 !important; }
 .matrix-pokemon-notes b { color: var(--muted); }
+
+/* Draft 6v6 analysis and EV-budget indicator */
+.draft-ev-remaining { display:block; min-height:1.1em; margin-top:2px; color:#63c98a; font-size:.58rem; font-weight:600; white-space:nowrap; }
+.draft-ev-remaining.evs-remaining-positive { color:#63c98a; }
+.draft-ev-remaining.evs-remaining-zero { color:var(--muted); }
+.draft-ev-remaining.evs-remaining-over { color:#f07878; }
+.draft-team-analysis-modal { width:min(1100px, 96vw); max-height:90vh; overflow:auto; }
+.draft-team-analysis-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:8px; }
+.draft-team-analysis-grid article { min-width:0; padding:10px; border:1px solid var(--border); border-radius:9px; }
+.draft-team-analysis-grid article > strong { display:block; margin-bottom:4px; }
+.draft-team-analysis-grid p { color:var(--muted); font-size:.72rem; line-height:1.4; }
+.draft-team-analysis-grid ul,.draft-team-analysis-grid ol { margin:6px 0 0; padding-left:18px; }
+.draft-team-analysis-grid li { margin:5px 0; font-size:.73rem; line-height:1.35; }
+.draft-team-analysis-grid li small { display:block; color:var(--muted); font-size:.66rem; }
+@media(max-width:800px) { .draft-team-analysis-grid { grid-template-columns:1fr; } }
