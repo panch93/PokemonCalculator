@@ -1653,3 +1653,10 @@ select, select:focus, select option, datalist option {
 .draft-speed-benchmark-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .draft-speed-benchmark-toolbar p { margin: 0; }
 .draft-speed-benchmark-toolbar button { flex: 0 0 auto; padding: 4px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); font-size: .65rem; cursor: pointer; }
+
+
+/* Small calculation indicator attached to each Team Analysis portrait. */
+.team-analysis-roster-portrait { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.analysis-loading-spinner { position: absolute; right: -4px; top: -4px; width: 13px; height: 13px; border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent); border-top-color: var(--accent); border-radius: 50%; animation: analysis-spin .75s linear infinite; background: var(--panel); z-index: 2; }
+@keyframes analysis-spin { to { transform: rotate(360deg); } }
+.draft-walling-detail { display: block; margin-top: 2px; color: var(--muted); }

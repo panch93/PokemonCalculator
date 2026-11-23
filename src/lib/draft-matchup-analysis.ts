@@ -1,5 +1,4 @@
 import { calculateMove, getMoveDetails, getPokemonHp } from "./calc";
-import supportCategories from "../data/support-categories.json";
 import { getEffectiveMovePriority, getEffectiveSpeed } from "./battle-order";
 import { getChampionsSpeciesLearnset, getHistoricalSpeciesLearnset, getMove, getSpecies, loadShowdownData } from "./showdown-data";
 import { getMaxIVs, type DamageSummary, type FieldState, type MoveDetails, type PokemonSet, type StatId, type Stats } from "./types";
@@ -86,12 +85,6 @@ export type DraftSetupSweepTarget = {
   canSetUp: boolean;
   canContinueAfterSetup: boolean;
   plausibleSweepTarget: boolean;
-  canSetUpInFront?: boolean;
-  stoppedSweepTarget?: boolean;
-  hpAfterSetupPct?: number;
-  stopReason?: string;
-  setupMoveDamagePct?: number;
-  setupMoveMaxDamagePct?: number;
 };
 export type DraftSetupSweep = {
   move: string;
@@ -100,11 +93,6 @@ export type DraftSetupSweep = {
   setupCostPct: number;
   targets: DraftSetupSweepTarget[];
   plausibleTargets: number;
-  setupHost?: string;
-  canSetUpInFront?: string[];
-  swept?: string[];
-  stoppedBy?: string[];
-  boostChance?: number;
 };
 
 export type DraftMatchupAnalysis = {
@@ -349,41 +337,44 @@ export function getDraftProfileEffectiveSpeed(profile: DraftPokemonProfile, fiel
   return getEffectiveSpeed(set, fieldState, side, configFor(profile, "spe").stage);
 }
 
-function setupMoveCandidates(species: string, generation: number, filter: DraftMoveFilter, knownMoves: string[] = []): Array<{ name: string; boosts: Partial<Record<StatId, number>>; priority: number; costPct: number; damaging: boolean; boostChance: number }> {
-  const setupCategory = (supportCategories as Array<{ id: string; moves?: string[] }>).find(category => category.id === "setup");
-  const unifiedNames = new Set((setupCategory?.moves || []).map(moveId));
+function setupMoveCandidates(species: string, generation: number, filter: DraftMoveFilter, knownMoves: string[] = []): Array<{ name: string; boosts: Partial<Record<StatId, number>>; priority: number; costPct: number }> {
+  const completeMoveset = knownMoves.filter(Boolean).length >= 4;
   const learnset = generation >= 10
     ? (getChampionsSpeciesLearnset(species) || getHistoricalSpeciesLearnset(species))
     : getHistoricalSpeciesLearnset(species);
   const knownIds = new Set(knownMoves.filter(Boolean).map(moveId));
-  const completeMoveset = knownMoves.filter(Boolean).length >= 4;
   const candidates = completeMoveset ? knownMoves.filter(Boolean) : [...new Set([...(learnset || []), ...knownMoves.filter(Boolean)])];
-  const result: Array<{ name: string; boosts: Partial<Record<StatId, number>>; priority: number; costPct: number; damaging: boolean; boostChance: number }> = [];
+  const result: Array<{ name: string; boosts: Partial<Record<StatId, number>>; priority: number; costPct: number }> = [];
   for (const name of candidates) {
-    const metadata = getMove(name) as (Record<string, any> & { boosts?: Record<string, number> }) | undefined;
+    const metadata = getMove(name) as (Record<string, unknown> & { boosts?: Record<string, number> }) | undefined;
     const id = moveId(name);
-    if (id === "swagger") continue;
-    const selfBoosts = metadata?.selfBoost?.boosts || metadata?.secondary?.self?.boosts;
-    const boosts = metadata?.boosts || (id === "bellydrum" ? { atk: 6 } : undefined) || selfBoosts;
-    if (!boosts) continue;
-    const damaging = metadata?.category === "Physical" || metadata?.category === "Special";
-    if (!unifiedNames.has(id)) continue;
-    if ((metadata?.flags as Record<string, unknown> | undefined)?.charge) continue;
-    if (!damaging && metadata?.category !== "Status") continue;
-    if (!Object.entries(boosts).some(([stat, value]) => ["atk", "spa", "spe"].includes(stat) && Number(value) > 0)) continue;
+    if (id === "swagger") continue; // Swagger boosts its target, not its user; it is still analysed as a normal known move.
+    const boosts = metadata?.boosts || (id === "bellydrum" ? { atk: 6 } : undefined);
+    if (!boosts || metadata?.category !== "Status") continue;
     if (id === "curse" && (getSpecies(species)?.types || []).includes("Ghost")) continue;
+    // Two-turn charge moves need a separate charge-turn / Power Herb model.
+    if ((metadata.flags as Record<string, unknown> | undefined)?.charge) continue;
+    const positive = Object.entries(boosts).filter(([, value]) => typeof value === "number" && value > 0);
+    if (!positive.some(([stat]) => ["atk", "spa", "spe"].includes(stat))) continue;
     const details = getMoveDetails(name, generation);
     if (!details) continue;
     if (!knownIds.has(id) && (filter.blacklist.some(value => moveId(value) === id) || !passesDraftMoveFilters(details, filter))) continue;
     const mapped: Partial<Record<StatId, number>> = {};
-    for (const [stat, value] of Object.entries(boosts)) if (["atk", "def", "spa", "spd", "spe"].includes(stat) && typeof value === "number") mapped[stat as StatId] = Math.max(-6, Math.min(6, value));
+    for (const [stat, value] of Object.entries(boosts)) {
+      if (["atk", "def", "spa", "spd", "spe"].includes(stat) && typeof value === "number") mapped[stat as StatId] = Math.max(-6, Math.min(6, value));
+    }
     const costPct = id === "bellydrum" || id === "filletaway" ? 50 : id === "clangoroussoul" ? 33 : 0;
-    if (Object.keys(mapped).length) result.push({ name: details.name, boosts: mapped, priority: details.priority, costPct, damaging, boostChance: Number(metadata?.secondary?.chance ?? 100) });
+    if (Object.keys(mapped).length) result.push({ name: details.name, boosts: mapped, priority: details.priority, costPct });
   }
-  const unique = new Map<string, typeof result[number]>();
-  for (const entry of result) { const signature = `${JSON.stringify(entry.boosts)}:${entry.priority}:${entry.costPct}:${entry.damaging}:${entry.boostChance}`; if (!unique.has(signature)) unique.set(signature, entry); }
-  const score = (entry: typeof result[number]) => Object.entries(entry.boosts).reduce((sum, [stat, value]) => sum + Math.max(0, Number(value) || 0) + (stat === "spe" ? 0.5 * Math.max(0, Number(value) || 0) : 0), 0);
-  return [...unique.values()].sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
+  // Avoid redundant calculations for setup moves with identical boost profiles.
+  const unique = new Map<string, { name: string; boosts: Partial<Record<StatId, number>>; priority: number; costPct: number }>();
+  for (const entry of result) {
+    const signature = `${JSON.stringify(entry.boosts)}:${entry.priority}:${entry.costPct}`;
+    if (!unique.has(signature)) unique.set(signature, entry);
+  }
+  const score = (entry: { boosts: Partial<Record<StatId, number>> }) =>
+    Object.entries(entry.boosts).reduce((sum, [stat, value]) => sum + Math.max(0, Number(value) || 0) + (stat === "spe" ? 0.5 * Math.max(0, Number(value) || 0) : 0), 0);
+  return [...unique.values()].sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name)).slice(0, 8);
 }
 
 function withSetupBoosts(profile: DraftPokemonProfile, boosts: Partial<Record<StatId, number>>): DraftPokemonProfile {
@@ -394,14 +385,6 @@ function withSetupBoosts(profile: DraftPokemonProfile, boosts: Partial<Record<St
     stats[stat] = { ...current, stage: Math.max(-6, Math.min(6, current.stage + (whiteHerbPreventsDrop ? 0 : amount))) };
   }
   return { ...profile, stats };
-}
-
-function postSetupMoveDamage(primary: DraftMoveThreat | undefined, fallback: DraftMoveThreat | undefined, defenderSet: PokemonSet, setupPriority: number, defenderSpeed: number, attackerSpeed: number, field: FieldState): number {
-  const move = primary || fallback;
-  if (!move) return 0;
-  const priority = move.effectivePriority ?? getEffectiveMovePriority(defenderSet, move.move, field);
-  const defenderActs = priority > setupPriority || (priority === setupPriority && (field.trickRoom ? defenderSpeed < attackerSpeed : defenderSpeed > attackerSpeed));
-  return defenderActs ? move.maxPct : 0;
 }
 
 /**
@@ -451,6 +434,8 @@ export async function analyzeDraftPokemon(
       attackerWalls: Boolean(reply.best && replyDamage <= DRAFT_WALL_THRESHOLD),
       checkedByAttacker: Boolean(outgoing.best && bestDamage < 50),
     });
+    // Yield once per opponent pair as well as within long move loops, keeping
+    // pointer movement and other UI interactions responsive on large rosters.
     await new Promise<void>(resolve => setTimeout(resolve, 0));
   }
   const setupSweeps: DraftSetupSweep[] = [];
@@ -462,129 +447,100 @@ export async function analyzeDraftPokemon(
     for (const setup of setupMoves) {
       if (isCancelled()) break;
       const hasNegativeBoost = Object.values(setup.boosts).some(value => Number(value) < 0);
-      const itemVariants: Array<{ profile: DraftPokemonProfile; label: string }> = [{ profile: attacker, label: attacker.item?.trim() || "Item unknown" }];
+      const itemVariants: Array<{ profile: DraftPokemonProfile; label: string }> = [
+        { profile: attacker, label: attacker.item?.trim() || "Item unknown" },
+      ];
       if (hasUnknownItem && hasNegativeBoost) itemVariants.push({ profile: { ...attacker, item: "White Herb" }, label: "White Herb assumption" });
       for (const itemVariant of itemVariants) {
+      if (isCancelled()) break;
+      const setupProfile = itemVariant.profile;
+      const attackerSpeedSet = speedSetFor(setupProfile);
+      const boostedProfile = withSetupBoosts(setupProfile, setup.boosts);
+      const boostedSpeedSet = speedSetFor(boostedProfile);
+      const targets: DraftSetupSweepTarget[] = [];
+      for (const opponent of opponents) {
         if (isCancelled()) break;
-        const setupProfile = itemVariant.profile;
-        const boostedProfile = withSetupBoosts(setupProfile, setup.boosts);
-        const setupSpeedSet = speedSetFor(setupProfile);
-        const boostedSpeedSet = speedSetFor(boostedProfile);
-        const setupPriority = getEffectiveMovePriority(setupSpeedSet, setup.name, fieldState);
-        const setupHosts: Array<{ opponent: DraftPokemonProfile; hpAfterSetup: number; incomingMove?: DraftMoveThreat; incomingDamage: number; setupDamagePct: number; setupMoveMaxDamagePct: number; setupMoveKOs: boolean }> = [];
-        const opponentStats = new Map<DraftPokemonProfile, { profile: DraftPokemonProfile; reply: Awaited<ReturnType<typeof bestAttack>>; boostedReply: Awaited<ReturnType<typeof bestAttack>>; boostedAttack: Awaited<ReturnType<typeof bestAttack>>; setupDamage: Awaited<ReturnType<typeof bestAttack>> }>();
-        for (const opponent of opponents) {
-          if (isCancelled()) break;
-          const [reply, boostedReply, boostedAttack, setupDamage] = await Promise.all([
-            bestAttack(opponent, setupProfile, generation, counters, isCancelled, filter, fieldState),
-            bestAttack(opponent, boostedProfile, generation, counters, isCancelled, filter, fieldState),
-            bestAttack(boostedProfile, opponent, generation, counters, isCancelled, filter, fieldState),
-            setup.damaging ? bestAttack({ ...setupProfile, moves: [setup.name, "", "", ""] }, opponent, generation, counters, isCancelled, filter, fieldState) : Promise.resolve({} as Awaited<ReturnType<typeof bestAttack>>),
-          ]);
-          opponentStats.set(opponent, { profile: opponent, reply, boostedReply, boostedAttack, setupDamage });
-          const defenderSpeedSet = speedSetFor(opponent);
-          const attackerSpeed = getEffectiveSpeed(setupSpeedSet, fieldState, "attacker", configFor(setupProfile, "spe").stage);
-          const defenderSpeed = getEffectiveSpeed(defenderSpeedSet, fieldState, "defender", configFor(opponent, "spe").stage);
-          const defenderFirstMoves = (reply.byPriority || []).filter(move => {
-            const priority = move.effectivePriority ?? getEffectiveMovePriority(defenderSpeedSet, move.move, fieldState);
-            return priority > setupPriority || (priority === setupPriority && (fieldState.trickRoom ? defenderSpeed < attackerSpeed : defenderSpeed > attackerSpeed));
-          });
-          const incomingMove = defenderFirstMoves.reduce<DraftMoveThreat | undefined>((best, move) => isBetterMove(move, best) ? move : best, undefined);
-          const attackerFirst = !incomingMove;
-          const setupMoveThreat = setupDamage.best;
-          const setupMoveKOs = Boolean(setup.damaging && attackerFirst && setupMoveThreat && setupMoveThreat.minPct >= 100);
-          const damageBeforeSetup = incomingMove?.maxPct || 0;
-          const hpAfterSetup = 100 - damageBeforeSetup - setup.costPct;
-          if (hpAfterSetup > 0) {
-            // If the setup attack KOs first, the target never gets its reply.
-            // Otherwise, the user must survive the target's first available hit.
-            let postSetupDamage = 0;
-            if (!setupMoveKOs) {
-              const attackerPostSpeed = getEffectiveSpeed(boostedSpeedSet, fieldState, "attacker", configFor(boostedProfile, "spe").stage);
-              const defenderPostFirst = (boostedReply.byPriority || []).filter(move => {
-                const priority = move.effectivePriority ?? getEffectiveMovePriority(defenderSpeedSet, move.move, fieldState);
-                return priority > setupPriority || (priority === setupPriority && (fieldState.trickRoom ? defenderSpeed < attackerPostSpeed : defenderSpeed > attackerPostSpeed));
-              }).reduce<DraftMoveThreat | undefined>((best, move) => isBetterMove(move, best) ? move : best, undefined);
-              postSetupDamage = postSetupMoveDamage(defenderPostFirst, boostedReply.best, defenderSpeedSet, setupPriority, defenderSpeed, attackerPostSpeed, fieldState);
-            }
-            if (setupMoveKOs || hpAfterSetup - postSetupDamage > 0) setupHosts.push({ opponent, hpAfterSetup: Math.max(0, hpAfterSetup - postSetupDamage), incomingMove, incomingDamage: damageBeforeSetup + postSetupDamage, setupDamagePct: setupMoveThreat?.minPct || 0, setupMoveMaxDamagePct: setupMoveThreat?.maxPct || 0, setupMoveKOs });
-          }
-        }
-        if (!setupHosts.length) {
-          setupSweeps.push({ move: setup.name, itemAssumption: itemVariant.label, boosts: setup.boosts, setupCostPct: setup.costPct, targets: opponents.map(opponent => ({ species: opponent.species, bestMove: undefined, bestMoveMaxPct: 0, incomingMove: undefined, incomingMaxPct: 0, afterSetupIncomingMaxPct: 0, setupTurnSpeed: 0, attackerSpeed: 0, opponentSpeed: 0, opponentActsBeforeSetup: false, canSetUp: false, canContinueAfterSetup: false, plausibleSweepTarget: false })), plausibleTargets: 0, canSetUpInFront: [], swept: [], stoppedBy: [], boostChance: setup.boostChance });
-          continue;
-        }
-        // Each species may have several opponent-set assumptions in Team Lab.
-        // A species is a valid setup opportunity only when every assumed set survives.
-        const opponentCounts = new Map<string, number>();
-        for (const opponent of opponents) opponentCounts.set(opponent.species, (opponentCounts.get(opponent.species) || 0) + 1);
-        const hostGroups = new Map<string, typeof setupHosts>();
-        for (const entry of setupHosts) hostGroups.set(entry.opponent.species, [...(hostGroups.get(entry.opponent.species) || []), entry]);
-        const validHostGroups = [...hostGroups.entries()]
-          .filter(([species, entries]) => entries.length === (opponentCounts.get(species) || 0))
-          .map(([species, entries]) => ({ species, worst: [...entries].sort((a, b) => a.hpAfterSetup - b.hpAfterSetup)[0] }))
-          .sort((a, b) => b.worst.hpAfterSetup - a.worst.hpAfterSetup);
-        if (!validHostGroups.length) {
-          setupSweeps.push({ move: setup.name, itemAssumption: itemVariant.label, boosts: setup.boosts, setupCostPct: setup.costPct, targets: opponents.map(opponent => ({ species: opponent.species, bestMove: undefined, bestMoveMaxPct: 0, incomingMove: undefined, incomingMaxPct: 0, afterSetupIncomingMaxPct: 0, setupTurnSpeed: 0, attackerSpeed: 0, opponentSpeed: 0, opponentActsBeforeSetup: false, canSetUp: false, canContinueAfterSetup: false, plausibleSweepTarget: false })), plausibleTargets: 0, canSetUpInFront: [], swept: [], stoppedBy: [], boostChance: setup.boostChance });
-          continue;
-        }
-        // Setup is paid exactly once. Choose the safest valid host, then assess
-        // every remaining species against the HP left after that one setup turn.
-        const host = validHostGroups[0].worst;
-        const validHostSpecies = validHostGroups.map(entry => entry.species);
-        const hostName = host.opponent.species;
-        let currentHp = host.hpAfterSetup;
-        const sweptNames: string[] = [];
-        const stoppedNames: string[] = [];
-        const targets: DraftSetupSweepTarget[] = [];
-        for (const opponent of opponents) {
-          const row = opponentStats.get(opponent);
-          if (!row) continue;
-          const defenderSpeedSet = speedSetFor(opponent);
-          const attackerSpeed = getEffectiveSpeed(boostedSpeedSet, fieldState, "attacker", configFor(boostedProfile, "spe").stage);
-          const defenderSpeed = getEffectiveSpeed(defenderSpeedSet, fieldState, "defender", configFor(opponent, "spe").stage);
-          const bestMove = row.boostedAttack.best;
-          const attackerOptions = row.boostedAttack.byPriority || [];
-          const defenderOptions = row.boostedReply.byPriority || [];
-          const canActBefore = (first: DraftMoveThreat | undefined, second: DraftMoveThreat | undefined, firstSpeed: number, secondSpeed: number) => {
-            if (!first) return false;
-            const p1 = first.effectivePriority ?? getEffectiveMovePriority(boostedSpeedSet, first.move, fieldState);
-            const p2 = second ? (second.effectivePriority ?? getEffectiveMovePriority(defenderSpeedSet, second.move, fieldState)) : -7;
-            return p1 > p2 || (p1 === p2 && (fieldState.trickRoom ? firstSpeed < secondSpeed : firstSpeed > secondSpeed));
-          };
-          const earliest = (moves: DraftMoveThreat[], user: DraftPokemonProfile) => [...moves].sort((a, b) => (b.effectivePriority ?? getEffectiveMovePriority(speedSetFor(user), b.move, fieldState)) - (a.effectivePriority ?? getEffectiveMovePriority(speedSetFor(user), a.move, fieldState)) || b.maxPct - a.maxPct)[0];
-          const firstDefenderMove = earliest(defenderOptions, opponent);
-          const attackerBeforeOptions = attackerOptions.filter(move => !firstDefenderMove || canActBefore(move, firstDefenderMove, attackerSpeed, defenderSpeed));
-          const chosenFirstAttack = attackerBeforeOptions.reduce<DraftMoveThreat | undefined>((best, move) => isBetterMove(move, best) ? move : best, undefined);
-          const attackerFirst = Boolean(chosenFirstAttack);
-          const hostRow = opponent.species === hostName;
-          const hostSetupMoveKOs = Boolean(hostRow && host.setupMoveKOs);
-          const attackKOs = hostSetupMoveKOs || Boolean(chosenFirstAttack && (chosenFirstAttack.minPct + (hostRow ? host.setupDamagePct : 0)) >= 100);
-          const defenderRelevantOptions = defenderOptions.filter(move => attackerFirst
-            ? !canActBefore(move, chosenFirstAttack, defenderSpeed, attackerSpeed)
-            : !chosenFirstAttack || canActBefore(move, chosenFirstAttack, defenderSpeed, attackerSpeed));
-          const defenderMove = defenderRelevantOptions.reduce<DraftMoveThreat | undefined>((best, move) => isBetterMove(move, best) ? move : best, undefined) || firstDefenderMove;
-          const defenderDamage = defenderMove?.maxPct || 0;
-          let stopped = false;
-          let stopReason = "";
-          if (!attackerFirst && defenderDamage >= currentHp) { stopped = true; stopReason = `${defenderMove?.move || "Opponent move"} acts first and KOs from ${currentHp.toFixed(1)}% HP`; }
-          else if (attackKOs && (attackerFirst || defenderDamage < currentHp)) { sweptNames.push(opponent.species); }
-          else if (defenderDamage >= currentHp) { stopped = true; stopReason = `${defenderMove?.move || "Opponent move"} KOs ${attackerFirst ? `after ${bestMove?.move || "the attack"}` : "before the attack"} (${currentHp.toFixed(1)}% HP remaining)`; }
-          if (stopped) stoppedNames.push(opponent.species);
-          const displayedMove = hostSetupMoveKOs ? undefined : (chosenFirstAttack || bestMove);
-          targets.push({ species: opponent.species, bestMove: displayedMove, bestMoveMaxPct: hostSetupMoveKOs ? 100 : Math.min(100, (displayedMove?.maxPct || 0) + (hostRow ? host.setupMoveMaxDamagePct : 0)), setupMoveDamagePct: hostRow ? host.setupDamagePct : 0, setupMoveMaxDamagePct: hostRow ? host.setupMoveMaxDamagePct : 0, incomingMove: hostRow ? host.incomingMove?.move : defenderMove?.move, incomingMaxPct: hostRow ? host.incomingDamage : defenderDamage, afterSetupIncomingMaxPct: defenderDamage, setupTurnSpeed: getEffectiveSpeed(setupSpeedSet, fieldState, "attacker", configFor(setupProfile, "spe").stage), attackerSpeed, opponentSpeed: defenderSpeed, opponentActsBeforeSetup: hostRow ? Boolean(host.incomingMove) : !attackerFirst, canSetUp: hostRow, canSetUpInFront: hostRow, canContinueAfterSetup: !stopped, plausibleSweepTarget: sweptNames.includes(opponent.species), stoppedSweepTarget: stopped, hpAfterSetupPct: currentHp, stopReason });
-        }
-        const groupedTargets = new Map<string, DraftSetupSweepTarget[]>();
-        for (const target of targets) groupedTargets.set(target.species, [...(groupedTargets.get(target.species) || []), target]);
-        const uniqueTargets = [...groupedTargets.entries()].map(([species, assumptions]) => {
-          const worstDamage = [...assumptions].sort((a, b) => a.bestMoveMaxPct - b.bestMoveMaxPct)[0];
-          const stopper = assumptions.find(target => target.stoppedSweepTarget);
-          const sweptAcrossAssumptions = assumptions.length === (opponentCounts.get(species) || 0) && assumptions.every(target => target.plausibleSweepTarget);
-          return { ...worstDamage, species, plausibleSweepTarget: sweptAcrossAssumptions, stoppedSweepTarget: Boolean(stopper), stopReason: stopper?.stopReason || worstDamage.stopReason, hpAfterSetupPct: Math.min(...assumptions.map(target => target.hpAfterSetupPct ?? 100)), incomingMaxPct: Math.max(...assumptions.map(target => target.incomingMaxPct)) };
+        const opponentSpeedSet = speedSetFor(opponent);
+        const setupTurnSpeed = getEffectiveSpeed(attackerSpeedSet, fieldState, "attacker", configFor(attacker, "spe").stage);
+        const attackerSpeed = getEffectiveSpeed(boostedSpeedSet, fieldState, "attacker", configFor(boostedProfile, "spe").stage);
+        const opponentSpeed = getEffectiveSpeed(opponentSpeedSet, fieldState, "defender", configFor(opponent, "spe").stage);
+        const setupPriority = getEffectiveMovePriority(attackerSpeedSet, setup.name, fieldState);
+        const opponentAttack = await bestAttack(opponent, attacker, generation, counters, isCancelled, filter, fieldState);
+        const afterSetupIncoming = await bestAttack(opponent, boostedProfile, generation, counters, isCancelled, filter, fieldState);
+        const boostedAttack = await bestAttack(boostedProfile, opponent, generation, counters, isCancelled, filter, fieldState);
+        const actsBefore = (move: DraftMoveThreat, userSpeed: number, userPriority: number) => {
+          const priority = getEffectiveMovePriority(opponentSpeedSet, move.move, fieldState);
+          return priority > userPriority || (priority === userPriority && (fieldState.trickRoom ? opponentSpeed <= userSpeed : opponentSpeed >= userSpeed));
+        };
+        const beforeSetupCandidates = (opponentAttack.byPriority || []).filter(move => actsBefore(move, setupTurnSpeed, setupPriority));
+        const incomingMove = beforeSetupCandidates.reduce<DraftMoveThreat | undefined>((best, move) => isBetterMove(move, best) ? move : best, undefined);
+        const opponentActsBeforeSetup = Boolean(incomingMove);
+        const damageBeforeSetup = opponentActsBeforeSetup ? (incomingMove?.maxPct ?? 0) : 0;
+        const setupCanOccur = damageBeforeSetup + setup.costPct < 100;
+        const opponentNextPriority = afterSetupIncoming.best ? getEffectiveMovePriority(opponentSpeedSet, afterSetupIncoming.best.move, fieldState) : -7;
+        const attackerFirstOptions = (boostedAttack.byPriority || []).filter(move => {
+          const priority = getEffectiveMovePriority(boostedSpeedSet, move.move, fieldState);
+          return !afterSetupIncoming.best || priority > opponentNextPriority || (priority === opponentNextPriority && (fieldState.trickRoom ? attackerSpeed < opponentSpeed : attackerSpeed > opponentSpeed));
         });
-        const sweptSpecies = uniqueTargets.filter(target => target.plausibleSweepTarget).map(target => target.species);
-        const stoppedSpecies = uniqueTargets.filter(target => target.stoppedSweepTarget).map(target => target.species);
-        setupSweeps.push({ move: setup.name, itemAssumption: itemVariant.label, boosts: setup.boosts, setupCostPct: setup.costPct, targets: uniqueTargets, plausibleTargets: sweptSpecies.length, setupHost: hostName, canSetUpInFront: validHostSpecies, swept: sweptSpecies, stoppedBy: stoppedSpecies, boostChance: setup.boostChance });
+        const strongestFirstMove = attackerFirstOptions.reduce<DraftMoveThreat | undefined>((best, move) => isBetterMove(move, best) ? move : best, undefined);
+        // Prefer a move that can act before the opponent when it still reaches
+        // the strong-hit threshold; otherwise retain the strongest overall hit.
+        const boostedMove = strongestFirstMove && strongestFirstMove.maxPct >= DRAFT_STRONG_HIT_THRESHOLD ? strongestFirstMove : boostedAttack.best;
+        const boostedMovePriority = boostedMove ? getEffectiveMovePriority(boostedSpeedSet, boostedMove.move, fieldState) : -7;
+        const afterSetupCandidates = (afterSetupIncoming.byPriority || []).filter(move => actsBefore(move, attackerSpeed, boostedMovePriority));
+        const afterSetupMove = afterSetupCandidates.reduce<DraftMoveThreat | undefined>((best, move) => isBetterMove(move, best) ? move : best, undefined);
+        const attackerActsFirstAfterSetup = !afterSetupMove;
+        const afterDamage = afterSetupMove?.maxPct ?? afterSetupIncoming.best?.maxPct ?? 0;
+        const canContinueAfterSetup = setupCanOccur && (
+          damageBeforeSetup + setup.costPct + afterDamage < 100 ||
+          Boolean(attackerActsFirstAfterSetup && boostedMove && boostedMove.minPct >= 100)
+        );
+        const bestMove = boostedMove;
+        const bestMoveMaxPct = bestMove?.maxPct ?? 0;
+        targets.push({
+          species: opponent.species,
+          bestMove,
+          bestMoveMaxPct,
+          incomingMove: incomingMove?.move,
+          incomingMaxPct: incomingMove?.maxPct ?? 0,
+          afterSetupIncomingMaxPct: afterDamage,
+          setupTurnSpeed,
+          attackerSpeed,
+          opponentSpeed,
+          opponentActsBeforeSetup,
+          canSetUp: setupCanOccur,
+          canContinueAfterSetup,
+          plausibleSweepTarget: setupCanOccur && canContinueAfterSetup && bestMoveMaxPct >= DRAFT_STRONG_HIT_THRESHOLD,
+        });
+      }
+      // Team Lab may pass multiple defensive / item assumptions for the same
+      // opposing species. Collapse them into one conservative per-species row:
+      // all assumptions must permit setup and continuation for a positive flag.
+      const groupedTargets = new Map<string, DraftSetupSweepTarget>();
+      for (const target of targets) {
+        const previous = groupedTargets.get(target.species);
+        if (!previous) { groupedTargets.set(target.species, target); continue; }
+        const worstDamageMove = target.bestMoveMaxPct < previous.bestMoveMaxPct ? target : previous;
+        const worstIncoming = target.incomingMaxPct > previous.incomingMaxPct ? target : previous;
+        const opponentActsFirst = previous.opponentActsBeforeSetup || target.opponentActsBeforeSetup;
+        const canSetUp = previous.canSetUp && target.canSetUp;
+        const canContinue = previous.canContinueAfterSetup && target.canContinueAfterSetup;
+        groupedTargets.set(target.species, {
+          ...previous,
+          bestMove: worstDamageMove.bestMove,
+          bestMoveMaxPct: Math.min(previous.bestMoveMaxPct, target.bestMoveMaxPct),
+          incomingMove: worstIncoming.incomingMove,
+          incomingMaxPct: Math.max(previous.incomingMaxPct, target.incomingMaxPct),
+          afterSetupIncomingMaxPct: Math.max(previous.afterSetupIncomingMaxPct, target.afterSetupIncomingMaxPct),
+          opponentSpeed: fieldState.trickRoom ? Math.min(previous.opponentSpeed, target.opponentSpeed) : Math.max(previous.opponentSpeed, target.opponentSpeed),
+          opponentActsBeforeSetup: opponentActsFirst,
+          canSetUp,
+          canContinueAfterSetup: canContinue,
+          plausibleSweepTarget: canSetUp && canContinue && Math.min(previous.bestMoveMaxPct, target.bestMoveMaxPct) >= DRAFT_STRONG_HIT_THRESHOLD,
+        });
+      }
+      const uniqueTargets = [...groupedTargets.values()];
+      setupSweeps.push({ move: setup.name, itemAssumption: itemVariant.label, boosts: setup.boosts, setupCostPct: setup.costPct, targets: uniqueTargets, plausibleTargets: uniqueTargets.filter(target => target.plausibleSweepTarget).length });
       }
     }
   }
