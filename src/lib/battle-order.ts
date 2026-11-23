@@ -21,6 +21,29 @@ export function getWeatherSpeedAbilityMultiplier(abilityName: string, field: Pic
   return 1;
 }
 
+
+function getUnmodifiedStat(p: PokemonSet, stat: "atk" | "def" | "spa" | "spd" | "spe", base: number, level: number): number {
+  const iv = MAX_IVS[stat];
+  const ev = Math.max(0, Math.min(252, p.evs?.[stat] ?? 0));
+  let value = Math.floor((Math.floor((2 * base + iv + Math.floor(ev / 4)) * level / 100) + 5));
+  const nature = getNature(p.nature || "Serious") as DexEntry;
+  if (nature?.plus === stat) value = Math.floor(value * 1.1);
+  if (nature?.minus === stat) value = Math.floor(value * 0.9);
+  return value;
+}
+
+function hasSpeedProtosynthesis(p: PokemonSet, field: Pick<FieldState, "weather" | "terrain">, level: number): boolean {
+  const abilityName = clean(p.ability);
+  const abilityActive = (abilityName === "protosynthesis" && (field.weather === "Sun" || item(p, "Booster Energy"))) ||
+    (abilityName === "quarkdrive" && (field.terrain === "Electric" || item(p, "Booster Energy")));
+  if (!abilityActive) return false;
+  const stats = getSpecies(p.species || p.name)?.baseStats;
+  if (!stats) return false;
+  const speed = getUnmodifiedStat(p, "spe", Number(stats.spe || 0), level);
+  // Showdown's tie order prioritizes Atk/Def/SpA/SpD before Speed.
+  return (["atk", "def", "spa", "spd"] as const).every(stat => speed > getUnmodifiedStat(p, stat, Number(stats[stat] || 0), level));
+}
+
 /** Gen 9 estimated effective Speed using the live Pokémon Showdown data adapter. */
 export function getEffectiveSpeed(p: PokemonSet, field: FieldState, side: "attacker" | "defender" = "attacker", speedStage = 0): number {
   const species = getSpecies(p.species || p.name) as DexEntry;
@@ -45,6 +68,7 @@ export function getEffectiveSpeed(p: PokemonSet, field: FieldState, side: "attac
   // In this team-planning UI, a missing item is treated as Unburden having activated.
   if (ability(p, "Unburden") && !p.item.trim()) speed *= 2;
   if (item(p, "Choice Scarf")) speed = Math.floor(speed * 1.5);
+  if (hasSpeedProtosynthesis(p, field, level)) speed = Math.floor(speed * 1.5);
   if (item(p, "Iron Ball") || item(p, "Macho Brace") || ["Power Anklet", "Power Band", "Power Belt", "Power Bracer", "Power Lens", "Power Weight"].some(x => item(p, x))) speed = Math.floor(speed * 0.5);
   speed *= getWeatherSpeedAbilityMultiplier(p.ability, field);
   if (field.tailwindSide === side) speed *= 2;

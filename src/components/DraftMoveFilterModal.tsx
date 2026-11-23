@@ -13,7 +13,7 @@ type Props = {
   onClose: () => void;
 };
 
-export default function DraftMoveFilterModal({ open, title = "Move filters", description = "Filters apply to both attacking directions. Whitelisted moves bypass accuracy and priority thresholds, but blacklist entries always win.", value, moveNames, onSave, onClose }: Props) {
+export default function DraftMoveFilterModal({ open, title = "Move filters", description = "Filters apply to hypothetical learnset candidates in both attacking directions. Explicitly entered moves are always included; whitelist entries bypass accuracy and priority thresholds, while blacklist entries exclude hypothetical candidates.", value, moveNames, onSave, onClose }: Props) {
   const [draft, setDraft] = useState<DraftMoveFilter>(value);
   const [picker, setPicker] = useState("");
   useEffect(() => { if (open) { setDraft({ ...value, whitelist: [...value.whitelist], blacklist: [...value.blacklist] }); setPicker(""); } }, [open, value]);
@@ -34,7 +34,7 @@ export default function DraftMoveFilterModal({ open, title = "Move filters", des
       <datalist id={`${id}-moves`}>{moveNames.map(move => <option key={move} value={move} />)}</datalist>
       <div className="draft-move-filter-picker"><label htmlFor={`${id}-picker`}>Add a move</label><input id={`${id}-picker`} list={`${id}-moves`} value={picker} onChange={event => setPicker(event.target.value)} placeholder="Search moves…" /><button type="button" onClick={() => add("whitelist")}>Add to whitelist</button><button type="button" onClick={() => add("blacklist")}>Add to blacklist</button></div>
       <div className="draft-move-filter-lists"><label>Whitelist · always include these moves (unless blacklisted)<textarea rows={Math.max(3, Math.min(12, draft.whitelist.length || 3))} value={draft.whitelist.join("\n")} onChange={event => setDraft(current => ({ ...current, whitelist: event.target.value.split(/[\n,]+/).map(value => value.trim()).filter(Boolean) }))} placeholder="Leave empty to allow all moves" /></label><label>Blacklist · always excluded<textarea rows={Math.max(3, Math.min(12, draft.blacklist.length || 3))} value={draft.blacklist.join("\n")} onChange={event => setDraft(current => ({ ...current, blacklist: event.target.value.split(/[\n,]+/).map(value => value.trim()).filter(Boolean) }))} placeholder="No excluded moves" /></label></div>
-      <div className="button-row draft-editor-actions"><button type="button" onClick={() => setDraft({ ...DEFAULT_DRAFT_MOVE_FILTER, whitelist: [], blacklist: [] })}>Reset defaults</button></div>
+      <div className="button-row draft-editor-actions"><button type="button" onClick={() => setDraft({ ...DEFAULT_DRAFT_MOVE_FILTER, whitelist: [...DEFAULT_DRAFT_MOVE_FILTER.whitelist], blacklist: [...DEFAULT_DRAFT_MOVE_FILTER.blacklist] })}>Reset defaults</button></div>
     </section>
   </div>;
 }

@@ -7,7 +7,20 @@ import { DRAFT_STRONG_HIT_THRESHOLD, DRAFT_WALL_THRESHOLD, isEligibleDraftMove, 
 export { DRAFT_STRONG_HIT_THRESHOLD, DRAFT_WALL_THRESHOLD } from "./draft-matchup-rules";
 const MAX_MOVES_PER_TYPE_CATEGORY = 3;
 export type DraftMoveFilter = { minAccuracy: number; minPriority: number; whitelist: string[]; blacklist: string[] };
-export const DEFAULT_DRAFT_MOVE_FILTER: DraftMoveFilter = { minAccuracy: 75, minPriority: 0, whitelist: [], blacklist: [] };
+export const DEFAULT_DRAFT_MOVE_FILTER: DraftMoveFilter = {
+  minAccuracy: 75,
+  minPriority: 0,
+  whitelist: [],
+  // These are commonly conditional, lock-in, charge, or opponent-boosting
+  // moves. They remain available when explicitly entered in a known moveset.
+  blacklist: [
+    "Swagger", "Outrage", "Thrash", "Petal Dance", "Uproar",
+    "Rollout", "Ice Ball", "Rage", "Fury Cutter", "Echoed Voice",
+    "Solar Beam", "Solar Blade", "Skull Bash", "Sky Attack", "Razor Wind",
+    "Fly", "Dig", "Dive", "Bounce", "Phantom Force", "Shadow Force",
+    "Meteor Beam", "Electro Shot", "Geomancy", "Hyper Beam", "Giga Impact",
+  ],
+};
 const moveId = (value: string) => normalize(value);
 const CHUNK_SIZE = 16;
 
@@ -244,7 +257,9 @@ async function bestAttack(
   const manualMoves = (attackerProfile.moves || [])
     .filter(Boolean)
     .map(name => getMoveDetails(name, generation))
-    .filter((move): move is MoveDetails => Boolean(move && isEligibleDraftMove(move) && passesDraftMoveFilters(move, filter)));
+    // Explicitly entered moves are authoritative: analysis filters only trim
+    // hypothetical learnset candidates, never a move in the Pokémon's set.
+    .filter((move): move is MoveDetails => Boolean(move && isEligibleDraftMove(move)));
   const hasCompleteMoveset = (attackerProfile.moves || []).filter(Boolean).length >= 4;
   const manualStabByType = new Map<string, number>();
   const speciesTypes = getSpecies(attackerProfile.species)?.types || [];
@@ -321,11 +336,13 @@ function setupMoveCandidates(species: string, generation: number, filter: DraftM
   const learnset = generation >= 10
     ? (getChampionsSpeciesLearnset(species) || getHistoricalSpeciesLearnset(species))
     : getHistoricalSpeciesLearnset(species);
-  const candidates = completeMoveset ? knownMoves.filter(Boolean) : [...(learnset || [])];
+  const knownIds = new Set(knownMoves.filter(Boolean).map(moveId));
+  const candidates = completeMoveset ? knownMoves.filter(Boolean) : [...new Set([...(learnset || []), ...knownMoves.filter(Boolean)])];
   const result: Array<{ name: string; boosts: Partial<Record<StatId, number>>; priority: number; costPct: number }> = [];
   for (const name of candidates) {
     const metadata = getMove(name) as (Record<string, unknown> & { boosts?: Record<string, number> }) | undefined;
     const id = moveId(name);
+    if (id === "swagger") continue; // Swagger boosts its target, not its user; it is still analysed as a normal known move.
     const boosts = metadata?.boosts || (id === "bellydrum" ? { atk: 6 } : undefined);
     if (!boosts || metadata?.category !== "Status") continue;
     if (id === "curse" && (getSpecies(species)?.types || []).includes("Ghost")) continue;
@@ -334,8 +351,8 @@ function setupMoveCandidates(species: string, generation: number, filter: DraftM
     const positive = Object.entries(boosts).filter(([, value]) => typeof value === "number" && value > 0);
     if (!positive.some(([stat]) => ["atk", "spa", "spe"].includes(stat))) continue;
     const details = getMoveDetails(name, generation);
-    if (!details || filter.blacklist.some(value => moveId(value) === moveId(name))) continue;
-    if (!passesDraftMoveFilters(details, filter)) continue;
+    if (!details) continue;
+    if (!knownIds.has(id) && (filter.blacklist.some(value => moveId(value) === id) || !passesDraftMoveFilters(details, filter))) continue;
     const mapped: Partial<Record<StatId, number>> = {};
     for (const [stat, value] of Object.entries(boosts)) {
       if (["atk", "def", "spa", "spd", "spe"].includes(stat) && typeof value === "number") mapped[stat as StatId] = Math.max(-6, Math.min(6, value));
@@ -525,7 +542,7 @@ export async function analyzeDraftPokemon(
     setupSweeps,
     movesEvaluated: counters.evaluated,
     approximate: true,
-    note: `Potential matchups only: top three eligible moves per type/category after ${filter.minAccuracy}% accuracy and whitelist/blacklist filters, configured items, abilities, EVs/Stat Points, natures, and stat stages on both sides; selected weather and terrain are applied.${includeSetupAnalysis ? " Learnable setup moves are separately assessed using boosted damage, turn order, priority, and whether the user can survive the setup turn and the following hit." : ""} Damage and multi-hit probabilities inherit the calculator's supported mechanics; this is not a guaranteed set or battle prediction.`,
+    note: `Potential matchups only: top three eligible hypothetical learnset moves per type/category after ${filter.minAccuracy}% accuracy and whitelist/blacklist filters; explicitly entered moves are always included regardless of filters. Configured items, abilities, EVs/Stat Points, natures, and stat stages on both sides; selected weather and terrain are applied.${includeSetupAnalysis ? " Learnable setup moves are separately assessed using boosted damage, turn order, priority, and whether the user can survive the setup turn and the following hit." : ""} Damage and multi-hit probabilities inherit the calculator's supported mechanics; this is not a guaranteed set or battle prediction.`,
   };
   if (!isCancelled()) {
     analysisCache.set(cacheKey, analysis);

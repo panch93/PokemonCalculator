@@ -16,6 +16,7 @@ import { getNature, getSpecies, getSpeciesAbilities, getMoveList } from "../lib/
 import { analyzeDraftPokemon, getDraftProfileEffectiveSpeed, DEFAULT_DRAFT_MOVE_FILTER, type DraftMatchupAnalysis, type DraftPokemonProfile, type DraftMoveFilter } from "../lib/draft-matchup-analysis";
 import DraftMoveFilterModal from "./DraftMoveFilterModal";
 import PokemonSprite from "./PokemonSprite";
+import { getSmogonPresetItemCandidates } from "../lib/smogon-presets";
 
 const DEFAULT_FIELD: FieldState = {
   gameType: "Singles", weather: "", terrain: "", defenderStealthRock: false, defenderSpikes: 0, defenderReflect: false,
@@ -59,8 +60,8 @@ export default function TeamLab() {
   const [teamAnalysisProgress, setTeamAnalysisProgress] = useState("");
   const [teamAnalysisFilterOpen, setTeamAnalysisFilterOpen] = useState(false);
   const [teamAnalysisFilter, setTeamAnalysisFilter] = useState<DraftMoveFilter>(DEFAULT_DRAFT_MOVE_FILTER);
+  const [teamAnalysisMoveNames, setTeamAnalysisMoveNames] = useState<string[]>([]);
   const [selectedAnalysisPokemon, setSelectedAnalysisPokemon] = useState<{ side: "left" | "right"; species: string } | null>(null);
-  const teamAnalysisMoveNames = useMemo(() => getMoveList(), []);
   const teamAnalysisToken = useRef(0);
 
   useEffect(() => {
@@ -184,7 +185,7 @@ export default function TeamLab() {
     setTeamAnalysisLoading(true);
     setTeamAnalysisError("");
     setTeamAnalysisRuns([]);
-    setTeamAnalysisProgress("Loading Pokémon, move and learnset data…");
+    setTeamAnalysisProgress("Loading Pokémon, learnsets and Smogon preset item data…");
     const isCancelled = () => teamAnalysisToken.current !== token;
     const active = (team: Team) => team.filter(p => Boolean(p.species) && !p.dead && !/^empty slot/i.test(p.name || ""));
     const firstAliveA = active(left)[0];
@@ -195,6 +196,7 @@ export default function TeamLab() {
     const championsMode = generation >= 10 || /champions/i.test(format);
     const budget = championsMode ? 66 : 510;
     const perStatMax = championsMode ? 32 : 252;
+    let presetItems: string[] = [];
     const makeProfiles = (pokemon: Team[number], team: Team): Array<{ profile: DraftPokemonProfile; scenario: string }> => {
       const baseEvs = { ...pokemon.evs };
       const used = Object.values(baseEvs).reduce((sum, value) => sum + (Number(value) || 0), 0);
@@ -211,11 +213,9 @@ export default function TeamLab() {
         championsMode, level: pokemon.level || (championsMode ? 50 : 100), alliesFainted,
         stats: Object.fromEntries((['hp','atk','def','spa','spd','spe'] as StatId[]).map(stat => [stat, { ev: evs[stat] || 0, nature: natureFor(stat), stage: 0 }])) as DraftPokemonProfile['stats'],
       });
-      const knownItem = pokemon.item?.trim() || "";
-      const scenarios: Array<{ profile: DraftPokemonProfile; scenario: string }> = [{ profile: build(baseEvs, knownItem), scenario: knownItem ? `Configured set · ${knownItem}` : "Configured EVs · item unknown" }];
       const addTo = (evs: typeof baseEvs, priorities: StatId[]) => {
         let points = remaining;
-        const unit = generation >= 10 ? 1 : 4;
+        const unit = championsMode ? 1 : 4;
         points = Math.floor(points / unit) * unit;
         for (const stat of priorities) {
           if (points <= 0) break;
@@ -227,18 +227,23 @@ export default function TeamLab() {
         return evs;
       };
       const attackStat: StatId = (baseStats.atk || 0) >= (baseStats.spa || 0) ? "atk" : "spa";
-      if (remaining > 0) {
-        const offensive = addTo({ ...baseEvs }, [attackStat, "spe", "hp", attackStat === "atk" ? "spa" : "atk"]);
-        const offensiveItem = knownItem || "Life Orb";
-        scenarios.push({ profile: build(offensive, offensiveItem), scenario: `${knownItem ? "Remaining EVs: offense + Speed" : "Life Orb assumption + offensive EVs"}` });
-        const bulky = addTo({ ...baseEvs }, ["hp", "def", "spd", "spe"]);
-        const bulkyItem = knownItem || "Assault Vest";
-        scenarios.push({ profile: build(bulky, bulkyItem), scenario: `${knownItem ? "Remaining EVs: HP / defenses" : "Assault Vest assumption + bulky EVs"}` });
-        if (!knownItem && (field.defenderStealthRock || field.defenderSpikes > 0)) scenarios.push({ profile: build(bulky, "Heavy-Duty Boots"), scenario: "Heavy-Duty Boots assumption + bulky EVs" });
-      } else if (!knownItem) {
-        scenarios.push({ profile: build(baseEvs, "Life Orb"), scenario: "Life Orb assumption · configured EVs" });
-        scenarios.push({ profile: build(baseEvs, "Assault Vest"), scenario: "Assault Vest assumption · configured EVs" });
-        if (field.defenderStealthRock || field.defenderSpikes > 0) scenarios.push({ profile: build(baseEvs, "Heavy-Duty Boots"), scenario: "Heavy-Duty Boots assumption · configured EVs" });
+      const knownItem = pokemon.item?.trim() || "";
+      const scenarios: Array<{ profile: DraftPokemonProfile; scenario: string }> = [{ profile: build(baseEvs, knownItem), scenario: knownItem ? `Configured set · ${knownItem}` : "Configured EVs · item unknown" }];
+      const offensive = remaining > 0 ? addTo({ ...baseEvs }, [attackStat, "spe", "hp", attackStat === "atk" ? "spa" : "atk"]) : { ...baseEvs };
+      const bulky = remaining > 0 ? addTo({ ...baseEvs }, ["hp", "def", "spd", "spe"]) : { ...baseEvs };
+      if (knownItem) {
+        if (remaining > 0) {
+          scenarios.push({ profile: build(offensive, knownItem), scenario: `Remaining EVs · offense + Speed · ${knownItem}` });
+          scenarios.push({ profile: build(bulky, knownItem), scenario: `Remaining EVs · HP / defenses · ${knownItem}` });
+        }
+      } else {
+        const candidates = presetItems.length ? presetItems : ["Life Orb", "Choice Scarf", "Choice Band", "Choice Specs", "Leftovers", "Assault Vest", "Rocky Helmet", "Heavy-Duty Boots"];
+        const defensiveItems = new Set(["assaultvest", "leftovers", "rockyhelmet", "heavydutyboots", "eviolite", "sitrusberry", "focussash"]);
+        for (const item of candidates) {
+          const defensive = defensiveItems.has(item.toLowerCase().replace(/[^a-z0-9]/g, ""));
+          const evs = defensive ? bulky : offensive;
+          scenarios.push({ profile: build(evs, item), scenario: `Smogon preset item · ${item}${remaining > 0 ? defensive ? " · remaining EVs to bulk" : " · remaining EVs to offense / Speed" : " · configured EVs"}` });
+        }
       }
       return scenarios;
     };
@@ -246,6 +251,8 @@ export default function TeamLab() {
       // Do not start damage calculations against an unloaded move table. This
       // also protects against a click during the initial learnset-loading pass.
       await loadFormatLearnsets(format);
+      setTeamAnalysisMoveNames(getMoveList());
+      presetItems = await getSmogonPresetItemCandidates(8).catch(() => []);
       if (isCancelled()) return;
       const allActive = [...active(left), ...active(right)];
       if (allActive.length === 0) {
@@ -266,7 +273,10 @@ export default function TeamLab() {
             const options = makeProfiles(opponent, side.opposingTeam);
             // Test the entered target set and one plausible defensive allocation/item,
             // rather than multiplying every attack scenario by every target scenario.
-            const chosen = options.length > 2 ? [options[0], options[2], ...(options[3] ? [options[3]] : [])] : options;
+            const base = options[0];
+            const scarf = options.find(entry => (entry.profile.item || "").toLowerCase() === "choice scarf");
+            const defensive = options.find(entry => ["assault vest", "leftovers", "rocky helmet", "eviolite"].includes((entry.profile.item || "").toLowerCase()));
+            const chosen = [base, scarf, defensive].filter((entry, index, all): entry is NonNullable<typeof entry> => Boolean(entry) && all.findIndex(value => value?.profile.item === entry?.profile.item && value?.scenario === entry?.scenario) === index);
             return chosen.map(entry => ({ species: opponent.species, scenario: entry.scenario, profile: entry.profile }));
           });
           for (const attackerScenario of attackerScenarios) {
@@ -321,7 +331,7 @@ export default function TeamLab() {
           onToggleSwap={() => { setSwapped(value => !value); setSelected(value => value ? ({ row: value.col, col: value.row }) : null); }}
           overallNotes={overallNotes}
           onOverallNotesChange={setOverallNotes}
-          onTeamAnalysisClick={runTeamAnalysis}
+          onTeamAnalysisClick={() => { void runTeamAnalysis(); }}
           onSelect={(row, col) => setSelected({ row, col })}
           onMoveChange={updateRowMove}
           onRowStageChange={(index, stat, value) => updateStage(index, stat, value, swapped ? "right" : "left")}
@@ -341,7 +351,7 @@ export default function TeamLab() {
         {!teamAnalysisLoading && !teamAnalysisRuns.length && !teamAnalysisError && <p className="muted">No analysis scenarios were produced. Check that both teams contain living Pokémon and that the selected format's learnset data has loaded.</p>}
         <div className="team-analysis-rosters">{([{ side: "left" as const, label: "Team A", team: left }, { side: "right" as const, label: "Team B", team: right }]).map(group => { const species: string[] = [...new Set<string>(group.team.filter(pokemon => pokemon.species && !pokemon.dead && !/^empty slot/i.test(pokemon.name || "")).map(pokemon => pokemon.species))]; return <section className="team-analysis-roster" key={group.side}><h3>{group.label}</h3><div className="team-analysis-roster-pokemon">{species.map(name => { const selected = selectedAnalysisPokemon?.side === group.side && selectedAnalysisPokemon.species === name; const runs = teamAnalysisRuns.filter(run => run.side === group.side && run.species === name); const roleThresholdFor = (count: number) => count ? Math.min(count, Math.max(1, Math.ceil(count / 2))) : Number.POSITIVE_INFINITY; const hasSweeperRole = runs.some(run => { const allTargets = new Set(run.analysis.opponents.map(opponent => opponent.species)); const strongTargets = new Set(run.analysis.opponents.filter((opponent, index) => { const target = run.opponentProfiles[index]; if (!target || (opponent.bestAttack?.maxPct || 0) < 70) return false; const attackerSpeed = getDraftProfileEffectiveSpeed(run.profile, field, "attacker"); const targetSpeed = getDraftProfileEffectiveSpeed(target, field, "defender"); return attackerSpeed >= targetSpeed || Boolean(opponent.bestReply && opponent.bestReply.maxPct < 100); }).map(opponent => opponent.species)); return strongTargets.size >= roleThresholdFor(allTargets.size); }); const hasWallingRole = runs.some(run => { const allTargets = new Set(run.analysis.opponents.map(opponent => opponent.species)); const walledTargets = new Set(run.analysis.opponents.filter(opponent => opponent.bestReply && opponent.bestReply.maxPct <= 35).map(opponent => opponent.species)); return walledTargets.size >= roleThresholdFor(allTargets.size); }); return <button type="button" key={name} className={`team-analysis-roster-mon ${selected ? "selected" : ""}`} onClick={() => setSelectedAnalysisPokemon({ side: group.side, species: name })}><PokemonSprite species={name} className="team-analysis-roster-sprite" /><span>{name}</span><span className="team-analysis-tags">{runs.some(run => run.analysis.setupSweeps.some(setup => setup.plausibleTargets > 0)) ? <i className="analysis-tag setup">Setup</i> : null}{hasSweeperRole ? <i className="analysis-tag sweeper">Sweeper</i> : null}{hasWallingRole ? <i className="analysis-tag walling">Walling</i> : null}</span><small>{runs.length ? `${runs.length} scenario${runs.length === 1 ? "" : "s"}` : teamAnalysisLoading ? "Calculating…" : "No result"}</small></button>; })}</div></section>; })}</div>
         {selectedAnalysisPokemon && (() => { const selectedRuns = teamAnalysisRuns.filter(run => run.side === selectedAnalysisPokemon.side && run.species === selectedAnalysisPokemon.species); return <section className="team-analysis-selected"><h3>{selectedAnalysisPokemon.side === "left" ? "Team A" : "Team B"} · {selectedAnalysisPokemon.species}</h3>{selectedRuns.length ? selectedRuns.map((run, runIndex) => { const rows = run.analysis.opponents.map((opponent, index) => ({ opponent, scenario: run.opponentScenarios[index]?.scenario || "Opponent set" })); const hits = rows.filter(row => (row.opponent.bestAttack?.maxPct || 0) >= 70).sort((a,b) => (b.opponent.bestAttack?.maxPct || 0) - (a.opponent.bestAttack?.maxPct || 0)); const damages = rows.filter(row => (row.opponent.bestAttack?.maxPct || 0) > 35 && (row.opponent.bestAttack?.maxPct || 0) < 70).sort((a,b) => (b.opponent.bestAttack?.maxPct || 0) - (a.opponent.bestAttack?.maxPct || 0)); const switchIns = rows.filter(row => row.opponent.bestReply && row.opponent.bestReply.maxPct <= 35).sort((a,b) => (a.opponent.bestReply?.maxPct || 0) - (b.opponent.bestReply?.maxPct || 0)); const koRows = rows.filter(row => row.opponent.bestAttack && row.opponent.bestAttack.maxPct > 0).sort((a,b) => (b.opponent.bestAttack?.maxPct || 0) - (a.opponent.bestAttack?.maxPct || 0)).slice(0,5); const allocation = (["hp","atk","def","spa","spd","spe"] as StatId[]).map(stat => `${stat.toUpperCase()} ${run.profile.stats?.[stat]?.ev ?? 0}`).join(" · "); return <details className="team-analysis-run" key={`${run.scenario}:${runIndex}`} open={runIndex === 0}><summary><strong>{run.scenario}</strong><small>{allocation} · {hits.length} strong-hit targets · {switchIns.length} potential switch-ins</small></summary><div className="team-analysis-columns"><section><h3>Win conditions</h3><p>Opponents taking at least 70% from a learnable move in this scenario.</p>{hits.length ? <ul>{hits.slice(0,8).map((row,index)=><li key={`${row.opponent.species}:${index}`}><b>{row.opponent.species}</b> — {row.opponent.bestAttack?.move} · {row.opponent.bestAttack?.minPct.toFixed(1)}–{row.opponent.bestAttack?.maxPct.toFixed(1)}% <small>({row.opponent.bestAttack?.accuracy}% accuracy · {row.scenario})</small></li>)}</ul> : <p className="muted">No strong-hit targets found.</p>}{damages.length > 0 && <details className="team-analysis-subdetails"><summary>Other damage targets ({damages.length})</summary><ul>{damages.slice(0,8).map((row,index)=><li key={`${row.opponent.species}:${index}`}><b>{row.opponent.species}</b> — {row.opponent.bestAttack?.move} · {row.opponent.bestAttack?.minPct.toFixed(1)}–{row.opponent.bestAttack?.maxPct.toFixed(1)}%</li>)}</ul></details>}</section><section><h3>Defensive switching</h3><p>Potential switch-ins into the opponent’s best learnable attack (35% maximum or less).</p>{switchIns.length ? <ul>{switchIns.slice(0,8).map((row,index)=><li key={`${row.opponent.species}:${index}`}><b>{row.opponent.species}</b> — {row.opponent.bestReply?.move} · {row.opponent.bestReply?.minPct.toFixed(1)}–{row.opponent.bestReply?.maxPct.toFixed(1)}% <small>({row.scenario})</small></li>)}</ul> : <p className="muted">No reliable low-damage switch-ins in this scenario.</p>}</section><section><h3>KO thresholds</h3><p>Estimated extra chip needed to move a target into the damage range. Percentages are relative to full HP.</p>{koRows.length ? <ul>{koRows.map((row,index)=>{ const move=row.opponent.bestAttack!; const guaranteed=Math.max(0,100-move.minPct); const possible=Math.max(0,100-move.maxPct); return <li key={`${row.opponent.species}:${index}`}><b>{row.opponent.species}</b> — {move.move} ({move.minPct.toFixed(1)}–{move.maxPct.toFixed(1)}%); <small>{guaranteed <= 0 ? `Damage-roll KO from full HP if it hits (${move.accuracy}% accuracy)` : `~${guaranteed.toFixed(1)}% chip for a damage-roll-guaranteed KO on a hit`}; {possible <= 0 ? `KO possible without chip (${move.accuracy}% accuracy)` : `~${possible.toFixed(1)}% chip for a possible KO`}; {row.scenario}</small></li>;})}</ul> : <p className="muted">No damaging learnset moves found.</p>}</section></div><section className="team-analysis-setup"><h3>Setup strategy</h3>{(() => { const viable = run.analysis.setupSweeps.filter(setup => setup.plausibleTargets > 0).sort((a, b) => b.plausibleTargets - a.plausibleTargets); return viable.length ? <p>Can plausibly set up against {Math.max(...viable.map(setup => setup.plausibleTargets))} opposing Pokémon. Strongest lines: {viable.slice(0, 2).map(setup => `${setup.move} (${setup.plausibleTargets} targets)`).join(" · ")}{viable.length > 2 ? ` · +${viable.length - 2} other viable line(s)` : ""}.</p> : <p className="muted">No setup line can currently set up and sweep the remaining roster under the configured Speed, damage and survival assumptions.</p>; })()}</section></details>; }) : <p className="muted">{teamAnalysisLoading ? "Waiting for this Pokémon’s analysis…" : "No analysis result for this Pokémon."}</p>}</section>; })()}
-        {teamAnalysisRuns.length > 0 && <p className="team-analysis-footnote">The analysis is intentionally scenario-based. Unknown items are tested as Life Orb / Assault Vest, and Heavy-Duty Boots when hazards are enabled; setup moves with self-inflicted stat drops also test a White Herb assumption; this is a representative subset, not every item in the game. Unspent EVs are allocated into representative offensive or defensive spreads; the exact allocation is shown per scenario. It checks up to eight distinct one-turn stat-boost profiles. It does not infer a guaranteed set or solve every exact four-move combination; two-turn charge setup moves are excluded. Switching safety does not yet simulate every status move, hazard sequence, recovery turn, or double-switch.</p>}
+        {teamAnalysisRuns.length > 0 && <p className="team-analysis-footnote">The analysis is intentionally scenario-based. Unknown items are tested using common held items collected from Smogon sample-set presets across generations, with speed-relevant items such as Choice Scarf retained even when less frequent; setup moves with self-inflicted stat drops also test a White Herb assumption; this is a representative subset, not every item in the game. Unspent EVs are allocated into representative offensive or defensive spreads; the exact allocation is shown per scenario. It checks up to eight distinct one-turn stat-boost profiles. It does not infer a guaranteed set or solve every exact four-move combination; two-turn charge setup moves are excluded. Switching safety does not yet simulate every status move, hazard sequence, recovery turn, or double-switch.</p>}
       </section></div>}
       <DraftMoveFilterModal open={teamAnalysisFilterOpen} title="Team analysis · move filters" value={teamAnalysisFilter} moveNames={teamAnalysisMoveNames} onSave={next => { setTeamAnalysisFilter(next); if (teamAnalysisOpen) void runTeamAnalysis(next); }} onClose={() => setTeamAnalysisFilterOpen(false)} />
       <TeamPastePanel left={left} right={right} format={format} onSelectDraft={() => { setTeamsOpen(false); try { const saved = JSON.parse(localStorage.getItem("pokemon-team-lab-draft-matchups-v2") || "{}"); const entries = Object.entries(saved.matchups || {}).map(([id, value]: [string, any]) => ({ id, name: value.matchupName || `Matchup ${Number(id) + 1}`, teamA: Array.isArray(value.teamA) ? value.teamA.filter(Boolean) : [], teamB: Array.isArray(value.teamB) ? value.teamB.filter(Boolean) : [], draftSets: value.draftSets, abilityOverrides: value.abilityOverrides, speedConfigs: value.speedConfigs, statConfigs: value.statConfigs })); setDraftOptions(entries); setDraftChoice(String(saved.currentIndex ?? entries[0]?.id ?? "0")); setDraftSelectedA([]); setDraftSelectedB([]); setDraftPickerOpen(true); } catch { setDraftOptions([]); setDraftPickerOpen(true); } }} open={teamsOpen} onClose={() => setTeamsOpen(false)} onImport={importTeam} onEditTeam={(side, team) => { if (side === "left") { setLeft(team); setMovesA(previous => reconcileMoves(team, previous)); } else { setRight(team); setMovesB(previous => reconcileMoves(team, previous)); } }} />
