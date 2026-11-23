@@ -14,33 +14,28 @@ type RawSet = Record<string, unknown>;
 type SetDatabase = Record<string, Record<string, RawSet>>;
 const asString = (value: unknown): string => Array.isArray(value) ? asString(value[0]) : typeof value === "string" ? value.trim() : "";
 let itemUsagePromise: Promise<Array<{ item: string; count: number }>> | null = null;
+let presetDatabasesPromise: Promise<SetDatabase[]> | null = null;
+function loadPresetDatabases(): Promise<SetDatabase[]> {
+  if (!presetDatabasesPromise) {
+    presetDatabasesPromise = Promise.all(SMOGON_PRESET_FORMATS.map(async ([format]) => {
+      try { const response = await fetch(`https://pkmn.github.io/smogon/data/sets/${format}.json`); return response.ok ? await response.json() as SetDatabase : null; }
+      catch { return null; }
+    })).then(values => values.filter((value): value is SetDatabase => Boolean(value)));
+  }
+  return presetDatabasesPromise;
+}
 
 export function loadSmogonPresetItemUsage(): Promise<Array<{ item: string; count: number }>> {
   if (itemUsagePromise) return itemUsagePromise;
-  itemUsagePromise = Promise.all(SMOGON_PRESET_FORMATS.map(async ([format]) => {
-    try {
-      const response = await fetch(`https://pkmn.github.io/smogon/data/sets/${format}.json`);
-      if (!response.ok) return null;
-      return await response.json() as SetDatabase;
-    } catch { return null; }
-  })).then(databases => {
+  itemUsagePromise = loadPresetDatabases().then(databases => {
     const counts = new Map<string, number>();
-    for (const database of databases) {
-      if (!database) continue;
-      for (const sets of Object.values(database)) {
-        for (const preset of Object.values(sets || {})) {
-          const item = asString(preset.Item ?? preset.item);
-          if (item) counts.set(item, (counts.get(item) || 0) + 1);
-        }
-      }
+    for (const database of databases) for (const sets of Object.values(database)) for (const preset of Object.values(sets || {})) {
+      const item = asString(preset.Item ?? preset.item); if (item) counts.set(item, (counts.get(item) || 0) + 1);
     }
     const usage = [...counts].map(([item, count]) => ({ item, count })).sort((a, b) => b.count - a.count || a.item.localeCompare(b.item));
     if (!usage.length) itemUsagePromise = null;
     return usage;
-  }).catch(error => {
-    itemUsagePromise = null;
-    throw error;
-  });
+  }).catch(error => { itemUsagePromise = null; throw error; });
   return itemUsagePromise;
 }
 
@@ -53,5 +48,20 @@ export async function getSmogonPresetItemCandidates(limit = 8): Promise<string[]
     const found = byName.get(strategicItem.toLowerCase().replace(/[^a-z0-9]/g, ""));
     if (found && !selected.some(item => item.toLowerCase() === found.toLowerCase())) selected.push(found);
   }
+  return selected;
+}
+
+/** Item candidates drawn only from this species' own Smogon preset sets. */
+export async function getSmogonPresetItemCandidatesForSpecies(species: string, limit = 8): Promise<string[]> {
+  const wanted = species.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const counts = new Map<string, number>();
+  const databases = await loadPresetDatabases();
+  for (const database of databases) for (const [speciesName, sets] of Object.entries(database)) {
+    if (speciesName.toLowerCase().replace(/[^a-z0-9]/g, "") !== wanted) continue;
+    for (const preset of Object.values(sets || {})) { const item = asString(preset.Item ?? preset.item); if (item) counts.set(item, (counts.get(item) || 0) + 1); }
+  }
+  const byName = new Map([...counts.keys()].map(item => [item.toLowerCase().replace(/[^a-z0-9]/g, ""), item]));
+  const selected = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, limit).map(([item]) => item);
+  for (const strategic of ["Choice Scarf", "Booster Energy", "White Herb"]) { const found = byName.get(strategic.toLowerCase().replace(/[^a-z0-9]/g, "")); if (found && !selected.some(item => item.toLowerCase() === found.toLowerCase())) selected.push(found); }
   return selected;
 }
