@@ -48,7 +48,10 @@ export type DraftMoveThreat = {
   accuracy: number;
   stab: boolean;
   approximate: boolean;
+  /** Raw move priority (used by move filters). */
   priority: number;
+  /** Effective priority after ability and selected-field modifiers. */
+  effectivePriority?: number;
 };
 export type DraftOpponentResult = {
   species: string;
@@ -58,6 +61,9 @@ export type DraftOpponentResult = {
   bestStabReply?: DraftMoveThreat;
   selectedAttacks?: DraftMoveThreat[];
   selectedReplies?: DraftMoveThreat[];
+  /** Best damage option at each effective priority bracket, used for turn-order checks. */
+  priorityAttacks?: DraftMoveThreat[];
+  priorityReplies?: DraftMoveThreat[];
   threat: boolean;
   reliablyThreatens: boolean;
   wallsAttacker: boolean;
@@ -285,7 +291,7 @@ async function bestAttack(
     seenMoves.add(id);
     return true;
   });
-  const cacheKey = JSON.stringify(["loaded-data-v2", generation, attackerProfile, defenderProfile, filter, fieldState, moves.map(move => normalize(move.name))]);
+  const cacheKey = JSON.stringify(["loaded-data-v3", generation, attackerProfile, defenderProfile, filter, fieldState, moves.map(move => normalize(move.name))]);
   const cached = bestAttackCache.get(cacheKey);
   if (cached) return cached;
   let best: DraftMoveThreat | undefined;
@@ -301,11 +307,11 @@ async function bestAttack(
     const result = calculateMove(attacker, defender, move.name, fieldState, stagesFor(attackerProfile), stagesFor(defenderProfile), false, generation, false);
     counters.evaluated++;
     if (result) {
-      const candidate = summarizeMove(move, result, attackerProfile, defender, generation);
+      const effectivePriority = getEffectiveMovePriority(attacker, move.name, fieldState);
+      const candidate = { ...summarizeMove(move, result, attackerProfile, defender, generation), effectivePriority };
       if (manualIds.has(normalize(move.name))) selected.push(candidate);
       if (isBetterMove(candidate, best)) best = candidate;
       if (candidate.stab && isBetterMove(candidate, bestStab)) bestStab = candidate;
-      const effectivePriority = getEffectiveMovePriority(attacker, move.name, fieldState);
       if (isBetterMove(candidate, byPriority.get(effectivePriority))) byPriority.set(effectivePriority, candidate);
     }
     if ((index + 1) % CHUNK_SIZE === 0) await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -398,7 +404,7 @@ export async function analyzeDraftPokemon(
   // The calculator's move/species metadata and the learnset resolver share the
   // bundled data loader. Await it before any cache lookup or calculation.
   await loadShowdownData();
-  const cacheKey = JSON.stringify(["loaded-data-v2", generation, attacker, opponents, filter, fieldState, includeSetupAnalysis]);
+  const cacheKey = JSON.stringify(["loaded-data-v3", generation, attacker, opponents, filter, fieldState, includeSetupAnalysis]);
   const cached = analysisCache.get(cacheKey);
   if (cached) return cached;
   const counters = { evaluated: 0 };
@@ -420,6 +426,8 @@ export async function analyzeDraftPokemon(
       bestStabReply: reply.bestStab,
       selectedAttacks: outgoing.selected || [],
       selectedReplies: reply.selected || [],
+      priorityAttacks: outgoing.byPriority || [],
+      priorityReplies: reply.byPriority || [],
       threat: bestDamage >= DRAFT_STRONG_HIT_THRESHOLD,
       reliablyThreatens: Boolean(outgoing.best && outgoing.best.minPct >= DRAFT_STRONG_HIT_THRESHOLD && outgoing.best.accuracy >= 100),
       wallsAttacker: Boolean(outgoing.best && bestDamage <= DRAFT_WALL_THRESHOLD),

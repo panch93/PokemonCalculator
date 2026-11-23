@@ -1023,7 +1023,7 @@ select, select:focus, select option, datalist option {
   max-width: min(370px, calc(100vw - 16px));
   max-height: min(320px, calc(100vh - 16px));
   overflow: auto;
-  pointer-events: none;
+  pointer-events: auto;
   padding: 9px;
   border: 1px solid var(--border, #465268);
   border-radius: 8px;
@@ -1623,3 +1623,18 @@ select, select:focus, select option, datalist option {
 .speed-order-team { flex: 0 0 auto; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; font-size: .62rem; font-weight: 900; }
 .speed-order-team.team-a { color: #93c5fd; background: rgba(96,165,250,.14); }
 .speed-order-team.team-b { color: #fcd34d; background: rgba(245,158,11,.14); }
+
+.draft-speed-benchmark-choice {
+  border: 0;
+  border-radius: 4px;
+  padding: 2px 5px;
+  background: rgba(91, 151, 230, .16);
+  color: var(--foreground, #e7edf6);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.draft-speed-benchmark-choice:hover,
+.draft-speed-benchmark-choice:focus-visible { background: rgba(91, 151, 230, .32); outline: 1px solid var(--accent, #6ca6f5); }
+.draft-speed-tooltip > p { margin: 3px 0 6px; color: var(--muted, #a2adbd); }
+.draft-killed-by { color: #f0a0a0; font-weight: 600; }
