@@ -44,49 +44,6 @@ export function loadSmogonPresetItemUsage(): Promise<Array<{ item: string; count
   return itemUsagePromise;
 }
 
-
-let presetDatabasesPromise: Promise<SetDatabase[]> | null = null;
-const presetItemsBySpecies = new Map<string, Promise<string[]>>();
-
-function loadPresetDatabases(): Promise<SetDatabase[]> {
-  if (!presetDatabasesPromise) {
-    presetDatabasesPromise = Promise.all(SMOGON_PRESET_FORMATS.map(async ([format]) => {
-      try {
-        const response = await fetch(`https://pkmn.github.io/smogon/data/sets/${format}.json`);
-        return response.ok ? await response.json() as SetDatabase : null;
-      } catch { return null; }
-    })).then(results => results.filter((value): value is SetDatabase => Boolean(value)));
-  }
-  return presetDatabasesPromise;
-}
-
-/** Item candidates are ranked from this species' own Smogon sample-set presets. */
-export async function getSmogonPresetItemCandidatesForSpecies(species: string, limit = 8): Promise<string[]> {
-  const key = species.toLowerCase().replace(/[^a-z0-9]/g, "");
-  let pending = presetItemsBySpecies.get(key);
-  if (!pending) {
-    pending = loadPresetDatabases().then(databases => {
-      const counts = new Map<string, number>();
-      for (const database of databases) {
-        for (const preset of Object.values(database[key] || {})) {
-          const item = asString(preset.Item ?? preset.item);
-          if (item) counts.set(item, (counts.get(item) || 0) + 1);
-        }
-      }
-      const usage = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-      const selected = usage.slice(0, limit).map(([item]) => item);
-      const normalized = new Set(selected.map(item => item.toLowerCase().replace(/[^a-z0-9]/g, "")));
-      for (const strategicItem of ["Choice Scarf", "Booster Energy", "White Herb"]) {
-        const found = usage.find(([item]) => item.toLowerCase().replace(/[^a-z0-9]/g, "") === strategicItem.toLowerCase().replace(/[^a-z0-9]/g, ""))?.[0];
-        if (found && !normalized.has(found.toLowerCase().replace(/[^a-z0-9]/g, ""))) selected.push(found);
-      }
-      return selected;
-    });
-    presetItemsBySpecies.set(key, pending);
-  }
-  return pending;
-}
-
 /** Common preset items plus speed-specific items even when their global count is lower. */
 export async function getSmogonPresetItemCandidates(limit = 8): Promise<string[]> {
   const usage = await loadSmogonPresetItemUsage();

@@ -1655,8 +1655,16 @@ select, select:focus, select option, datalist option {
 .draft-speed-benchmark-toolbar button { flex: 0 0 auto; padding: 4px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); font-size: .65rem; cursor: pointer; }
 
 
-/* Small calculation indicator attached to each Team Analysis portrait. */
-.team-analysis-roster-portrait { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
-.analysis-loading-spinner { position: absolute; right: -4px; top: -4px; width: 13px; height: 13px; border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent); border-top-color: var(--accent); border-radius: 50%; animation: analysis-spin .75s linear infinite; background: var(--panel); z-index: 2; }
-@keyframes analysis-spin { to { transform: rotate(360deg); } }
-.draft-walling-detail { display: block; margin-top: 2px; color: var(--muted); }
+.matrix .matrix-ev-budget {
+  display: block;
+  margin: 1px 0 0;
+  color: var(--muted, #aab2c0);
+  font-size: .55rem;
+  font-weight: 500;
+  line-height: 1.1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.matrix .matrix-ev-budget.is-over { color: #f07878; }
+.team-analysis-setup-opportunity { margin: 5px 0; color: var(--muted, #aab2c0); font-size: .7rem; }
+.team-analysis-stopped-by { margin: 6px 0; padding: 5px 7px; border-left: 2px solid #e09a55; color: var(--text, #e7eaf0); font-size: .7rem; }

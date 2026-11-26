@@ -46,6 +46,7 @@ export type DraftMoveThreat = {
   minPct: number;
   maxPct: number;
   chance70: number;
+  chanceKo?: number;
   accuracy: number;
   stab: boolean;
   approximate: boolean;
@@ -85,22 +86,34 @@ export type DraftSetupSweepTarget = {
   opponentActsBeforeSetup: boolean;
   canSetUp: boolean;
   canContinueAfterSetup: boolean;
-  setupRemainingHpPct: number;
-  stoppedBy: boolean;
-  stoppedByMove?: string;
-  stopReason?: string;
-  opponentActsBeforeAttack?: boolean;
   plausibleSweepTarget: boolean;
+  afterSetupIncomingMove?: string;
+  afterSetupTurnOrderReason?: string;
+  setupMoveName?: string;
+  setupMoveDamagePct?: number;
+  startingOpponentHpPct?: number;
+  removedBySetup?: boolean;
+  setupMoveKoChance?: number;
+  setupMoveKoGuaranteed?: boolean;
+  attackerActsFirstAfterSetup?: boolean;
+  estimatedTurnsToKo?: number;
+  estimatedIncomingHits?: number;
+  sweepOrder?: number;
+  remainingHpPct?: number;
+  wearDown?: boolean;
+  stoppedReason?: string;
 };
 export type DraftSetupSweep = {
   move: string;
   itemAssumption?: string;
   boosts: Partial<Record<StatId, number>>;
   setupCostPct: number;
-  boostChance: number;
+  boostChance?: number;
+  setupOpportunitySpecies?: string;
+  setupRemainingHpPct?: number;
+  stoppedBySpecies?: string;
+  stoppedByReason?: string;
   targets: DraftSetupSweepTarget[];
-  setupOpportunitySpecies: string[];
-  setupRemainingHpPct: number;
   plausibleTargets: number;
 };
 
@@ -233,6 +246,7 @@ function summarizeMove(move: MoveDetails, result: DamageSummary, attacker: Draft
   const stab = originalTypes.includes(move.type) || attacker.teraType === move.type;
   const thresholdHp = maxHp * (DRAFT_STRONG_HIT_THRESHOLD / 100);
   const chance70 = (result.histogram || []).reduce((sum, outcome) => sum + (outcome.damage >= thresholdHp ? outcome.probability : 0), 0) * 100;
+  const chanceKo = (result.histogram || []).reduce((sum, outcome) => sum + (outcome.damage >= maxHp ? outcome.probability : 0), 0) * 100;
   return {
     move: move.name,
     type: move.type,
@@ -240,6 +254,7 @@ function summarizeMove(move: MoveDetails, result: DamageSummary, attacker: Draft
     minPct: result.minPct,
     maxPct: result.maxPct,
     chance70,
+    chanceKo,
     accuracy: result.accuracy ?? move.accuracy ?? 100,
     stab,
     approximate: Boolean(result.distributionApproximate),
@@ -252,6 +267,22 @@ function isBetterMove(candidate: DraftMoveThreat, current?: DraftMoveThreat): bo
   if (candidate.maxPct !== current.maxPct) return candidate.maxPct > current.maxPct;
   if (candidate.chance70 !== current.chance70) return candidate.chance70 > current.chance70;
   return candidate.minPct > current.minPct;
+}
+
+function isGroundedProfile(profile: DraftPokemonProfile): boolean {
+  const types = profile.teraType ? [profile.teraType] : getSpecies(profile.species)?.types || [];
+  const ability = normalize(profile.ability || "");
+  const item = normalize(profile.item || "");
+  return !types.includes("Flying") && ability !== "levitate" && item !== "airballoon";
+}
+
+function priorityMoveIsBlocked(attacker: DraftPokemonProfile, defender: DraftPokemonProfile, move: string, fieldState: FieldState, generation: number): boolean {
+  if (getEffectiveMovePriority(speedSetFor(attacker), move, fieldState) <= 0) return false;
+  const defenderAbility = normalize(defender.ability || "");
+  const attackerAbility = normalize(attacker.ability || "");
+  const bypassesAbilities = ["moldbreaker", "teravolt", "turboblaze"].includes(attackerAbility);
+  if (!bypassesAbilities && ["dazzling", "queenlymajesty", "armortail"].includes(defenderAbility)) return true;
+  return generation >= 7 && fieldState.terrain === "Psychic" && isGroundedProfile(defender);
 }
 
 async function bestAttack(
@@ -300,7 +331,7 @@ async function bestAttack(
     seenMoves.add(id);
     return true;
   });
-  const cacheKey = JSON.stringify(["loaded-data-v4", generation, attackerProfile, defenderProfile, filter, fieldState, moves.map(move => normalize(move.name))]);
+  const cacheKey = JSON.stringify(["loaded-data-v5", generation, attackerProfile, defenderProfile, filter, fieldState, moves.map(move => normalize(move.name))]);
   const cached = bestAttackCache.get(cacheKey);
   if (cached) return cached;
   let best: DraftMoveThreat | undefined;
@@ -311,6 +342,7 @@ async function bestAttack(
   for (let index = 0; index < moves.length; index++) {
     if (isCancelled()) return {};
     const move = moves[index];
+    if (priorityMoveIsBlocked(attackerProfile, defenderProfile, move.name, fieldState, generation)) continue;
     const attacker = makeDraftSet(attackerProfile, move, "attacker");
     const defender = makeDraftSet(defenderProfile, move, "defender");
     const result = calculateMove(attacker, defender, move.name, fieldState, stagesFor(attackerProfile), stagesFor(defenderProfile), false, generation, false);
@@ -357,17 +389,25 @@ function setupMoveCandidates(species: string, generation: number, filter: DraftM
   const candidates = completeMoveset ? knownMoves.filter(Boolean) : [...new Set([...(learnset || []), ...knownMoves.filter(Boolean)])];
   const result: Array<{ name: string; boosts: Partial<Record<StatId, number>>; priority: number; costPct: number; boostChance: number }> = [];
   for (const name of candidates) {
-    const metadata = getMove(name) as (Record<string, unknown> & { boosts?: Record<string, number>; secondary?: { chance?: number; self?: { boosts?: Record<string, number> } }; self?: { boosts?: Record<string, number> }; selfBoost?: { boosts?: Record<string, number> } }) | undefined;
+    const metadata = getMove(name) as (Record<string, unknown> & {
+      boosts?: Record<string, number>;
+      secondary?: { chance?: number; self?: { boosts?: Record<string, number> } };
+      self?: { boosts?: Record<string, number> };
+      selfBoost?: { boosts?: Record<string, number> };
+    }) | undefined;
     const id = moveId(name);
-    if (!sharedSetupIds.has(id) || id === "swagger") continue;
+    if (!sharedSetupIds.has(id) || id === "swagger" || id === "decorate") continue;
     const selfBoosts = metadata?.self?.boosts || metadata?.selfBoost?.boosts || metadata?.secondary?.self?.boosts;
-    const boosts = metadata?.boosts || selfBoosts || (id === "bellydrum" ? { atk: 6 } : undefined);
+    const boosts = metadata?.boosts || selfBoosts || (id === "bellydrum" ? { atk: 6 } : id === "stockpile" ? { def: 1, spd: 1 } : undefined);
     if (!boosts) continue;
     if (id === "curse" && (getSpecies(species)?.types || []).includes("Ghost")) continue;
-    // Two-turn charge moves require a separate charge-turn / Power Herb model.
+    // Two-turn charge moves need a separate charge-turn / Power Herb model.
     if ((metadata?.flags as Record<string, unknown> | undefined)?.charge) continue;
     const positive = Object.entries(boosts).filter(([, value]) => typeof value === "number" && value > 0);
-    if (!positive.some(([stat]) => ["atk", "spa", "spe"].includes(stat))) continue;
+    // Defensive-only setup (Iron Defense, Amnesia, Stockpile, etc.) is also
+    // relevant: it can let a bulky Pokémon survive repeated exchanges and win
+    // through accumulated damage even without an offensive stat boost.
+    if (!positive.length) continue;
     const details = getMoveDetails(name, generation);
     if (!details) continue;
     if (!knownIds.has(id) && (filter.blacklist.some(value => moveId(value) === id) || !passesDraftMoveFilters(details, filter))) continue;
@@ -411,7 +451,7 @@ export async function analyzeDraftPokemon(
   // The calculator's move/species metadata and the learnset resolver share the
   // bundled data loader. Await it before any cache lookup or calculation.
   await loadShowdownData();
-  const cacheKey = JSON.stringify(["loaded-data-v4", generation, attacker, opponents, filter, fieldState, includeSetupAnalysis]);
+  const cacheKey = JSON.stringify(["loaded-data-v5", generation, attacker, opponents, filter, fieldState, includeSetupAnalysis]);
   const cached = analysisCache.get(cacheKey);
   if (cached) return cached;
   const counters = { evaluated: 0 };
@@ -480,12 +520,8 @@ export async function analyzeDraftPokemon(
           return priority > userPriority || (priority === userPriority && (fieldState.trickRoom ? opponentSpeed <= userSpeed : opponentSpeed >= userSpeed));
         };
         const beforeSetupCandidates = (opponentAttack.byPriority || []).filter(move => actsBefore(move, setupTurnSpeed, setupPriority));
-        const incomingBeforeSetup = beforeSetupCandidates.reduce<DraftMoveThreat | undefined>((best, move) => isBetterMove(move, best) ? move : best, undefined);
-        const opponentActsBeforeSetup = Boolean(incomingBeforeSetup);
-
-        // A damaging setup move (e.g. Trailblaze / Fiery Dance / Scale Shot)
-        // can create its own setup opportunity by KOing the target before it
-        // can move. Otherwise, the target gets one attack during the setup turn.
+        const firstIncomingMove = beforeSetupCandidates.reduce<DraftMoveThreat | undefined>((best, move) => isBetterMove(move, best) ? move : best, undefined);
+        const opponentActsBeforeSetup = Boolean(firstIncomingMove);
         const setupDetails = getMoveDetails(setup.name, generation);
         let setupMoveThreat: DraftMoveThreat | undefined;
         if (setupDetails && setupDetails.power != null && setupDetails.power > 0) {
@@ -495,130 +531,220 @@ export async function analyzeDraftPokemon(
           if (setupDamage) setupMoveThreat = { ...summarizeMove(setupDetails, setupDamage, setupProfile, setupDefenderSet, generation), effectivePriority: getEffectiveMovePriority(setupAttackerSet, setupDetails.name, fieldState) };
         }
         const setupMoveActsFirst = !opponentActsBeforeSetup;
-        const setupMoveKOs = Boolean(setupMoveActsFirst && setupMoveThreat && setupMoveThreat.minPct >= 100);
-        const setupTurnIncoming = setupMoveKOs ? 0 : opponentActsBeforeSetup
-          ? (incomingBeforeSetup?.maxPct ?? 0)
-          : (afterSetupIncoming.best?.maxPct ?? 0);
-        const setupCanOccur = setupMoveKOs || setupTurnIncoming + setup.costPct < 100;
-
-        // Evaluate the boosted attack using the post-setup Speed. A setup Speed
-        // boost can change the order even when the setup move itself was slower.
-        // Also compare priority first: if an opponent's priority is higher, Speed
-        // cannot let the setup Pokémon move first; at equal priority, boosted Speed decides.
-        const boostedOptions = boostedAttack.byPriority || (boostedAttack.best ? [boostedAttack.best] : []);
-        const moveActsBeforeOpponent = (move: DraftMoveThreat) => {
-          const movePriority = getEffectiveMovePriority(boostedSpeedSet, move.move, fieldState);
-          const opponentCanActFirst = (afterSetupIncoming.byPriority || []).some(reply => {
+        const setupMoveKOs = Boolean(setupMoveThreat && setupMoveThreat.maxPct >= 100);
+        // A damaging setup move can KO on either action order: if the opponent
+        // moves first, the user must survive that hit before using the move.
+        // If the user moves first and KOs, the opponent gets no setup-turn hit.
+        const strongestSetupReply = firstIncomingMove && firstIncomingMove.maxPct > (opponentAttack.best?.maxPct ?? 0)
+          ? firstIncomingMove : opponentAttack.best;
+        const incomingMove = setupMoveKOs
+          ? (setupMoveActsFirst ? undefined : firstIncomingMove)
+          : strongestSetupReply;
+        const damageBeforeSetup = incomingMove?.maxPct ?? 0;
+        const setupCanOccur = damageBeforeSetup + setup.costPct < 100;
+        const setupMoveDamagePct = setupMoveThreat?.maxPct ?? 0;
+        const startingOpponentHpPct = setupMoveKOs ? 0 : Math.max(0, 100 - setupMoveDamagePct);
+        const attackerFirstOptions = (boostedAttack.byPriority || []).filter(move => {
+          const priority = getEffectiveMovePriority(boostedSpeedSet, move.move, fieldState);
+          const opponentCanActBefore = (afterSetupIncoming.byPriority || []).some(reply => {
             const replyPriority = getEffectiveMovePriority(opponentSpeedSet, reply.move, fieldState);
-            return replyPriority > movePriority || (replyPriority === movePriority &&
+            return replyPriority > priority || (replyPriority === priority &&
               (fieldState.trickRoom ? opponentSpeed <= attackerSpeed : opponentSpeed >= attackerSpeed));
           });
-          return !opponentCanActFirst;
-        };
-        const firstActionMoves = boostedOptions.filter(move => moveActsBeforeOpponent(move));
-        const bestFirstActionMove = firstActionMoves.reduce<DraftMoveThreat | undefined>((best, move) =>
-          isBetterMove(move, best) ? move : best, undefined);
-        const firstActionKo = firstActionMoves
-          .filter(move => move.maxPct >= 100)
-          .reduce<DraftMoveThreat | undefined>((best, move) => isBetterMove(move, best) ? move : best, undefined);
-        // Prefer a move that can act before the opponent, even if it cannot KO;
-        // a same-priority move plus higher boosted Speed can beat a lethal priority
-        // reply, after which the opponent may still retaliate.
-        const boostedMove = firstActionKo || bestFirstActionMove || boostedAttack.best;
-        const bestMoveMaxPct = boostedMove?.maxPct ?? 0;
-        const chosenPriority = boostedMove ? getEffectiveMovePriority(boostedSpeedSet, boostedMove.move, fieldState) : 0;
-        const opponentFirstAgainstChosenMove = boostedMove ? (afterSetupIncoming.byPriority || []).filter(reply => {
-          const replyPriority = getEffectiveMovePriority(opponentSpeedSet, reply.move, fieldState);
-          return replyPriority > chosenPriority || (replyPriority === chosenPriority &&
-            (fieldState.trickRoom ? opponentSpeed <= attackerSpeed : opponentSpeed >= attackerSpeed));
-        }).reduce<DraftMoveThreat | undefined>((best, move) => isBetterMove(move, best) ? move : best, undefined) : undefined;
-        // If the boosted Pokémon moves first but fails to KO, the target can
-        // retaliate. If the target moves first, it only stops the sweep if that
-        // first hit is lethal; otherwise the boosted Pokémon still gets its move.
-        const retaliation = opponentFirstAgainstChosenMove ? undefined : (bestMoveMaxPct < 100 ? afterSetupIncoming.best : undefined);
+          return !opponentCanActBefore;
+        });
+        const strongestFirstMove = attackerFirstOptions.reduce<DraftMoveThreat | undefined>((best, move) => isBetterMove(move, best) ? move : best, undefined);
+        // If any move can act before every opposing reply, use the strongest
+        // such move even when it is a weaker hit. This preserves same-priority
+        // Speed wins against priority attacks that would otherwise KO first.
+        const boostedMove = strongestFirstMove || boostedAttack.best;
+        const boostedMovePriority = boostedMove ? getEffectiveMovePriority(boostedSpeedSet, boostedMove.move, fieldState) : -7;
+        const afterSetupCandidates = (afterSetupIncoming.byPriority || []).filter(move => actsBefore(move, attackerSpeed, boostedMovePriority));
+        const afterSetupMove = afterSetupCandidates.reduce<DraftMoveThreat | undefined>((best, move) => isBetterMove(move, best) ? move : best, undefined);
+        const attackerActsFirstAfterSetup = !afterSetupMove;
+        const replyForOrder = afterSetupMove || afterSetupIncoming.best;
+        const replyPriority = replyForOrder ? getEffectiveMovePriority(opponentSpeedSet, replyForOrder.move, fieldState) : -7;
+        const speedOrderReason = opponentSpeed === attackerSpeed
+          ? "wins a Speed tie (treated as opponent-first)"
+          : fieldState.trickRoom
+            ? `moves first under Trick Room (lower Speed ${opponentSpeed} vs ${attackerSpeed})`
+            : `moves first on Speed (${opponentSpeed} vs ${attackerSpeed})`;
+        const afterSetupTurnOrderReason = afterSetupMove
+          ? replyPriority > boostedMovePriority
+            ? `higher priority (${replyPriority >= 0 ? "+" : ""}${replyPriority} vs ${boostedMovePriority >= 0 ? "+" : ""}${boostedMovePriority})`
+            : speedOrderReason
+          : `your move acts first (priority ${boostedMovePriority >= 0 ? "+" : ""}${boostedMovePriority}, Speed ${attackerSpeed} vs ${opponentSpeed})`;
+        const afterDamage = afterSetupMove?.maxPct ?? afterSetupIncoming.best?.maxPct ?? 0;
+        const canContinueAfterSetup = setupCanOccur && (
+          damageBeforeSetup + setup.costPct + afterDamage < 100 ||
+          Boolean(attackerActsFirstAfterSetup && boostedMove && boostedMove.minPct >= 100)
+        );
+        const bestMove = boostedMove;
+        const bestMoveMaxPct = bestMove?.maxPct ?? 0;
         targets.push({
           species: opponent.species,
-          bestMove: boostedMove,
+          bestMove,
           bestMoveMaxPct,
-          incomingMove: (opponentActsBeforeSetup ? incomingBeforeSetup : afterSetupIncoming.best)?.move,
-          incomingMaxPct: setupTurnIncoming,
-          afterSetupIncomingMaxPct: opponentFirstAgainstChosenMove?.maxPct ?? retaliation?.maxPct ?? 0,
+          incomingMove: incomingMove?.move,
+          incomingMaxPct: incomingMove?.maxPct ?? 0,
+          afterSetupIncomingMaxPct: afterDamage,
           setupTurnSpeed,
           attackerSpeed,
           opponentSpeed,
           opponentActsBeforeSetup,
           canSetUp: setupCanOccur,
-          canContinueAfterSetup: true,
-          setupRemainingHpPct: 0,
-          stoppedBy: false,
-          stoppedByMove: opponentFirstAgainstChosenMove?.move || retaliation?.move,
-          stopReason: undefined,
-          opponentActsBeforeAttack: Boolean(opponentFirstAgainstChosenMove),
-          plausibleSweepTarget: false,
+          canContinueAfterSetup,
+          plausibleSweepTarget: setupCanOccur && canContinueAfterSetup && bestMoveMaxPct >= DRAFT_STRONG_HIT_THRESHOLD,
+          afterSetupIncomingMove: afterSetupMove?.move || afterSetupIncoming.best?.move,
+          afterSetupTurnOrderReason,
+          setupMoveName: setupMoveThreat?.move,
+          setupMoveDamagePct,
+          startingOpponentHpPct,
+          removedBySetup: setupMoveKOs,
+          setupMoveKoChance: setupMoveThreat?.chanceKo,
+          setupMoveKoGuaranteed: Boolean(setupMoveKOs && setupMoveThreat && setupMoveThreat.minPct >= 100),
+          attackerActsFirstAfterSetup,
         });
       }
-      // Only one safe setup opportunity is required. Choose the one that leaves
-      // the attacker with the most HP, then test every opposing Pokémon against
-      // that same post-setup HP total and the boosted turn order.
-      const setupOpportunities = targets.filter(target => target.canSetUp)
-        .sort((a, b) => a.incomingMaxPct - b.incomingMaxPct);
-      const bestOpportunity = setupOpportunities[0];
-      const setupRemainingHpPct = bestOpportunity ? Math.max(0, 100 - bestOpportunity.incomingMaxPct - setup.costPct) : 0;
+      // Opponent profiles can contain multiple item / EV assumptions for the
+      // same species. Collapse those alternatives first; they are not extra
+      // Pokémon on the opposing roster.
+      const targetsBySpecies = new Map<string, DraftSetupSweepTarget>();
       for (const target of targets) {
-        target.setupRemainingHpPct = setupRemainingHpPct;
-        const lethalBeforeAttack = Boolean(bestOpportunity && target.opponentActsBeforeAttack &&
-          target.afterSetupIncomingMaxPct >= setupRemainingHpPct && setupRemainingHpPct > 0);
-        const firstReplyLethal = Boolean(bestOpportunity && !target.opponentActsBeforeAttack &&
-          target.afterSetupIncomingMaxPct >= setupRemainingHpPct && setupRemainingHpPct > 0 &&
-          target.bestMoveMaxPct < 100);
-        const insufficientDamage = target.bestMoveMaxPct < 100;
-        const stoppedBy = Boolean(bestOpportunity && (lethalBeforeAttack || firstReplyLethal || insufficientDamage));
-        target.stoppedBy = stoppedBy;
-        target.canContinueAfterSetup = Boolean(bestOpportunity && !stoppedBy);
-        target.plausibleSweepTarget = Boolean(bestOpportunity && !lethalBeforeAttack && !firstReplyLethal && target.bestMoveMaxPct >= 100);
-        if (stoppedBy) {
-          if (lethalBeforeAttack) {
-            target.stopReason = `Acts first with ${target.stoppedByMove || "a priority / faster attack"} and can KO before the boosted move (${target.afterSetupIncomingMaxPct.toFixed(1)}% vs ${setupRemainingHpPct.toFixed(1)}% HP)`;
-          } else if (firstReplyLethal) {
-            target.stopReason = `Survives ${target.bestMove?.move || "the attack"}, then retaliates with ${target.stoppedByMove || "an attack"} for up to ${target.afterSetupIncomingMaxPct.toFixed(1)}%`;
-          } else {
-            target.stopReason = `Not enough damage to KO (maximum ${target.bestMoveMaxPct.toFixed(1)}%)`;
-          }
-        } else {
-          target.stopReason = undefined;
-        }
-      }
-      // Team Lab may pass multiple defensive / item assumptions for the same
-      // opposing species. Keep setup access if any realistic variant allows it,
-      // but conservatively mark a species as a stopper if any variant can KO.
-      const groupedTargets = new Map<string, DraftSetupSweepTarget>();
-      for (const target of targets) {
-        const previous = groupedTargets.get(target.species);
-        if (!previous) { groupedTargets.set(target.species, target); continue; }
-        const worstDamageMove = target.bestMoveMaxPct < previous.bestMoveMaxPct ? target : previous;
-        const worstIncoming = target.incomingMaxPct > previous.incomingMaxPct ? target : previous;
-        const canSetUp = previous.canSetUp || target.canSetUp;
-        const stoppedBy = previous.stoppedBy || target.stoppedBy;
-        groupedTargets.set(target.species, {
+        const previous = targetsBySpecies.get(target.species);
+        if (!previous) { targetsBySpecies.set(target.species, target); continue; }
+        const weakestDamage = target.bestMoveMaxPct < previous.bestMoveMaxPct ? target : previous;
+        const highestSetupHit = target.incomingMaxPct > previous.incomingMaxPct ? target : previous;
+        const highestFollowUp = target.afterSetupIncomingMaxPct > previous.afterSetupIncomingMaxPct ? target : previous;
+        targetsBySpecies.set(target.species, {
           ...previous,
-          bestMove: worstDamageMove.bestMove,
+          bestMove: weakestDamage.bestMove,
           bestMoveMaxPct: Math.min(previous.bestMoveMaxPct, target.bestMoveMaxPct),
-          incomingMove: worstIncoming.incomingMove,
+          incomingMove: highestSetupHit.incomingMove,
           incomingMaxPct: Math.max(previous.incomingMaxPct, target.incomingMaxPct),
+          afterSetupIncomingMove: highestFollowUp.afterSetupIncomingMove,
+          afterSetupTurnOrderReason: highestFollowUp.afterSetupTurnOrderReason,
+          setupMoveName: weakestDamage.setupMoveName,
+          setupMoveDamagePct: Math.min(previous.setupMoveDamagePct ?? 0, target.setupMoveDamagePct ?? 0),
+          startingOpponentHpPct: Math.max(previous.startingOpponentHpPct ?? 100, target.startingOpponentHpPct ?? 100),
+          removedBySetup: Boolean(previous.removedBySetup && target.removedBySetup),
+          setupMoveKoChance: Math.min(previous.setupMoveKoChance ?? 0, target.setupMoveKoChance ?? 0),
+          setupMoveKoGuaranteed: Boolean(previous.setupMoveKoGuaranteed && target.setupMoveKoGuaranteed),
           afterSetupIncomingMaxPct: Math.max(previous.afterSetupIncomingMaxPct, target.afterSetupIncomingMaxPct),
           opponentSpeed: fieldState.trickRoom ? Math.min(previous.opponentSpeed, target.opponentSpeed) : Math.max(previous.opponentSpeed, target.opponentSpeed),
-          canSetUp,
-          stoppedBy,
-          stoppedByMove: stoppedBy ? (target.stoppedBy ? target.stoppedByMove : previous.stoppedByMove) : undefined,
-          stopReason: stoppedBy ? (target.stoppedBy ? target.stopReason : previous.stopReason) : undefined,
-          opponentActsBeforeAttack: previous.opponentActsBeforeAttack || target.opponentActsBeforeAttack,
-          canContinueAfterSetup: Boolean(bestOpportunity && !stoppedBy),
-          plausibleSweepTarget: Boolean(bestOpportunity && !stoppedBy && Math.min(previous.bestMoveMaxPct, target.bestMoveMaxPct) >= 100),
+          opponentActsBeforeSetup: previous.opponentActsBeforeSetup || target.opponentActsBeforeSetup,
+          canSetUp: previous.canSetUp && target.canSetUp,
+          attackerActsFirstAfterSetup: Boolean(previous.attackerActsFirstAfterSetup && target.attackerActsFirstAfterSetup),
         });
       }
-      const uniqueTargets = [...groupedTargets.values()];
-      const setupOpportunitySpecies = uniqueTargets.filter(target => target.canSetUp).map(target => target.species);
-      setupSweeps.push({ move: setup.name, itemAssumption: itemVariant.label, boosts: setup.boosts, setupCostPct: setup.costPct, boostChance: setup.boostChance, targets: uniqueTargets, setupOpportunitySpecies, setupRemainingHpPct, plausibleTargets: uniqueTargets.filter(target => target.plausibleSweepTarget).length });
+      const uniqueTargets = [...targetsBySpecies.values()];
+      // A setup turn is needed only once. Find one opponent that permits it,
+      // then simulate a best-estimate route through the rest of the roster.
+      const setupOpportunity = uniqueTargets
+        .filter(target => target.canSetUp)
+        .sort((a, b) => Number(Boolean(b.removedBySetup)) - Number(Boolean(a.removedBySetup)) || a.incomingMaxPct - b.incomingMaxPct)[0];
+      const setupRemainingHp = setupOpportunity
+        ? Math.max(0, 100 - setupOpportunity.incomingMaxPct - setup.costPct)
+        : 0;
+      let stoppedBySpecies: string | undefined;
+      let stoppedByReason: string | undefined;
+      if (setupOpportunity) {
+        // Only the Pokémon actually facing the setup move takes its damage or
+        // can be KO'd by it; the rest of the opposing roster remains untouched.
+        for (const target of uniqueTargets) {
+          if (target.species !== setupOpportunity.species) {
+            target.removedBySetup = false;
+            target.setupMoveDamagePct = 0;
+            target.startingOpponentHpPct = 100;
+          }
+        }
+        let remainingHp = setupRemainingHp;
+        const estimateTurns = (target: DraftSetupSweepTarget) => target.bestMoveMaxPct > 0
+          ? Math.max(1, Math.ceil((target.startingOpponentHpPct ?? 100) / target.bestMoveMaxPct)) : Number.POSITIVE_INFINITY;
+        // Prefer targets that can be removed quickly while taking the least
+        // cumulative retaliation. This is an estimated route, not a battle AI.
+        for (const target of uniqueTargets.filter(row => row.removedBySetup)) {
+          target.canSetUp = true;
+          target.canContinueAfterSetup = true;
+          target.plausibleSweepTarget = true;
+          target.sweepOrder = 0;
+          target.remainingHpPct = setupRemainingHp;
+        }
+        const orderedTargets = uniqueTargets.filter(target => !target.removedBySetup).sort((a, b) => {
+          const turnsA = estimateTurns(a), turnsB = estimateTurns(b);
+          const hitsA = a.attackerActsFirstAfterSetup ? Math.max(0, turnsA - 1) : turnsA;
+          const hitsB = b.attackerActsFirstAfterSetup ? Math.max(0, turnsB - 1) : turnsB;
+          return hitsA * a.afterSetupIncomingMaxPct - hitsB * b.afterSetupIncomingMaxPct || b.bestMoveMaxPct - a.bestMoveMaxPct;
+        });
+        let stopped = false;
+        for (const [orderIndex, target] of orderedTargets.entries()) {
+          target.sweepOrder = orderIndex + 1;
+          if (stopped) {
+            target.canSetUp = true;
+            target.canContinueAfterSetup = false;
+            target.plausibleSweepTarget = false;
+            target.remainingHpPct = Math.max(0, remainingHp);
+            continue;
+          }
+          const turnsToKo = estimateTurns(target);
+          const maxTurns = Math.min(20, Number.isFinite(turnsToKo) ? turnsToKo : 20);
+          const targetHp = { value: target.startingOpponentHpPct ?? 100 };
+          let incomingHits = 0;
+          let defeated = false;
+          let stopReason = "";
+          const incomingDamage = Math.max(0, target.afterSetupIncomingMaxPct);
+          for (let turn = 0; turn < maxTurns; turn++) {
+            if (!target.attackerActsFirstAfterSetup && incomingDamage > 0) {
+              incomingHits++;
+              remainingHp -= incomingDamage;
+              if (remainingHp <= 0) {
+                stopReason = `${target.afterSetupIncomingMove || "Opponent's attack"} acts first (${target.afterSetupTurnOrderReason || "turn order"}) and deals ${incomingDamage.toFixed(1)}% per turn; only ${Math.max(0, remainingHp + incomingDamage).toFixed(1)}% HP remained`;
+                break;
+              }
+            }
+            targetHp.value -= target.bestMoveMaxPct;
+            if (targetHp.value <= 0) { defeated = true; break; }
+            if (target.attackerActsFirstAfterSetup && incomingDamage > 0) {
+              incomingHits++;
+              remainingHp -= incomingDamage;
+              if (remainingHp <= 0) {
+                stopReason = `${target.afterSetupIncomingMove || "Opponent's attack"} retaliates after your move (${target.afterSetupTurnOrderReason || "turn order"}) for ${incomingDamage.toFixed(1)}%; the remaining HP is insufficient`;
+                break;
+              }
+            }
+          }
+          const wearDown = !defeated && !stopReason && target.bestMoveMaxPct > 0;
+          if (!defeated && !stopReason) {
+            stopReason = wearDown
+              ? `the best move deals only ${target.bestMoveMaxPct.toFixed(1)}% per hit; the estimate reaches its 20-turn limit before a KO`
+              : "no damaging move in the evaluated move pool can KO this target";
+          }
+          target.canSetUp = true;
+          target.canContinueAfterSetup = !stopReason;
+          target.plausibleSweepTarget = defeated && !stopReason;
+          target.estimatedTurnsToKo = Number.isFinite(turnsToKo) ? turnsToKo : undefined;
+          target.estimatedIncomingHits = incomingHits;
+          target.remainingHpPct = Math.max(0, remainingHp);
+          target.wearDown = wearDown;
+          if (stopReason) {
+            target.stoppedReason = stopReason;
+            target.canContinueAfterSetup = false;
+            target.plausibleSweepTarget = false;
+            stoppedBySpecies = target.species;
+            stoppedByReason = stopReason;
+            stopped = true;
+          }
+        }
+      } else {
+        for (const target of uniqueTargets) {
+          target.canSetUp = false;
+          target.canContinueAfterSetup = false;
+          target.plausibleSweepTarget = false;
+          target.stoppedReason = "No opposing Pokémon provides a survivable setup turn";
+          target.remainingHpPct = 0;
+        }
+      }
+      setupSweeps.push({ move: setup.name, itemAssumption: itemVariant.label, boosts: setup.boosts, setupCostPct: setup.costPct, boostChance: setup.boostChance, setupOpportunitySpecies: setupOpportunity?.species, setupRemainingHpPct: setupOpportunity ? setupRemainingHp : undefined, stoppedBySpecies, stoppedByReason, targets: uniqueTargets, plausibleTargets: uniqueTargets.filter(target => target.plausibleSweepTarget).length });
       }
     }
   }
@@ -628,7 +754,7 @@ export async function analyzeDraftPokemon(
     setupSweeps,
     movesEvaluated: counters.evaluated,
     approximate: true,
-    note: `Potential matchups only: top three eligible hypothetical learnset moves per type/category after ${filter.minAccuracy}% accuracy and whitelist/blacklist filters; explicitly entered moves are always included regardless of filters. Configured items, abilities, EVs/Stat Points, natures, and stat stages on both sides; selected weather and terrain are applied.${includeSetupAnalysis ? " Setup requires one viable setup opportunity; after that, every opposing target is checked against the same remaining HP, boosted damage, move priority, and Speed order." : ""} Damage and multi-hit probabilities inherit the calculator's supported mechanics; this is not a guaranteed set or battle prediction.`,
+    note: `Potential matchups only: top three eligible hypothetical learnset moves per type/category after ${filter.minAccuracy}% accuracy and whitelist/blacklist filters; explicitly entered moves are always included regardless of filters. Configured items, abilities, EVs/Stat Points, natures, and stat stages on both sides; selected weather and terrain are applied.${includeSetupAnalysis ? " Learnable setup moves are separately assessed using boosted damage, turn order, priority, and whether there is at least one survivable setup opportunity, then a best-estimate post-setup route that carries remaining HP across opponents and accounts for priority, Speed, and repeated damage exchanges." : ""} Damage and multi-hit probabilities inherit the calculator's supported mechanics; this is not a guaranteed set or battle prediction.`,
   };
   if (!isCancelled()) {
     analysisCache.set(cacheKey, analysis);
