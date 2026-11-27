@@ -55,3 +55,50 @@ export async function getSmogonPresetItemCandidates(limit = 8): Promise<string[]
   }
   return selected;
 }
+
+
+let speciesItemPromise: Promise<Map<string, Map<string, { item: string; count: number }>>> | null = null;
+const speciesKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/** Item candidates are restricted to sets for this exact species across the available Smogon formats. */
+export async function getSmogonPresetItemCandidatesForSpecies(species: string, limit = 8): Promise<string[]> {
+  if (!speciesItemPromise) {
+    speciesItemPromise = Promise.all(SMOGON_PRESET_FORMATS.map(async ([format]) => {
+      try {
+        const response = await fetch(`https://pkmn.github.io/smogon/data/sets/${format}.json`);
+        if (!response.ok) return null;
+        return await response.json() as SetDatabase;
+      } catch { return null; }
+    })).then(databases => {
+      const countsBySpecies = new Map<string, Map<string, { item: string; count: number }>>();
+      for (const database of databases) {
+        if (!database) continue;
+        for (const [speciesName, sets] of Object.entries(database)) {
+          const key = speciesKey(speciesName);
+          if (!countsBySpecies.has(key)) countsBySpecies.set(key, new Map());
+          const counts = countsBySpecies.get(key)!;
+          for (const preset of Object.values(sets || {})) {
+            const item = asString(preset.Item ?? preset.item);
+            if (!item) continue;
+            const itemKey = speciesKey(item);
+            const previous = counts.get(itemKey);
+            counts.set(itemKey, { item, count: (previous?.count || 0) + 1 });
+          }
+        }
+      }
+      return countsBySpecies;
+    }).catch(error => { speciesItemPromise = null; throw error; });
+  }
+  const pending = speciesItemPromise;
+  if (!pending) return [];
+  const byItem = await pending;
+  const usage = [...(byItem.get(speciesKey(species))?.values() || [])]
+    .sort((a, b) => b.count - a.count || a.item.localeCompare(b.item));
+  const selected = usage.slice(0, limit).map(entry => entry.item);
+  // Retain species-appropriate speed / setup tech even when it is less common.
+  for (const strategic of ["Choice Scarf", "Booster Energy", "White Herb"]) {
+    const found = usage.find(entry => speciesKey(entry.item) === speciesKey(strategic))?.item;
+    if (found && !selected.some(item => speciesKey(item) === speciesKey(found))) selected.push(found);
+  }
+  return selected;
+}

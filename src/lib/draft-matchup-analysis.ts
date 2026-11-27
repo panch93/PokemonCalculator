@@ -102,6 +102,7 @@ export type DraftSetupSweepTarget = {
   remainingHpPct?: number;
   wearDown?: boolean;
   stoppedReason?: string;
+  wouldSweepIfReached?: boolean;
 };
 export type DraftSetupSweep = {
   move: string;
@@ -680,10 +681,37 @@ export async function analyzeDraftPokemon(
         for (const [orderIndex, target] of orderedTargets.entries()) {
           target.sweepOrder = orderIndex + 1;
           if (stopped) {
+            // Preserve a useful independent matchup for every remaining foe.
+            // These are not counted as reached in the actual route, but show
+            // whether this foe could be beaten if the earlier stopper were removed.
+            const hypotheticalHp = setupRemainingHp;
+            const hypotheticalTargetHp = { value: target.startingOpponentHpPct ?? 100 };
+            const turns = estimateTurns(target);
+            const maxTurns = Math.min(20, Number.isFinite(turns) ? turns : 20);
+            let hp = hypotheticalHp;
+            let defeated = false;
+            const incomingDamage = Math.max(0, target.afterSetupIncomingMaxPct);
+            for (let turn = 0; turn < maxTurns; turn++) {
+              if (!target.attackerActsFirstAfterSetup && incomingDamage > 0) {
+                hp -= incomingDamage;
+                if (hp <= 0) break;
+              }
+              hypotheticalTargetHp.value -= target.bestMoveMaxPct;
+              if (hypotheticalTargetHp.value <= 0) { defeated = true; break; }
+              if (target.attackerActsFirstAfterSetup && incomingDamage > 0) {
+                hp -= incomingDamage;
+                if (hp <= 0) break;
+              }
+            }
             target.canSetUp = true;
             target.canContinueAfterSetup = false;
             target.plausibleSweepTarget = false;
-            target.remainingHpPct = Math.max(0, remainingHp);
+            target.wouldSweepIfReached = defeated;
+            target.estimatedTurnsToKo = Number.isFinite(turns) ? turns : undefined;
+            target.remainingHpPct = Math.max(0, hp);
+            target.stoppedReason = defeated
+              ? `This matchup is individually winnable from ${hypotheticalHp.toFixed(1)}% HP after setup, but the actual route is blocked by ${stoppedBySpecies || "the earlier stopper"}`
+              : `This matchup is not won from ${hypotheticalHp.toFixed(1)}% HP after setup, even when considered independently of ${stoppedBySpecies || "the earlier stopper"}`;
             continue;
           }
           const turnsToKo = estimateTurns(target);
